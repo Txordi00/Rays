@@ -1,19 +1,14 @@
 #ifndef USE_CXX20_MODULES
+#else
+import vulkan_hpp;
+#include <vulkan/vulkan_hpp_macros.hpp>
+#endif
 #include "engine.hpp"
 #include "utils.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include <VkBootstrap.h>
 #include <cmath>
 #include <thread>
-#else
-import vulkan_hpp;
-#include "engine.hpp"
-#include <SDL3/SDL_vulkan.h>
-#include <VkBootstrap.h>
-#include <cmath>
-#include <thread>
-#include <vulkan/vulkan_hpp_macros.hpp>
-#endif
 
 Engine::Engine()
 {

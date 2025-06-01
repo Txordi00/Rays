@@ -1,15 +1,12 @@
 #pragma once
 
-#ifndef USE_CXX20_MODULES
+// #ifndef USE_CXX20_MODULES
+// #else
+// import vulkan_hpp;
+// #endif
 #include "types.hpp"
 #include <SDL3/SDL.h>
 #include <vector>
-#else
-import vulkan_hpp;
-#include "types.hpp"
-#include <SDL3/SDL.h>
-#include <vector>
-#endif
 
 struct FrameData
 {

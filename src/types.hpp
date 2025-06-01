@@ -1,11 +1,10 @@
 #pragma once
-#include <iostream>
 #ifndef USE_CXX20_MODULES
 #include <vulkan/vulkan.hpp>
 #else
 import vulkan_hpp;
-#include <iostream>
 #endif
+#include <iostream>
 
 #define VK_CHECK(x) \
     { \
