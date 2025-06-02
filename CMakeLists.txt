@@ -53,6 +53,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE VulkanHppModule)
 target_link_libraries(${PROJECT_NAME} PRIVATE vk-bootstrap::vk-bootstrap)
 # target_compile_definitions(${PROJECT_NAME} PRIVATE USE_CXX20_MODULES)
-target_precompile_headers(${PROJECT_NAME} PRIVATE <vulkan/vulkan.hpp> <vulkan/vulkan_handles.hpp> <vulkan/vulkan_structs.hpp> <vulkan/vulkan_funcs.hpp>)
+# target_precompile_headers(${PROJECT_NAME} PRIVATE <vulkan/vulkan.hpp> <vulkan/vulkan_handles.hpp> <vulkan/vulkan_structs.hpp> <vulkan/vulkan_funcs.hpp>)
 
 # add_dependencies(${PROJECT_NAME} shaders)

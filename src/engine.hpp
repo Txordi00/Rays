@@ -7,6 +7,7 @@
 #include "types.hpp"
 #include <SDL3/SDL.h>
 #include <vector>
+#include <vk_mem_alloc.h>
 
 struct FrameData
 {
@@ -14,6 +15,15 @@ struct FrameData
     vk::CommandBuffer mainCommandBuffer;
     vk::Semaphore swapchainSemaphore, renderSemaphore;
     vk::Fence renderFence;
+};
+
+struct ImageData
+{
+    vk::Image image;
+    vk::ImageView imageView;
+    VmaAllocation allocation;
+    vk::Extent3D extent;
+    vk::Format format;
 };
 
 class Engine
@@ -39,10 +49,14 @@ private:
     //shuts down the engine
     void clean();
 
+    // Functions that init() calls
     void init_vulkan();
-    void init_swapchain();
+    void create_draw_data();
     void init_commands();
     void init_sync_structures();
+
+    // A command that changes the color of the background
+    void change_background(vk::CommandBuffer cmd);
 
     // Strucutres gotten at init time
     vk::Instance instance;
@@ -50,21 +64,27 @@ private:
     vk::PhysicalDevice physicalDevice;
     vk::Device device;
     vk::SurfaceKHR surface;
+    VmaAllocator allocator;
 
     // Swapchain structures and functions
     vk::SwapchainKHR swapchain;
     vk::Format swapchainImageFormat;
-    vk::Extent2D windowExtent;
+    vk::Extent2D swapchainExtent;
     std::vector<vk::Image> swapchainImages;
     std::vector<vk::ImageView> swapchainImageViews;
     void create_swapchain(uint32_t width, uint32_t height);
     void destroy_swapchain();
+
+    // Draw date
+    ImageData imageDraw;
+    // vk::Extent2D imageDrawExtent;
 
     // Commands data
     FrameData frames[FRAME_OVERLAP];
     vk::Queue graphicsQueue;
     uint32_t graphicsQueueFamilyIndex;
 
+    // Other data
     bool isInitialized{false};
     uint64_t frameNumber{0};
     bool stopRendering{false};

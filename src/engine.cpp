@@ -9,6 +9,10 @@ import vulkan_hpp;
 #include <VkBootstrap.h>
 #include <cmath>
 #include <thread>
+#define VMA_IMPLEMENTATION
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+#include <vk_mem_alloc.h>
 
 Engine::Engine()
 {
@@ -23,7 +27,8 @@ void Engine::init()
     window = SDL_CreateWindow(PROJNAME.c_str(), W, H, SDL_WINDOW_VULKAN);
 
     init_vulkan();
-    init_swapchain();
+    create_swapchain(W, H);
+    create_draw_data();
     init_commands();
     init_sync_structures();
 
@@ -46,6 +51,9 @@ void Engine::clean()
         }
         destroy_swapchain();
         instance.destroySurfaceKHR(surface);
+        device.destroyImageView(imageDraw.imageView);
+        vmaDestroyImage(allocator, imageDraw.image, imageDraw.allocation);
+        vmaDestroyAllocator(allocator);
         device.destroy();
         vkb::destroy_debug_utils_messenger(instance, debugMessenger);
         instance.destroy();
@@ -112,15 +120,67 @@ void Engine::init_vulkan()
     vkb::DeviceBuilder deviceBuilder{vkbPhysDev};
     vkb::Device vkbDevice = deviceBuilder.build().value();
     device = vkbDevice.device;
+    // Final step of initialization of the dynamic dispatcher
     VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
 
+    // Load the
     graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     graphicsQueueFamilyIndex = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+    // Initialization of the VMA Allocator
+    VmaVulkanFunctions vulkanFunctions{};
+    vulkanFunctions.vkGetInstanceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr;
+    vulkanFunctions.vkGetDeviceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr;
+    // vulkanFunctions.vkCreateImage = VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateImage;
+
+    VmaAllocatorCreateInfo allocatorInfo{};
+    allocatorInfo.instance = instance;
+    allocatorInfo.physicalDevice = physicalDevice;
+    allocatorInfo.device = device;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    allocatorInfo.pVulkanFunctions = &vulkanFunctions;
+    vmaCreateAllocator(&allocatorInfo, &allocator);
 }
 
-void Engine::init_swapchain()
+void Engine::create_draw_data()
 {
-    create_swapchain(windowExtent.width, windowExtent.height);
+    // Same extent as the window
+    vk::Extent3D drawExtent{swapchainExtent, 1};
+
+    // Overkill format
+    imageDraw.format = vk::Format::eR16G16B16A16Sfloat;
+    imageDraw.extent = drawExtent;
+
+    // Probably have to add Storage and Color Attachment later on
+    vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
+                                         | vk::ImageUsageFlagBits::eTransferSrc
+                                         | vk::ImageUsageFlagBits::eStorage
+                                         | vk::ImageUsageFlagBits::eColorAttachment;
+
+    VkImageCreateInfo imageCreateInfo = static_cast<VkImageCreateInfo>(
+        utils::init::image_create_info(imageDraw.format, drawUsageFlags, drawExtent));
+
+    VmaAllocationCreateInfo allocationCreateInfo{};
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    // allocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VkImage drawImage_c;
+    // Efficiently create and allocate the image with VMA
+    vmaCreateImage(allocator,
+                   &imageCreateInfo,
+                   &allocationCreateInfo,
+                   &drawImage_c,
+                   &imageDraw.allocation,
+                   nullptr);
+
+    imageDraw.image = drawImage_c;
+    // Create the handle vk::ImageView. Not possible to do this with VMA
+    vk::ImageViewCreateInfo imageViewCreateInfo
+        = utils::init::image_view_create_info(imageDraw.format,
+                                              imageDraw.image,
+                                              vk::ImageAspectFlagBits::eColor);
+
+    imageDraw.imageView = device.createImageView(imageViewCreateInfo);
 }
 
 void Engine::init_commands()
@@ -172,7 +232,7 @@ void Engine::create_swapchain(uint32_t width, uint32_t height)
               .build()
               .value();
 
-    windowExtent = vkbSwapchain.extent;
+    swapchainExtent = vkbSwapchain.extent;
     swapchain = vkbSwapchain.swapchain;
     swapchainImageFormat = static_cast<vk::Format>(vkbSwapchain.image_format);
     std::vector<VkImage> swapchainImagesC = vkbSwapchain.get_images().value();
@@ -250,35 +310,42 @@ void Engine::draw()
 
     // We can safely copy command buffers
     vk::CommandBuffer cmd = get_current_frame().mainCommandBuffer;
-    // Thanks to the fence, we are sure now that we can safely reset the commbuff and start recording again.
+    // Thanks to the fence, we are sure now that we can safely reset cmd and start recording again.
     cmd.reset();
+
+    // Record the next set of commands
     vk::CommandBufferBeginInfo commandBufferBeginInfo{};
     commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     cmd.begin(commandBufferBeginInfo);
 
-    //make the swapchain image into writeable mode before rendering
+    // Make the draw image into writeable mode before rendering
+    utils::transition_image(cmd,
+                            imageDraw.image,
+                            vk::ImageLayout::eUndefined,
+                            vk::ImageLayout::eGeneral);
+    // Draw into the draw image
+    change_background(cmd);
+
+    // Transition the draw image to be sent and the swapchain image to receive it
+    utils::transition_image(cmd,
+                            imageDraw.image,
+                            vk::ImageLayout::eGeneral,
+                            vk::ImageLayout::eTransferSrcOptimal);
     utils::transition_image(cmd,
                             swapchainImages[swapchainImageIndex],
                             vk::ImageLayout::eUndefined,
-                            vk::ImageLayout::eGeneral);
+                            vk::ImageLayout::eTransferDstOptimal);
 
-    // Set a flashing clear value
-    vk::ClearColorValue clearValue;
-    float flash = std::abs(std::sin(static_cast<float>(frameNumber) / 90.f));
-    clearValue = {flash, flash, flash, 1.f};
-    vk::ImageSubresourceRange clearRange{};
-    clearRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
-    clearRange.setLevelCount(vk::RemainingMipLevels);
-    clearRange.setLayerCount(vk::RemainingArrayLayers);
-    cmd.clearColorImage(swapchainImages[swapchainImageIndex],
-                        vk::ImageLayout::eGeneral,
-                        clearValue,
-                        clearRange);
+    // Copy draw to swapchain
+    utils::copy_image(cmd,
+                      imageDraw.image,
+                      swapchainImages[swapchainImageIndex],
+                      vk::Extent2D{imageDraw.extent.width, imageDraw.extent.height},
+                      swapchainExtent);
 
-    // Transition to present on screen
     utils::transition_image(cmd,
                             swapchainImages[swapchainImageIndex],
-                            vk::ImageLayout::eGeneral,
+                            vk::ImageLayout::eTransferDstOptimal,
                             vk::ImageLayout::ePresentSrcKHR);
 
     cmd.end();
@@ -321,4 +388,17 @@ void Engine::draw()
     VK_CHECK(resQueuePresent);
 
     frameNumber++;
+}
+
+void Engine::change_background(vk::CommandBuffer cmd)
+{
+    // Set a flashing clear value
+    vk::ClearColorValue clearValue;
+    float flash = std::abs(std::sin(static_cast<float>(frameNumber) / 90.f));
+    clearValue = {flash, flash, flash, 1.f};
+    vk::ImageSubresourceRange clearRange{};
+    clearRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
+    clearRange.setLevelCount(vk::RemainingMipLevels);
+    clearRange.setLayerCount(vk::RemainingArrayLayers);
+    cmd.clearColorImage(imageDraw.image, vk::ImageLayout::eGeneral, clearValue, clearRange);
 }
