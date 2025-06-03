@@ -43,7 +43,7 @@ void Engine::clean()
 {
     if (isInitialized) {
         device.waitIdle();
-        for (int i = 0; i < FRAME_OVERLAP; i++) {
+        for (int i = 0; i < frameOverlap; i++) {
             device.destroyCommandPool(frames[i].commandPool);
             device.destroyFence(frames[i].renderFence);
             device.destroySemaphore(frames[i].renderSemaphore);
@@ -137,7 +137,7 @@ void Engine::init_vulkan()
     allocatorInfo.instance = instance;
     allocatorInfo.physicalDevice = physicalDevice;
     allocatorInfo.device = device;
-    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    // allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     allocatorInfo.pVulkanFunctions = &vulkanFunctions;
     vmaCreateAllocator(&allocatorInfo, &allocator);
 }
@@ -157,29 +157,29 @@ void Engine::create_draw_data()
                                          | vk::ImageUsageFlagBits::eStorage
                                          | vk::ImageUsageFlagBits::eColorAttachment;
 
-    VkImageCreateInfo imageCreateInfo = static_cast<VkImageCreateInfo>(
-        utils::init::image_create_info(imageDraw.format, drawUsageFlags, drawExtent));
+    vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(imageDraw.format,
+                                                                         drawUsageFlags,
+                                                                         drawExtent);
 
     VmaAllocationCreateInfo allocationCreateInfo{};
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     // allocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    VkImage drawImage_c;
+    // VkImage drawImage_c;
     // Efficiently create and allocate the image with VMA
     vmaCreateImage(allocator,
-                   &imageCreateInfo,
+                   (VkImageCreateInfo *) &imageCreateInfo,
                    &allocationCreateInfo,
-                   &drawImage_c,
+                   (VkImage *) &imageDraw.image,
                    &imageDraw.allocation,
                    nullptr);
 
-    imageDraw.image = drawImage_c;
+    // imageDraw.image = drawImage_c;
     // Create the handle vk::ImageView. Not possible to do this with VMA
     vk::ImageViewCreateInfo imageViewCreateInfo
         = utils::init::image_view_create_info(imageDraw.format,
                                               imageDraw.image,
                                               vk::ImageAspectFlagBits::eColor);
-
     imageDraw.imageView = device.createImageView(imageViewCreateInfo);
 }
 
@@ -188,7 +188,7 @@ void Engine::init_commands()
     vk::CommandPoolCreateInfo commandPoolCreateInfo{};
     commandPoolCreateInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
     commandPoolCreateInfo.setQueueFamilyIndex(graphicsQueueFamilyIndex);
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (int i = 0; i < frameOverlap; i++) {
         // Create a command pool per thread
         frames[i].commandPool = device.createCommandPool(commandPoolCreateInfo);
         // Allocate them straight away
@@ -206,7 +206,7 @@ void Engine::init_sync_structures()
     fenceCreateInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
     vk::SemaphoreCreateInfo semaphoreCreateInfo{};
 
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (int i = 0; i < frameOverlap; i++) {
         // gpu->cpu. will force us to wait for the draw commands of a given frame to be finished
         frames[i].renderFence = device.createFence(fenceCreateInfo);
         // gpu->gpu. will control presenting the image to the OS once the drawing finishes
@@ -229,11 +229,14 @@ void Engine::create_swapchain(uint32_t width, uint32_t height)
               .set_desired_format(
                   VkSurfaceFormatKHR{.format = VK_FORMAT_B8G8R8A8_UNORM,
                                      .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+              .set_desired_min_image_count(MINIMUM_FRAME_OVERLAP)
               .build()
               .value();
 
     swapchainExtent = vkbSwapchain.extent;
     swapchain = vkbSwapchain.swapchain;
+
+    // Get the swapchain VkObjects and convert them to vk::Objects
     swapchainImageFormat = static_cast<vk::Format>(vkbSwapchain.image_format);
     std::vector<VkImage> swapchainImagesC = vkbSwapchain.get_images().value();
     swapchainImages.resize(swapchainImagesC.size());
@@ -243,6 +246,10 @@ void Engine::create_swapchain(uint32_t width, uint32_t height)
     swapchainImageViews.resize(swapchainImageViewsC.size());
     for (size_t i = 0; i < swapchainImageViewsC.size(); i++)
         swapchainImageViews[i] = static_cast<vk::ImageView>(swapchainImageViewsC[i]);
+
+    // Select the number of frames that we are going to process per thread
+    frameOverlap = std::max(vkbSwapchain.image_count, MINIMUM_FRAME_OVERLAP);
+    frames.resize(frameOverlap);
 }
 
 void Engine::destroy_swapchain()
@@ -257,8 +264,6 @@ void Engine::destroy_swapchain()
 
 void Engine::run()
 {
-    VK_CHECK(vk::Result::eErrorTooManyObjects);
-
     SDL_Event e;
     bool quit = false;
 
@@ -390,7 +395,7 @@ void Engine::draw()
     frameNumber++;
 }
 
-void Engine::change_background(vk::CommandBuffer cmd)
+void Engine::change_background(vk::CommandBuffer &cmd)
 {
     // Set a flashing clear value
     vk::ClearColorValue clearValue;
@@ -400,5 +405,7 @@ void Engine::change_background(vk::CommandBuffer cmd)
     clearRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
     clearRange.setLevelCount(vk::RemainingMipLevels);
     clearRange.setLayerCount(vk::RemainingArrayLayers);
+    clearRange.setBaseArrayLayer(0);
+    clearRange.setBaseMipLevel(0);
     cmd.clearColorImage(imageDraw.image, vk::ImageLayout::eGeneral, clearValue, clearRange);
 }

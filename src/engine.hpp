@@ -40,7 +40,7 @@ public:
     void run();
 
     // Return frame
-    FrameData &get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
+    FrameData &get_current_frame() { return frames[frameNumber % frameOverlap]; };
 
 private:
     //initializes everything in the engine
@@ -56,7 +56,7 @@ private:
     void init_sync_structures();
 
     // A command that changes the color of the background
-    void change_background(vk::CommandBuffer cmd);
+    void change_background(vk::CommandBuffer &cmd);
 
     // Strucutres gotten at init time
     vk::Instance instance;
@@ -80,7 +80,8 @@ private:
     // vk::Extent2D imageDrawExtent;
 
     // Commands data
-    FrameData frames[FRAME_OVERLAP];
+    std::vector<FrameData> frames;
+    unsigned int frameOverlap;
     vk::Queue graphicsQueue;
     uint32_t graphicsQueueFamilyIndex;
 

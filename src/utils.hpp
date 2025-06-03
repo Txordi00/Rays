@@ -76,6 +76,8 @@ void copy_image(vk::CommandBuffer &cmd,
     blitInfo.setSrcImageLayout(vk::ImageLayout::eTransferSrcOptimal);
     blitInfo.setRegions(blitRegion);
     blitInfo.setFilter(vk::Filter::eLinear);
+
+    cmd.blitImage2(blitInfo);
 }
 
 namespace init {

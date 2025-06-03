@@ -20,7 +20,7 @@ const std::string PROJNAME = "LRT";
 const unsigned int API_VERSION[3] = {1, 3, 0};
 
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
-const unsigned int FRAME_OVERLAP = 2;
+const unsigned int MINIMUM_FRAME_OVERLAP = 3;
 const uint64_t FENCE_TIMEOUT = 1000000000;
 
 #ifdef NDEBUG
