@@ -4,7 +4,6 @@
 // #else
 // import vulkan_hpp;
 // #endif
-#include "types.hpp"
 #include <SDL3/SDL.h>
 #include <vector>
 #include <vk_mem_alloc.h>
@@ -65,6 +64,7 @@ private:
     vk::Device device;
     vk::SurfaceKHR surface;
     VmaAllocator allocator;
+    vk::PhysicalDeviceProperties physicalDeviceProperties;
 
     // Swapchain structures and functions
     vk::SwapchainKHR swapchain;

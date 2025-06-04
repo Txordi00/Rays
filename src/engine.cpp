@@ -3,7 +3,9 @@
 import vulkan_hpp;
 #include <vulkan/vulkan_hpp_macros.hpp>
 #endif
+
 #include "engine.hpp"
+#include "types.hpp"
 #include "utils.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include <VkBootstrap.h>
@@ -115,6 +117,7 @@ void Engine::init_vulkan()
               .select()
               .value();
     physicalDevice = vkbPhysDev.physical_device;
+    physicalDeviceProperties = vkbPhysDev.properties;
 
     // Create the vulkan logical device
     vkb::DeviceBuilder deviceBuilder{vkbPhysDev};
@@ -165,7 +168,6 @@ void Engine::create_draw_data()
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     // allocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    // VkImage drawImage_c;
     // Efficiently create and allocate the image with VMA
     vmaCreateImage(allocator,
                    (VkImageCreateInfo *) &imageCreateInfo,
