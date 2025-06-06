@@ -4,7 +4,9 @@
 // #else
 // import vulkan_hpp;
 // #endif
+#include "descriptors.hpp"
 #include <SDL3/SDL.h>
+#include <memory>
 #include <vector>
 #include <vk_mem_alloc.h>
 
@@ -84,6 +86,18 @@ private:
     unsigned int frameOverlap;
     vk::Queue graphicsQueue;
     uint32_t graphicsQueueFamilyIndex;
+
+    // Descriptors data and functions
+    std::unique_ptr<DescriptorPool> descriptorPool;
+    vk::DescriptorSet drawImageDescriptors;
+    DescriptorSetData drawImageDescriptorsData;
+    void init_descriptors();
+
+    // Pipelines
+    void init_pipelines();
+    void init_background_compute_pipeline();
+    vk::Pipeline backgroundComputePipeline;
+    vk::PipelineLayout backgroundComputePipelineLayout;
 
     // Other data
     bool isInitialized{false};

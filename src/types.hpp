@@ -23,6 +23,8 @@ const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
 const unsigned int MINIMUM_FRAME_OVERLAP = 3;
 const uint64_t FENCE_TIMEOUT = 1000000000;
 
+const std::string GRADIENT_COMP_SHADER_FP = "shaders/gradient.comp.spv";
+
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else

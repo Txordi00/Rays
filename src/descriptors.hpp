@@ -21,7 +21,7 @@ private:
     vk::DescriptorSetLayout layout;
 };
 
-struct DescriptorData
+struct DescriptorSetData
 {
     vk::DescriptorSetLayout layout;
     vk::DescriptorType type;
@@ -32,15 +32,19 @@ class DescriptorPool
 {
 public:
     DescriptorPool(const vk::Device &device,
-                   const std::vector<DescriptorData> &descriptorSets,
+                   const std::vector<DescriptorSetData> &descriptorSets,
                    const uint32_t maxSets);
-    ~DescriptorPool();
+    ~DescriptorPool() = default;
     vk::DescriptorPool create(const vk::DescriptorPoolCreateFlags &descriptorPoolCreateFlags);
+    std::vector<vk::DescriptorSet> allocate_descriptors(const std::vector<unsigned int> &indexes);
     void reset();
+    void destroyPool();
+
+    vk::DescriptorPool getPool() const { return pool; }
 
 private:
     vk::Device device;
-    std::vector<DescriptorData> descriptors;
+    std::vector<DescriptorSetData> descriptorSets;
     uint32_t maxSets;
     vk::DescriptorPool pool;
 };

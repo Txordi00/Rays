@@ -10,6 +10,7 @@ import vulkan_hpp;
 #include <SDL3/SDL_vulkan.h>
 #include <VkBootstrap.h>
 #include <cmath>
+#include <memory>
 #include <thread>
 #define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
@@ -33,6 +34,8 @@ void Engine::init()
     create_draw_data();
     init_commands();
     init_sync_structures();
+    init_descriptors();
+    init_pipelines();
 
     isInitialized = true;
 }
@@ -45,6 +48,11 @@ void Engine::clean()
 {
     if (isInitialized) {
         device.waitIdle();
+        device.destroyPipelineLayout(backgroundComputePipelineLayout);
+        device.destroyPipeline(backgroundComputePipeline);
+        descriptorPool->destroyPool();
+        device.destroyDescriptorSetLayout(drawImageDescriptorsData.layout);
+
         for (int i = 0; i < frameOverlap; i++) {
             device.destroyCommandPool(frames[i].commandPool);
             device.destroyFence(frames[i].renderFence);
@@ -264,6 +272,79 @@ void Engine::destroy_swapchain()
     swapchainImages.clear();
 }
 
+void Engine::init_descriptors()
+{
+    // Set the descriptor set properties for the gradient compute shader layout
+    vk::DescriptorType drawImageDescriptorSetType = vk::DescriptorType::eStorageImage;
+    DescriptorSetLayout drawImageDescSetLayout{device};
+    vk::DescriptorSetLayoutBinding binding{};
+    binding.setBinding(0);
+    binding.setDescriptorType(drawImageDescriptorSetType);
+    binding.setStageFlags(vk::ShaderStageFlagBits::eCompute);
+    drawImageDescSetLayout.add_binding(binding);
+
+    vk::DescriptorSetLayoutCreateFlags descSetLayoutCreateFlags{};
+
+    drawImageDescriptorsData.layout = drawImageDescSetLayout.get_descriptor_set(
+        descSetLayoutCreateFlags);
+    drawImageDescriptorsData.type = drawImageDescriptorSetType;
+    drawImageDescriptorsData.descriptorCount = 10;
+
+    // I need to play with the maxSets parameter!
+    descriptorPool = std::make_unique<DescriptorPool>(device,
+                                                      std::vector<DescriptorSetData>{
+                                                          drawImageDescriptorsData},
+                                                      10);
+    vk::DescriptorPoolCreateFlags descriptorPoolCreateFlags{};
+    descriptorPool->create(descriptorPoolCreateFlags);
+
+    drawImageDescriptors = descriptorPool->allocate_descriptors({0})[0];
+
+    vk::DescriptorImageInfo imageInfo{};
+    imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
+    imageInfo.setImageView(imageDraw.imageView);
+
+    vk::WriteDescriptorSet descriptorImageDrawWrite{};
+    descriptorImageDrawWrite.setDstBinding(0);
+    descriptorImageDrawWrite.setImageInfo(imageInfo);
+    descriptorImageDrawWrite.setDescriptorType(drawImageDescriptorsData.type);
+    descriptorImageDrawWrite.setDescriptorCount(1);
+    descriptorImageDrawWrite.setDstSet(drawImageDescriptors);
+
+    device.updateDescriptorSets(descriptorImageDrawWrite, nullptr);
+
+    // device.updateDescriptorSets()
+}
+
+void Engine::init_pipelines()
+{
+    init_background_compute_pipeline();
+}
+
+void Engine::init_background_compute_pipeline()
+{
+    vk::PipelineLayoutCreateInfo backgroundComputeLayoutCreateInfo{};
+    backgroundComputeLayoutCreateInfo.setSetLayouts(drawImageDescriptorsData.layout);
+    backgroundComputePipelineLayout = device.createPipelineLayout(backgroundComputeLayoutCreateInfo);
+
+    vk::ShaderModule backgroundComputeShader = utils::load_shader(device, GRADIENT_COMP_SHADER_FP);
+
+    vk::PipelineShaderStageCreateInfo backgroundComputeStageCreate{};
+    backgroundComputeStageCreate.setModule(backgroundComputeShader);
+    backgroundComputeStageCreate.setPName("main");
+    backgroundComputeStageCreate.setStage(vk::ShaderStageFlagBits::eCompute);
+
+    vk::ComputePipelineCreateInfo backgroundComputePipelineCreate{};
+    backgroundComputePipelineCreate.setLayout(backgroundComputePipelineLayout);
+    backgroundComputePipelineCreate.setStage(backgroundComputeStageCreate);
+
+    auto [res, val] = device.createComputePipeline(nullptr, backgroundComputePipelineCreate);
+    VK_CHECK(res);
+    backgroundComputePipeline = val;
+
+    device.destroyShaderModule(backgroundComputeShader);
+}
+
 void Engine::run()
 {
     SDL_Event e;
@@ -399,15 +480,31 @@ void Engine::draw()
 
 void Engine::change_background(vk::CommandBuffer &cmd)
 {
-    // Set a flashing clear value
-    vk::ClearColorValue clearValue;
-    float flash = std::abs(std::sin(static_cast<float>(frameNumber) / 90.f));
-    clearValue = {flash, flash, flash, 1.f};
-    vk::ImageSubresourceRange clearRange{};
-    clearRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
-    clearRange.setLevelCount(vk::RemainingMipLevels);
-    clearRange.setLayerCount(vk::RemainingArrayLayers);
-    clearRange.setBaseArrayLayer(0);
-    clearRange.setBaseMipLevel(0);
-    cmd.clearColorImage(imageDraw.image, vk::ImageLayout::eGeneral, clearValue, clearRange);
+    // // Set a flashing clear value
+    // vk::ClearColorValue clearValue;
+    // float flash = std::abs(std::sin(static_cast<float>(frameNumber) / 90.f));
+    // clearValue = {flash, flash, flash, 1.f};
+    // vk::ImageSubresourceRange clearRange{};
+    // clearRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
+    // clearRange.setLevelCount(vk::RemainingMipLevels);
+    // clearRange.setLayerCount(vk::RemainingArrayLayers);
+    // clearRange.setBaseArrayLayer(0);
+    // clearRange.setBaseMipLevel(0);
+    // cmd.clearColorImage(imageDraw.image, vk::ImageLayout::eGeneral, clearValue, clearRange);
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, backgroundComputePipeline);
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                           backgroundComputePipelineLayout,
+                           0,
+                           drawImageDescriptors,
+                           nullptr);
+    cmd.dispatch(std::ceil(imageDraw.extent.width / 16.f),
+                 std::ceil(imageDraw.extent.height / 16.f),
+                 1);
+
+    // void bindDescriptorSets( VULKAN_HPP_NAMESPACE::PipelineBindPoint                                             pipelineBindPoint,
+    //                    VULKAN_HPP_NAMESPACE::PipelineLayout                                                layout,
+    //                    uint32_t                                                                            firstSet,
+    //                    VULKAN_HPP_NAMESPACE::ArrayProxy<const VULKAN_HPP_NAMESPACE::DescriptorSet> const & descriptorSets,
+    //                    VULKAN_HPP_NAMESPACE::ArrayProxy<const uint32_t> const &                            dynamicOffsets,
+    //                    Dispatch const & d VULKAN_HPP_DEFAULT_DISPATCHER_ASSIGNMENT ) const VULKAN_HPP_NOEXCEPT;
 }

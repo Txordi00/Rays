@@ -1,12 +1,13 @@
 #pragma once
 
-// #include <deque>
-// #include <functional>
 #ifndef USE_CXX20_MODULES
 #include <vulkan/vulkan.hpp>
 #else
 import vulkan_hpp;
 #endif
+
+#include <fstream>
+#include <iostream>
 
 namespace utils {
 void transition_image(vk::CommandBuffer &cmd,
@@ -78,6 +79,38 @@ void copy_image(vk::CommandBuffer &cmd,
     blitInfo.setFilter(vk::Filter::eLinear);
 
     cmd.blitImage2(blitInfo);
+}
+
+vk::ShaderModule load_shader(const vk::Device &device, const std::string filePath)
+{
+    // open the file. With cursor at the end
+    std::ifstream file(filePath, std::ifstream::ate | std::ifstream::binary);
+
+    if (!file.is_open())
+        throw std::runtime_error("Shader binary " + filePath + " could not be opened");
+
+    // find what the size of the file is by looking up the location of the cursor
+    // because the cursor is at the end, it gives the size directly in bytes
+    size_t fileSize = static_cast<size_t>(file.tellg());
+
+    // spirv expects the buffer to be on uint32, so make sure to reserve a int
+    // vector big enough for the entire file
+    std::vector<uint32_t> code(fileSize / sizeof(uint32_t));
+
+    // put file cursor at beginning
+    file.seekg(0);
+
+    // load the entire file into the buffer
+    file.read((char *) code.data(), fileSize);
+
+    // now that the file is loaded into the buffer, we can close it
+    file.close();
+
+    // Create the shader module in the device and return it
+    vk::ShaderModuleCreateInfo shaderModuleCreateInfo{};
+    shaderModuleCreateInfo.setCode(code);
+
+    return device.createShaderModule(shaderModuleCreateInfo);
 }
 
 namespace init {
