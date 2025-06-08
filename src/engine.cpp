@@ -281,11 +281,11 @@ void Engine::init_descriptors()
     binding.setBinding(0);
     binding.setDescriptorType(drawImageDescriptorSetType);
     binding.setStageFlags(vk::ShaderStageFlagBits::eCompute);
+    binding.setDescriptorCount(1);
     drawImageDescSetLayout.add_binding(binding);
 
     vk::DescriptorSetLayoutCreateFlags descSetLayoutCreateFlags{};
-
-    drawImageDescriptorsData.layout = drawImageDescSetLayout.get_descriptor_set(
+    drawImageDescriptorsData.layout = drawImageDescSetLayout.get_descriptor_set_layout(
         descSetLayoutCreateFlags);
     drawImageDescriptorsData.type = drawImageDescriptorSetType;
     drawImageDescriptorsData.descriptorCount = 10;
@@ -294,7 +294,7 @@ void Engine::init_descriptors()
     descriptorPool = std::make_unique<DescriptorPool>(device,
                                                       std::vector<DescriptorSetData>{
                                                           drawImageDescriptorsData},
-                                                      10);
+                                                      9);
     vk::DescriptorPoolCreateFlags descriptorPoolCreateFlags{};
     descriptorPool->create(descriptorPoolCreateFlags);
 
@@ -312,8 +312,6 @@ void Engine::init_descriptors()
     descriptorImageDrawWrite.setDstSet(drawImageDescriptors);
 
     device.updateDescriptorSets(descriptorImageDrawWrite, nullptr);
-
-    // device.updateDescriptorSets()
 }
 
 void Engine::init_pipelines()
@@ -338,9 +336,14 @@ void Engine::init_background_compute_pipeline()
     backgroundComputePipelineCreate.setLayout(backgroundComputePipelineLayout);
     backgroundComputePipelineCreate.setStage(backgroundComputeStageCreate);
 
+    // try {
+    // auto [res, val] = device.createComputePipeline(nullptr, backgroundComputePipelineCreate);
     auto [res, val] = device.createComputePipeline(nullptr, backgroundComputePipelineCreate);
     VK_CHECK(res);
     backgroundComputePipeline = val;
+    // } catch (std::exception const &e) {
+    //     std::cerr << "\033[1;33m" << "Vulkan exception: " << e.what() << "\033[0m" << std::endl;
+    // }
 
     device.destroyShaderModule(backgroundComputeShader);
 }

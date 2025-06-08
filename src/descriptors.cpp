@@ -9,7 +9,7 @@ void DescriptorSetLayout::add_binding(vk::DescriptorSetLayoutBinding binding)
     bindings.push_back(binding);
 }
 
-vk::DescriptorSetLayout DescriptorSetLayout::get_descriptor_set(
+vk::DescriptorSetLayout DescriptorSetLayout::get_descriptor_set_layout(
     vk::DescriptorSetLayoutCreateFlags descriptorSetLayoutCreateFlags)
 {
     assert(bindings.size() > 0);

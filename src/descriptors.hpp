@@ -11,7 +11,7 @@ public:
     DescriptorSetLayout(const vk::Device &device);
     ~DescriptorSetLayout() = default;
     void add_binding(vk::DescriptorSetLayoutBinding binding);
-    vk::DescriptorSetLayout get_descriptor_set(
+    vk::DescriptorSetLayout get_descriptor_set_layout(
         vk::DescriptorSetLayoutCreateFlags descriptorSetLayoutCreateFlags);
     void reset();
 
