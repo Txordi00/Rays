@@ -257,10 +257,17 @@ void Engine::init_imgui()
 
     vk::DescriptorPoolCreateInfo poolInfo{};
     poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-    poolInfo.setMaxSets(1000);
+    unsigned int maxSets = 0;
+    for (vk::DescriptorPoolSize &poolSize : poolSizes)
+        maxSets += poolSize.descriptorCount;
+    poolInfo.setMaxSets(maxSets);
     poolInfo.setPoolSizes(poolSizes);
 
-    imguiPool = device.createDescriptorPool(poolInfo);
+    try {
+        imguiPool = device.createDescriptorPool(poolInfo);
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
