@@ -238,18 +238,22 @@ void Engine::init_imgui()
     // 1: create descriptor pool for IMGUI
     //  the size of the pool is very oversize, but it's copied from imgui demo
     //  itself.
-    std::vector<vk::DescriptorPoolSize> poolSizes
-        = {{vk::DescriptorType::eSampler, 1000},
-           {vk::DescriptorType::eCombinedImageSampler, 1000},
-           {vk::DescriptorType::eSampledImage, 1000},
-           {vk::DescriptorType::eStorageImage, 1000},
-           {vk::DescriptorType::eUniformTexelBuffer, 1000},
-           {vk::DescriptorType::eStorageTexelBuffer, 1000},
-           {vk::DescriptorType::eUniformBuffer, 1000},
-           {vk::DescriptorType::eStorageBuffer, 1000},
-           {vk::DescriptorType::eUniformBufferDynamic, 1000},
-           {vk::DescriptorType::eStorageBufferDynamic, 1000},
-           {vk::DescriptorType::eInputAttachment, 1000}};
+    std::vector<vk::DescriptorPoolSize> poolSizes = {
+        {vk::DescriptorType::eCombinedImageSampler,
+         IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE},
+    };
+    // std::vector<vk::DescriptorPoolSize> poolSizes
+    //     = {{vk::DescriptorType::eSampler, 1000},
+    //        {vk::DescriptorType::eCombinedImageSampler, 1000},
+    //        {vk::DescriptorType::eSampledImage, 1000},
+    //        {vk::DescriptorType::eStorageImage, 1000},
+    //        {vk::DescriptorType::eUniformTexelBuffer, 1000},
+    //        {vk::DescriptorType::eStorageTexelBuffer, 1000},
+    //        {vk::DescriptorType::eUniformBuffer, 1000},
+    //        {vk::DescriptorType::eStorageBuffer, 1000},
+    //        {vk::DescriptorType::eUniformBufferDynamic, 1000},
+    //        {vk::DescriptorType::eStorageBufferDynamic, 1000},
+    //        {vk::DescriptorType::eInputAttachment, 1000}};
 
     vk::DescriptorPoolCreateInfo poolInfo{};
     poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
@@ -286,7 +290,7 @@ void Engine::init_imgui()
 
     ImGui_ImplVulkan_Init(&initInfo);
 
-    ImGui_ImplVulkan_CreateFontsTexture();
+    // ImGui_ImplVulkan_CreateFontsTexture();
 }
 
 void Engine::create_swapchain(uint32_t width, uint32_t height)
