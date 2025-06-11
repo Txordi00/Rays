@@ -4,9 +4,10 @@
 #else
 import vulkan_hpp;
 #endif
+#include <exception>
 #include <iostream>
 
-#define VK_CHECK(x) \
+#define VK_CHECK_RES(x) \
     { \
         vk::Result res = static_cast<vk::Result>(x); \
         if (res != vk::Result::eSuccess) { \
@@ -15,16 +16,23 @@ import vulkan_hpp;
         } \
     }
 
-// IT DOES NOT WORK YET
-#define VK_CHECK_E(x) \
+// To be used inside the catch part of a try and catch statement
+#define VK_CHECK_EXC(exception) \
     { \
-        try { \
-            x; \
-        } catch (const std::exception &e) { \
-            std::cerr << "\033[1;33m" << "Vulkan exception: " << e.what() << "\033[0m" \
-                      << std::endl; \
-        } \
+        std::cerr << "\033[1;33m" << "Vulkan exception: " << exception.what() << "\033[0m" \
+                  << std::endl; \
+        std::exit(EXIT_FAILURE); \
     }
+
+// #define VK_CHECK_E(x) \
+//     { \
+//         try { \
+//             x; \
+//         } catch (const std::exception &e) { \
+//             std::cerr << "\033[1;33m" << "Vulkan exception: " << e.what() << "\033[0m" \
+//                       << std::endl; \
+//         } \
+//     }
 
 std::exception e;
 

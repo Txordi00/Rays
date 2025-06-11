@@ -41,7 +41,7 @@ public:
     void run();
 
     // Return frame
-    FrameData &get_current_frame() { return frames[frameNumber % frameOverlap]; };
+    FrameData &get_current_frame() { return frames[frameNumber % frameOverlap]; }
 
 private:
     //initializes everything in the engine
@@ -55,6 +55,7 @@ private:
     void create_draw_data();
     void init_commands();
     void init_sync_structures();
+    void init_imgui();
 
     // A command that changes the color of the background
     void change_background(vk::CommandBuffer &cmd);
@@ -98,6 +99,10 @@ private:
     void init_background_compute_pipeline();
     vk::Pipeline backgroundComputePipeline;
     vk::PipelineLayout backgroundComputePipelineLayout;
+
+    // Imgui data
+    vk::DescriptorPool imguiPool;
+    void draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView);
 
     // Other data
     bool isInitialized{false};

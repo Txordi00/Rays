@@ -15,6 +15,9 @@ import vulkan_hpp;
 #define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_sdl3.h>
+#include <imgui/imgui_impl_vulkan.h>
 #include <vk_mem_alloc.h>
 
 Engine::Engine()
@@ -36,6 +39,7 @@ void Engine::init()
     init_sync_structures();
     init_descriptors();
     init_pipelines();
+    init_imgui();
 
     isInitialized = true;
 }
@@ -48,6 +52,9 @@ void Engine::clean()
 {
     if (isInitialized) {
         device.waitIdle();
+
+        ImGui_ImplVulkan_Shutdown();
+        device.destroyDescriptorPool(imguiPool);
         device.destroyPipelineLayout(backgroundComputePipelineLayout);
         device.destroyPipeline(backgroundComputePipeline);
         descriptorPool->destroyPool();
@@ -226,6 +233,62 @@ void Engine::init_sync_structures()
     }
 }
 
+void Engine::init_imgui()
+{
+    // 1: create descriptor pool for IMGUI
+    //  the size of the pool is very oversize, but it's copied from imgui demo
+    //  itself.
+    std::vector<vk::DescriptorPoolSize> poolSizes
+        = {{vk::DescriptorType::eSampler, 1000},
+           {vk::DescriptorType::eCombinedImageSampler, 1000},
+           {vk::DescriptorType::eSampledImage, 1000},
+           {vk::DescriptorType::eStorageImage, 1000},
+           {vk::DescriptorType::eUniformTexelBuffer, 1000},
+           {vk::DescriptorType::eStorageTexelBuffer, 1000},
+           {vk::DescriptorType::eUniformBuffer, 1000},
+           {vk::DescriptorType::eStorageBuffer, 1000},
+           {vk::DescriptorType::eUniformBufferDynamic, 1000},
+           {vk::DescriptorType::eStorageBufferDynamic, 1000},
+           {vk::DescriptorType::eInputAttachment, 1000}};
+
+    vk::DescriptorPoolCreateInfo poolInfo{};
+    poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
+    poolInfo.setMaxSets(1000);
+    poolInfo.setPoolSizes(poolSizes);
+
+    imguiPool = device.createDescriptorPool(poolInfo);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void) io;
+    ImGui_ImplSDL3_InitForVulkan(window);
+
+    // this initializes imgui for Vulkan
+    ImGui_ImplVulkan_InitInfo initInfo{};
+    initInfo.Instance = instance;
+    initInfo.PhysicalDevice = physicalDevice;
+    initInfo.Device = device;
+    initInfo.Queue = graphicsQueue;
+    initInfo.DescriptorPool = imguiPool;
+    initInfo.MinImageCount = MINIMUM_FRAME_OVERLAP;
+    initInfo.ImageCount = frameOverlap;
+    initInfo.UseDynamicRendering = true;
+
+    //dynamic rendering parameters for imgui to use
+    initInfo.PipelineRenderingCreateInfo
+        = VkPipelineRenderingCreateInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                                        .pNext = nullptr};
+    initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = (VkFormat *) &swapchainImageFormat;
+
+    initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+    ImGui_ImplVulkan_Init(&initInfo);
+
+    ImGui_ImplVulkan_CreateFontsTexture();
+}
+
 void Engine::create_swapchain(uint32_t width, uint32_t height)
 {
     vkb::SwapchainBuilder swapchainBuilder(physicalDevice, device, surface);
@@ -336,14 +399,15 @@ void Engine::init_background_compute_pipeline()
     backgroundComputePipelineCreate.setLayout(backgroundComputePipelineLayout);
     backgroundComputePipelineCreate.setStage(backgroundComputeStageCreate);
 
-    // try {
-    // auto [res, val] = device.createComputePipeline(nullptr, backgroundComputePipelineCreate);
-    auto [res, val] = device.createComputePipeline(nullptr, backgroundComputePipelineCreate);
-    VK_CHECK(res);
-    backgroundComputePipeline = val;
-    // } catch (std::exception const &e) {
-    //     std::cerr << "\033[1;33m" << "Vulkan exception: " << e.what() << "\033[0m" << std::endl;
-    // }
+    vk::Result res;
+    vk::Pipeline val;
+    try {
+        std::tie(res, val) = device.createComputePipeline(nullptr, backgroundComputePipelineCreate);
+        backgroundComputePipeline = val;
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
+    VK_CHECK_RES(res);
 
     device.destroyShaderModule(backgroundComputeShader);
 }
@@ -367,12 +431,24 @@ void Engine::run()
             case SDL_EVENT_WINDOW_RESTORED:
                 stopRendering = false;
             }
+            //send SDL event to imgui for handling
+            ImGui_ImplSDL3_ProcessEvent(&e);
         }
         // Do not draw and throttle if we are minimized
         if (stopRendering) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
+        // imgui new frame
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        //some imgui UI to test
+        ImGui::ShowDemoWindow();
+
+        //make imgui calculate internal draw structures
+        ImGui::Render();
         // Draw if not minimized
         draw();
     }
@@ -385,7 +461,7 @@ void Engine::draw()
     auto resWaitFences = device.waitForFences(get_current_frame().renderFence,
                                               vk::True,
                                               FENCE_TIMEOUT);
-    VK_CHECK(resWaitFences);
+    VK_CHECK_RES(resWaitFences);
     device.resetFences(get_current_frame().renderFence);
 
     // Request image from the swapchain
@@ -397,7 +473,7 @@ void Engine::draw()
     acquireImageInfo.setDeviceMask(1); // First and only device in the group
 
     auto [resNextImage, swapchainImageIndex] = device.acquireNextImage2KHR(acquireImageInfo);
-    VK_CHECK(resNextImage);
+    VK_CHECK_RES(resNextImage);
 
     // We can safely copy command buffers
     vk::CommandBuffer cmd = get_current_frame().mainCommandBuffer;
@@ -437,6 +513,13 @@ void Engine::draw()
     utils::transition_image(cmd,
                             swapchainImages[swapchainImageIndex],
                             vk::ImageLayout::eTransferDstOptimal,
+                            vk::ImageLayout::eColorAttachmentOptimal);
+
+    draw_imgui(cmd, swapchainImageViews[swapchainImageIndex]);
+
+    utils::transition_image(cmd,
+                            swapchainImages[swapchainImageIndex],
+                            vk::ImageLayout::eColorAttachmentOptimal,
                             vk::ImageLayout::ePresentSrcKHR);
 
     cmd.end();
@@ -476,38 +559,41 @@ void Engine::draw()
     presentInfo.setImageIndices(swapchainImageIndex);
 
     auto resQueuePresent = graphicsQueue.presentKHR(&presentInfo);
-    VK_CHECK(resQueuePresent);
+    VK_CHECK_RES(resQueuePresent);
 
     frameNumber++;
 }
 
 void Engine::change_background(vk::CommandBuffer &cmd)
 {
-    // // Set a flashing clear value
-    // vk::ClearColorValue clearValue;
-    // float flash = std::abs(std::sin(static_cast<float>(frameNumber) / 90.f));
-    // clearValue = {flash, flash, flash, 1.f};
-    // vk::ImageSubresourceRange clearRange{};
-    // clearRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
-    // clearRange.setLevelCount(vk::RemainingMipLevels);
-    // clearRange.setLayerCount(vk::RemainingArrayLayers);
-    // clearRange.setBaseArrayLayer(0);
-    // clearRange.setBaseMipLevel(0);
-    // cmd.clearColorImage(imageDraw.image, vk::ImageLayout::eGeneral, clearValue, clearRange);
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, backgroundComputePipeline);
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                            backgroundComputePipelineLayout,
                            0,
                            drawImageDescriptors,
                            nullptr);
-    cmd.dispatch(std::ceil(imageDraw.extent.width / 16.f),
-                 std::ceil(imageDraw.extent.height / 16.f),
+    cmd.dispatch(std::ceil(imageDraw.extent.width / 32.f),
+                 std::ceil(imageDraw.extent.height / 32.f),
                  1);
+    // cmd.dispatch(20, 10, 1);
+}
 
-    // void bindDescriptorSets( VULKAN_HPP_NAMESPACE::PipelineBindPoint                                             pipelineBindPoint,
-    //                    VULKAN_HPP_NAMESPACE::PipelineLayout                                                layout,
-    //                    uint32_t                                                                            firstSet,
-    //                    VULKAN_HPP_NAMESPACE::ArrayProxy<const VULKAN_HPP_NAMESPACE::DescriptorSet> const & descriptorSets,
-    //                    VULKAN_HPP_NAMESPACE::ArrayProxy<const uint32_t> const &                            dynamicOffsets,
-    //                    Dispatch const & d VULKAN_HPP_DEFAULT_DISPATCHER_ASSIGNMENT ) const VULKAN_HPP_NOEXCEPT;
+void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView)
+{
+    vk::RenderingAttachmentInfo colorAttachmentInfo{};
+    colorAttachmentInfo.setImageView(imageView);
+    colorAttachmentInfo.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
+    colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
+    colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
+
+    vk::RenderingInfo renderInfo{};
+    renderInfo.setColorAttachments(colorAttachmentInfo);
+    renderInfo.setLayerCount(1);
+    renderInfo.setRenderArea(vk::Rect2D{vk::Offset2D{0, 0}, swapchainExtent});
+
+    cmd.beginRendering(renderInfo);
+
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
+    cmd.endRendering();
 }

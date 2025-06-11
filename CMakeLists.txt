@@ -34,6 +34,11 @@ endif()
 find_package(glm CONFIG REQUIRED)
 # SDL3
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+# ImGui
+add_library(imgui STATIC "include/imgui/imgui.cpp" "include/imgui/imgui_demo.cpp"
+  "include/imgui/imgui_draw.cpp" "include/imgui/imgui_tables.cpp" "include/imgui/imgui_widgets.cpp"
+  "include/imgui/imgui_impl_sdl3.cpp" "include/imgui/imgui_impl_vulkan.cpp")
+target_link_libraries(imgui PRIVATE Vulkan::Vulkan)
 
 # Vk-bootstrap
 include(FetchContent)
@@ -54,6 +59,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE "include")
 target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE vk-bootstrap::vk-bootstrap)
+target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 
 # Link either vulkan either the vulkan_hpp module
 if(USE_VULKANHPP_CPP20_MODULE)
