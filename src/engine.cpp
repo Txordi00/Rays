@@ -395,11 +395,18 @@ void Engine::init_pipelines()
 
 void Engine::init_background_compute_pipeline()
 {
+    vk::PushConstantRange pushColors{};
+    pushColors.setOffset(0);
+    pushColors.setSize(sizeof(GradientColorPush));
+    pushColors.setStageFlags(vk::ShaderStageFlagBits::eCompute);
+
     vk::PipelineLayoutCreateInfo backgroundComputeLayoutCreateInfo{};
     backgroundComputeLayoutCreateInfo.setSetLayouts(drawImageDescriptorsData.layout);
+    backgroundComputeLayoutCreateInfo.setPushConstantRanges(pushColors);
     backgroundComputePipelineLayout = device.createPipelineLayout(backgroundComputeLayoutCreateInfo);
 
-    vk::ShaderModule backgroundComputeShader = utils::load_shader(device, GRADIENT_COMP_SHADER_FP);
+    vk::ShaderModule backgroundComputeShader = utils::load_shader(device,
+                                                                  GRADIENT_COLOR_COMP_SHADER_FP);
 
     vk::PipelineShaderStageCreateInfo backgroundComputeStageCreate{};
     backgroundComputeStageCreate.setModule(backgroundComputeShader);
@@ -577,14 +584,23 @@ void Engine::draw()
 
 void Engine::change_background(vk::CommandBuffer &cmd)
 {
+    GradientColorPush pushConstants;
+    pushConstants.colorUp = glm::vec4(1, 0, 0, 1);
+    pushConstants.colorDown = glm::vec4(0, 1, 0, 1);
+
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, backgroundComputePipeline);
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                            backgroundComputePipelineLayout,
                            0,
                            drawImageDescriptors,
                            nullptr);
-    cmd.dispatch(std::ceil(imageDraw.extent.width / 32.f),
-                 std::ceil(imageDraw.extent.height / 32.f),
+    cmd.pushConstants(backgroundComputePipelineLayout,
+                      vk::ShaderStageFlagBits::eCompute,
+                      0,
+                      sizeof(GradientColorPush),
+                      &pushConstants);
+    cmd.dispatch(std::ceil(imageDraw.extent.width / 16.f),
+                 std::ceil(imageDraw.extent.height / 16.f),
                  1);
     // cmd.dispatch(20, 10, 1);
 }

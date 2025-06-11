@@ -6,6 +6,7 @@
 // #endif
 #include "descriptors.hpp"
 #include <SDL3/SDL.h>
+#include <glm/glm.hpp>
 #include <memory>
 #include <vector>
 #include <vk_mem_alloc.h>
@@ -25,6 +26,12 @@ struct ImageData
     VmaAllocation allocation;
     vk::Extent3D extent;
     vk::Format format;
+};
+
+struct GradientColorPush
+{
+    glm::vec4 colorUp;
+    glm::vec4 colorDown;
 };
 
 class Engine
