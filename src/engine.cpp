@@ -55,8 +55,10 @@ void Engine::clean()
 
         ImGui_ImplVulkan_Shutdown();
         device.destroyDescriptorPool(imguiPool);
-        device.destroyPipelineLayout(backgroundComputePipelineLayout);
-        device.destroyPipeline(backgroundComputePipeline);
+        for (int i = 0; i < pipelines.size(); i++) {
+            device.destroyPipelineLayout(pipelines[i].pipelineLayout);
+            device.destroyPipeline(pipelines[i].pipeline);
+        }
         descriptorPool->destroyPool();
         device.destroyDescriptorSetLayout(drawImageDescriptorsData.layout);
 
@@ -395,39 +397,87 @@ void Engine::init_pipelines()
 
 void Engine::init_background_compute_pipeline()
 {
+    pipelines.resize(2);
+
+    pipelines[0].name = "gradientcolor";
+
     vk::PushConstantRange pushColors{};
     pushColors.setOffset(0);
     pushColors.setSize(sizeof(GradientColorPush));
     pushColors.setStageFlags(vk::ShaderStageFlagBits::eCompute);
 
-    vk::PipelineLayoutCreateInfo backgroundComputeLayoutCreateInfo{};
-    backgroundComputeLayoutCreateInfo.setSetLayouts(drawImageDescriptorsData.layout);
-    backgroundComputeLayoutCreateInfo.setPushConstantRanges(pushColors);
-    backgroundComputePipelineLayout = device.createPipelineLayout(backgroundComputeLayoutCreateInfo);
+    vk::PipelineLayoutCreateInfo gradColorComputeLayoutCreateInfo{};
+    gradColorComputeLayoutCreateInfo.setSetLayouts(drawImageDescriptorsData.layout);
+    gradColorComputeLayoutCreateInfo.setPushConstantRanges(pushColors);
+    pipelines[0].pipelineLayout = device.createPipelineLayout(gradColorComputeLayoutCreateInfo);
 
-    vk::ShaderModule backgroundComputeShader = utils::load_shader(device,
-                                                                  GRADIENT_COLOR_COMP_SHADER_FP);
+    vk::ShaderModule gradColorComputeShader = utils::load_shader(device,
+                                                                 GRADIENT_COLOR_COMP_SHADER_FP);
 
-    vk::PipelineShaderStageCreateInfo backgroundComputeStageCreate{};
-    backgroundComputeStageCreate.setModule(backgroundComputeShader);
-    backgroundComputeStageCreate.setPName("main");
-    backgroundComputeStageCreate.setStage(vk::ShaderStageFlagBits::eCompute);
+    vk::PipelineShaderStageCreateInfo gradColorComputeStageCreate{};
+    gradColorComputeStageCreate.setModule(gradColorComputeShader);
+    gradColorComputeStageCreate.setPName("main");
+    gradColorComputeStageCreate.setStage(vk::ShaderStageFlagBits::eCompute);
 
-    vk::ComputePipelineCreateInfo backgroundComputePipelineCreate{};
-    backgroundComputePipelineCreate.setLayout(backgroundComputePipelineLayout);
-    backgroundComputePipelineCreate.setStage(backgroundComputeStageCreate);
+    vk::ComputePipelineCreateInfo gradColorComputePipelineCreate{};
+    gradColorComputePipelineCreate.setLayout(pipelines[0].pipelineLayout);
+    gradColorComputePipelineCreate.setStage(gradColorComputeStageCreate);
 
     vk::Result res;
     vk::Pipeline val;
     try {
-        std::tie(res, val) = device.createComputePipeline(nullptr, backgroundComputePipelineCreate);
-        backgroundComputePipeline = val;
+        std::tie(res, val) = device.createComputePipeline(nullptr, gradColorComputePipelineCreate);
+        pipelines[0].pipeline = val;
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
     VK_CHECK_RES(res);
 
-    device.destroyShaderModule(backgroundComputeShader);
+    static GradientColorPush defaultGradColorPush{};
+    defaultGradColorPush.colorUp = glm::vec4{1., 0., 0., 1.};
+    defaultGradColorPush.colorDown = glm::vec4{0., 1., 0., 1.};
+    pipelines[0].pushData = (void *) &defaultGradColorPush;
+    pipelines[0].pushDataSize = sizeof(GradientColorPush);
+
+    device.destroyShaderModule(gradColorComputeShader);
+
+    pipelines[1].name = "sky";
+
+    vk::PushConstantRange pushSky{};
+    pushSky.setOffset(0);
+    pushSky.setSize(sizeof(SkyPush));
+    pushSky.setStageFlags(vk::ShaderStageFlagBits::eCompute);
+
+    vk::PipelineLayoutCreateInfo skyComputeLayoutCreateInfo{};
+    skyComputeLayoutCreateInfo.setSetLayouts(drawImageDescriptorsData.layout);
+    skyComputeLayoutCreateInfo.setPushConstantRanges(pushSky);
+    pipelines[1].pipelineLayout = device.createPipelineLayout(skyComputeLayoutCreateInfo);
+
+    vk::ShaderModule skyComputeShader = utils::load_shader(device, SKY_SHADER_FP);
+
+    vk::PipelineShaderStageCreateInfo skyComputeStageCreate{};
+    skyComputeStageCreate.setModule(skyComputeShader);
+    skyComputeStageCreate.setPName("main");
+    skyComputeStageCreate.setStage(vk::ShaderStageFlagBits::eCompute);
+
+    vk::ComputePipelineCreateInfo skyComputePipelineCreate{};
+    skyComputePipelineCreate.setLayout(pipelines[1].pipelineLayout);
+    skyComputePipelineCreate.setStage(skyComputeStageCreate);
+
+    try {
+        std::tie(res, val) = device.createComputePipeline(nullptr, skyComputePipelineCreate);
+        pipelines[1].pipeline = val;
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
+    VK_CHECK_RES(res);
+
+    static SkyPush skyPush{};
+    skyPush.colorW = glm::vec4{0.1, 0.2, 0.4, 0.97};
+    pipelines[1].pushData = (void *) &skyPush;
+    pipelines[1].pushDataSize = sizeof(SkyPush);
+
+    device.destroyShaderModule(skyComputeShader);
 }
 
 void Engine::run()
@@ -462,8 +512,21 @@ void Engine::run()
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
+        if (ImGui::Begin("background")) {
+            PipelineData &currentPipeline = pipelines[currentPipelineIndex];
+            const std::string text = "Selected background compute shader: " + currentPipeline.name;
+            ImGui::Text("%s", text.c_str());
+            ImGui::SliderInt("Shader Index: ", &currentPipelineIndex, 0, pipelines.size() - 1);
+            glm::vec4 *colorUp = (glm::vec4 *) pipelines[0].pushData;
+            glm::vec4 *colorDown = (glm::vec4 *) ((char *) pipelines[0].pushData
+                                                  + sizeof(glm::vec4));
+            ImGui::InputFloat4("[ColorGradient] colorUp", (float *) colorUp);
+            ImGui::InputFloat4("[ColorGradient] colorDown", (float *) colorDown);
+            ImGui::InputFloat4("[Sky] colorW", (float *) pipelines[1].pushData);
+        }
+        ImGui::End();
         //some imgui UI to test
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
 
         //make imgui calculate internal draw structures
         ImGui::Render();
@@ -584,25 +647,20 @@ void Engine::draw()
 
 void Engine::change_background(vk::CommandBuffer &cmd)
 {
-    GradientColorPush pushConstants;
-    pushConstants.colorUp = glm::vec4(1, 0, 0, 1);
-    pushConstants.colorDown = glm::vec4(0, 1, 0, 1);
-
-    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, backgroundComputePipeline);
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pipelines[currentPipelineIndex].pipeline);
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                           backgroundComputePipelineLayout,
+                           pipelines[currentPipelineIndex].pipelineLayout,
                            0,
                            drawImageDescriptors,
                            nullptr);
-    cmd.pushConstants(backgroundComputePipelineLayout,
+    cmd.pushConstants(pipelines[currentPipelineIndex].pipelineLayout,
                       vk::ShaderStageFlagBits::eCompute,
                       0,
-                      sizeof(GradientColorPush),
-                      &pushConstants);
-    cmd.dispatch(std::ceil(imageDraw.extent.width / 16.f),
-                 std::ceil(imageDraw.extent.height / 16.f),
+                      pipelines[currentPipelineIndex].pushDataSize,
+                      pipelines[currentPipelineIndex].pushData);
+    cmd.dispatch(std::ceil((float) imageDraw.extent.width / 16.f),
+                 std::ceil((float) imageDraw.extent.height / 16.f),
                  1);
-    // cmd.dispatch(20, 10, 1);
 }
 
 void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView)

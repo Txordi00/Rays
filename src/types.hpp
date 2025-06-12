@@ -47,9 +47,11 @@ const uint64_t FENCE_TIMEOUT = 1000000000;
 
 const std::string GRADIENT_COMP_SHADER_FP = "shaders/gradient.comp.spv";
 const std::string GRADIENT_COLOR_COMP_SHADER_FP = "shaders/gradient_color.comp.spv";
+const std::string SKY_SHADER_FP = "shaders/sky.comp.spv";
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
+

@@ -28,10 +28,24 @@ struct ImageData
     vk::Format format;
 };
 
+struct PipelineData
+{
+    std::string name;
+    vk::Pipeline pipeline;
+    vk::PipelineLayout pipelineLayout;
+    void *pushData;
+    uint32_t pushDataSize;
+};
+
 struct GradientColorPush
 {
     glm::vec4 colorUp;
     glm::vec4 colorDown;
+};
+
+struct SkyPush
+{
+    glm::vec4 colorW;
 };
 
 class Engine
@@ -104,8 +118,10 @@ private:
     // Pipelines
     void init_pipelines();
     void init_background_compute_pipeline();
-    vk::Pipeline backgroundComputePipeline;
-    vk::PipelineLayout backgroundComputePipelineLayout;
+    std::vector<PipelineData> pipelines;
+    int currentPipelineIndex{0};
+    // vk::Pipeline backgroundComputePipeline;
+    // vk::PipelineLayout backgroundComputePipelineLayout;
 
     // Imgui data
     vk::DescriptorPool imguiPool;
