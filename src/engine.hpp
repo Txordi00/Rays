@@ -5,6 +5,7 @@
 // import vulkan_hpp;
 // #endif
 #include "descriptors.hpp"
+#include "pipelines_compute.hpp"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 #include <memory>
@@ -26,26 +27,6 @@ struct ImageData
     VmaAllocation allocation;
     vk::Extent3D extent;
     vk::Format format;
-};
-
-struct PipelineData
-{
-    std::string name;
-    vk::Pipeline pipeline;
-    vk::PipelineLayout pipelineLayout;
-    void *pushData;
-    uint32_t pushDataSize;
-};
-
-struct GradientColorPush
-{
-    glm::vec4 colorUp;
-    glm::vec4 colorDown;
-};
-
-struct SkyPush
-{
-    glm::vec4 colorW;
 };
 
 class Engine
@@ -71,12 +52,11 @@ private:
     //shuts down the engine
     void clean();
 
-    // Functions that init() calls
+    // First init() calls
     void init_vulkan();
     void create_draw_data();
     void init_commands();
     void init_sync_structures();
-    void init_imgui();
 
     // A command that changes the color of the background
     void change_background(vk::CommandBuffer &cmd);
@@ -117,14 +97,12 @@ private:
 
     // Pipelines
     void init_pipelines();
-    void init_background_compute_pipeline();
-    std::vector<PipelineData> pipelines;
+    std::vector<ComputePipelineData> pipelines;
     int currentPipelineIndex{0};
-    // vk::Pipeline backgroundComputePipeline;
-    // vk::PipelineLayout backgroundComputePipelineLayout;
 
-    // Imgui data
+    // Imgui
     vk::DescriptorPool imguiPool;
+    void init_imgui();
     void draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView);
 
     // Other data

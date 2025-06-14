@@ -34,8 +34,6 @@ import vulkan_hpp;
 //         } \
 //     }
 
-std::exception e;
-
 const unsigned int W = 1000;
 const unsigned int H = 1000;
 const std::string PROJNAME = "LRT";
