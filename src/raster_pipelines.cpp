@@ -1,5 +1,6 @@
 #include "raster_pipelines.hpp"
 #include "types.hpp"
+#include "utils.hpp"
 
 void GraphicsPipelineBuilder::clear()
 {
@@ -12,6 +13,93 @@ void GraphicsPipelineBuilder::clear()
     depthStencil = vk::PipelineDepthStencilStateCreateInfo{};
     renderInfo = vk::PipelineRenderingCreateInfo{};
     colorAttachmentformat = vk::Format{};
+}
+
+void GraphicsPipelineBuilder::set_shaders(const vk::ShaderModule &vertexShader,
+                                          const vk::ShaderModule &fragmentShader)
+{
+    shaderStages.clear();
+    shaderStages.resize(2);
+
+    vk::PipelineShaderStageCreateInfo vertexInfo{};
+    vertexInfo.setModule(vertexShader);
+    vertexInfo.setPName("main");
+    vertexInfo.setStage(vk::ShaderStageFlagBits::eVertex);
+
+    vk::PipelineShaderStageCreateInfo fragmentInfo{};
+    vertexInfo.setModule(fragmentShader);
+    vertexInfo.setPName("main");
+    vertexInfo.setStage(vk::ShaderStageFlagBits::eFragment);
+
+    shaderStages[0] = vertexInfo;
+    shaderStages[1] = fragmentInfo;
+}
+void GraphicsPipelineBuilder::set_input_topology(const vk::PrimitiveTopology &topology)
+{
+    inputAssembly.setTopology(topology);
+    // we are not going to use primitive restart on the entire tutorial so leave
+    // it on false
+    inputAssembly.setPrimitiveRestartEnable(vk::False);
+}
+
+void GraphicsPipelineBuilder::set_polygon_mode(const vk::PolygonMode &mode)
+{
+    rasterizer.setPolygonMode(mode);
+    rasterizer.setLineWidth(1.f);
+}
+
+void GraphicsPipelineBuilder::set_cull_mode(const vk::CullModeFlags &cullMode,
+                                            const vk::FrontFace &frontFace)
+{
+    rasterizer.setCullMode(cullMode);
+    rasterizer.setFrontFace(frontFace);
+}
+
+void GraphicsPipelineBuilder::set_multisampling_none()
+{
+    multisampling.setSampleShadingEnable(vk::False);
+    // multisampling defaulted to no multisampling (1 sample per pixel)
+    multisampling.setRasterizationSamples(vk::SampleCountFlagBits::e1);
+    multisampling.setMinSampleShading(1.0f);
+    multisampling.setPSampleMask(nullptr);
+    // no alpha to coverage either
+    multisampling.setAlphaToCoverageEnable(vk::False);
+    multisampling.setAlphaToOneEnable(vk::False);
+}
+
+void GraphicsPipelineBuilder::disable_blending()
+{
+    // default write mask
+    colorBlendAttachment.setColorWriteMask(
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+        | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+    // no blending
+    colorBlendAttachment.setBlendEnable(vk::False);
+}
+
+void GraphicsPipelineBuilder::set_color_attachment_format(const vk::Format &format)
+{
+    colorAttachmentformat = format;
+    // connect the format to the renderInfo  structure
+    renderInfo.setColorAttachmentFormats(colorAttachmentformat);
+}
+
+void GraphicsPipelineBuilder::set_depth_format(const vk::Format &format)
+{
+    renderInfo.setDepthAttachmentFormat(format);
+}
+
+void GraphicsPipelineBuilder::disable_depthtest()
+{
+    depthStencil.setDepthTestEnable(vk::False);
+    depthStencil.setDepthWriteEnable(vk::False);
+    depthStencil.setDepthCompareOp(vk::CompareOp::eNever);
+    depthStencil.setDepthBoundsTestEnable(vk::False);
+    depthStencil.setStencilTestEnable(vk::False);
+    depthStencil.setFront(vk::StencilOpState{});
+    depthStencil.setBack(vk::StencilOpState{});
+    depthStencil.setMinDepthBounds(0.f);
+    depthStencil.setMaxDepthBounds(1.f);
 }
 
 vk::Pipeline GraphicsPipelineBuilder::buildPipeline(const vk::Device &device)
@@ -64,4 +152,57 @@ vk::Pipeline GraphicsPipelineBuilder::buildPipeline(const vk::Device &device)
     VK_CHECK_RES(res);
 
     return pipeline;
+}
+
+TrianglePipelineData get_triangle_pipeline(const vk::Device &device,
+                                           const vk::Format &colorImageFormat)
+{
+    TrianglePipelineData trianglePipelineData;
+
+    vk::ShaderModule vertexShader = utils::load_shader(device, TRIANGLE_VERT_SHADER);
+    vk::ShaderModule fragmentShader = utils::load_shader(device, TRIANGLE_FRAG_SHADER);
+
+    //build the pipeline layout that controls the inputs/outputs of the shader
+    //we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
+    vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.setSetLayouts(nullptr);
+
+    try {
+        trianglePipelineData.trianglePipelineLayout = device.createPipelineLayout(
+            pipelineLayoutInfo);
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
+
+    GraphicsPipelineBuilder pipelineBuilder{};
+    //use the triangle layout we created
+    pipelineBuilder.pipelineLayout = trianglePipelineData.trianglePipelineLayout;
+    //connecting the vertex and pixel shaders to the pipeline
+    pipelineBuilder.set_shaders(vertexShader, fragmentShader);
+    //it will draw triangles
+    pipelineBuilder.set_input_topology(vk::PrimitiveTopology::eTriangleList);
+    //filled triangles
+    pipelineBuilder.set_polygon_mode(vk::PolygonMode::eFill);
+    //no backface culling
+    pipelineBuilder.set_cull_mode(vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
+    //no multisampling
+    pipelineBuilder.set_multisampling_none();
+    //no blending
+    pipelineBuilder.disable_blending();
+    //no depth testing
+    pipelineBuilder.disable_depthtest();
+
+    //connect the image format we will draw into, from draw image
+    pipelineBuilder.set_color_attachment_format(colorImageFormat);
+    pipelineBuilder.set_depth_format(vk::Format::eUndefined);
+
+    try {
+        trianglePipelineData.trianglePipeline = pipelineBuilder.buildPipeline(device);
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
+    device.destroyShaderModule(vertexShader);
+    device.destroyShaderModule(fragmentShader);
+
+    return trianglePipelineData;
 }

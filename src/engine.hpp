@@ -6,6 +6,7 @@
 // #endif
 #include "descriptors.hpp"
 #include "pipelines_compute.hpp"
+#include "raster_pipelines.hpp"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 #include <memory>
@@ -58,9 +59,6 @@ private:
     void init_commands();
     void init_sync_structures();
 
-    // A command that changes the color of the background
-    void change_background(vk::CommandBuffer &cmd);
-
     // Strucutres gotten at init time
     vk::Instance instance;
     vk::DebugUtilsMessengerEXT debugMessenger;
@@ -97,8 +95,13 @@ private:
 
     // Pipelines
     void init_pipelines();
-    std::vector<ComputePipelineData> pipelines;
+    std::vector<ComputePipelineData> computePipelines;
+    TrianglePipelineData triangleGraphicsPipeline;
     int currentPipelineIndex{0};
+
+    // Draw commands
+    void change_background(const vk::CommandBuffer &cmd);
+    void draw_triangle(const vk::CommandBuffer &cmd);
 
     // Imgui
     vk::DescriptorPool imguiPool;

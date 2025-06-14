@@ -54,10 +54,12 @@ void Engine::clean()
         device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
+        device.destroyPipelineLayout(triangleGraphicsPipeline.trianglePipelineLayout);
+        device.destroyPipeline(triangleGraphicsPipeline.trianglePipeline);
         device.destroyDescriptorPool(imguiPool);
-        for (int i = 0; i < pipelines.size(); i++) {
-            device.destroyPipelineLayout(pipelines[i].pipelineLayout);
-            device.destroyPipeline(pipelines[i].pipeline);
+        for (int i = 0; i < computePipelines.size(); i++) {
+            device.destroyPipelineLayout(computePipelines[i].pipelineLayout);
+            device.destroyPipeline(computePipelines[i].pipeline);
         }
         descriptorPool->destroyPool();
         device.destroyDescriptorSetLayout(drawImageDescriptorsData.layout);
@@ -392,7 +394,8 @@ void Engine::init_descriptors()
 
 void Engine::init_pipelines()
 {
-    pipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
+    computePipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
+    triangleGraphicsPipeline = get_triangle_pipeline(device, imageDraw.format);
 }
 
 void Engine::run()
@@ -428,16 +431,16 @@ void Engine::run()
         ImGui::NewFrame();
 
         if (ImGui::Begin("background")) {
-            ComputePipelineData &currentPipeline = pipelines[currentPipelineIndex];
+            ComputePipelineData &currentPipeline = computePipelines[currentPipelineIndex];
             const std::string text = "Selected background compute shader: " + currentPipeline.name;
             ImGui::Text("%s", text.c_str());
-            ImGui::SliderInt("Shader Index: ", &currentPipelineIndex, 0, pipelines.size() - 1);
-            glm::vec4 *colorUp = (glm::vec4 *) pipelines[0].pushData;
-            glm::vec4 *colorDown = (glm::vec4 *) ((char *) pipelines[0].pushData
+            ImGui::SliderInt("Shader Index: ", &currentPipelineIndex, 0, computePipelines.size() - 1);
+            glm::vec4 *colorUp = (glm::vec4 *) computePipelines[0].pushData;
+            glm::vec4 *colorDown = (glm::vec4 *) ((char *) computePipelines[0].pushData
                                                   + sizeof(glm::vec4));
             ImGui::InputFloat4("[ColorGradient] colorUp", (float *) colorUp);
             ImGui::InputFloat4("[ColorGradient] colorDown", (float *) colorDown);
-            ImGui::InputFloat4("[Sky] colorW", (float *) pipelines[1].pushData);
+            ImGui::InputFloat4("[Sky] colorW", (float *) computePipelines[1].pushData);
         }
         ImGui::End();
         //some imgui UI to test
@@ -489,10 +492,17 @@ void Engine::draw()
     // Draw into the draw image
     change_background(cmd);
 
-    // Transition the draw image to be sent and the swapchain image to receive it
     utils::transition_image(cmd,
                             imageDraw.image,
                             vk::ImageLayout::eGeneral,
+                            vk::ImageLayout::eColorAttachmentOptimal);
+
+    draw_triangle(cmd);
+
+    // Transition the draw image to be sent and the swapchain image to receive it
+    utils::transition_image(cmd,
+                            imageDraw.image,
+                            vk::ImageLayout::eColorAttachmentOptimal,
                             vk::ImageLayout::eTransferSrcOptimal);
     utils::transition_image(cmd,
                             swapchainImages[swapchainImageIndex],
@@ -560,22 +570,62 @@ void Engine::draw()
     frameNumber++;
 }
 
-void Engine::change_background(vk::CommandBuffer &cmd)
+void Engine::change_background(const vk::CommandBuffer &cmd)
 {
-    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pipelines[currentPipelineIndex].pipeline);
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute,
+                     computePipelines[currentPipelineIndex].pipeline);
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                           pipelines[currentPipelineIndex].pipelineLayout,
+                           computePipelines[currentPipelineIndex].pipelineLayout,
                            0,
                            drawImageDescriptors,
                            nullptr);
-    cmd.pushConstants(pipelines[currentPipelineIndex].pipelineLayout,
+    cmd.pushConstants(computePipelines[currentPipelineIndex].pipelineLayout,
                       vk::ShaderStageFlagBits::eCompute,
                       0,
-                      pipelines[currentPipelineIndex].pushDataSize,
-                      pipelines[currentPipelineIndex].pushData);
+                      computePipelines[currentPipelineIndex].pushDataSize,
+                      computePipelines[currentPipelineIndex].pushData);
     cmd.dispatch(std::ceil((float) imageDraw.extent.width / 16.f),
                  std::ceil((float) imageDraw.extent.height / 16.f),
                  1);
+}
+
+void Engine::draw_triangle(const vk::CommandBuffer &cmd)
+{
+    vk::RenderingAttachmentInfo colorAttachmentInfo{};
+    colorAttachmentInfo.setImageView(imageDraw.imageView);
+    colorAttachmentInfo.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
+    colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
+    colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
+
+    vk::RenderingInfo renderInfo{};
+    renderInfo.setColorAttachments(colorAttachmentInfo);
+    renderInfo.setLayerCount(1);
+    renderInfo.setRenderArea(vk::Rect2D{vk::Offset2D{0, 0}, swapchainExtent});
+
+    //set dynamic viewport and scissor
+    vk::Viewport viewport{};
+    viewport.setX(0.f);
+    viewport.setY(0.f);
+    viewport.setWidth(swapchainExtent.width);
+    viewport.setHeight(swapchainExtent.height);
+    viewport.setMinDepth(0.f);
+    viewport.setMaxDepth(1.f);
+
+    vk::Rect2D scissor{};
+    scissor.setExtent(vk::Extent2D{swapchainExtent.width, swapchainExtent.height});
+    scissor.setOffset(vk::Offset2D{0, 0});
+
+    try {
+        cmd.beginRendering(renderInfo);
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                         triangleGraphicsPipeline.trianglePipeline);
+        cmd.setViewport(0, viewport);
+        cmd.setScissor(0, scissor);
+        cmd.draw(3, 1, 0, 0);
+        cmd.endRendering();
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
 }
 
 void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView)
