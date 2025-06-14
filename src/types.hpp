@@ -19,9 +19,9 @@ import vulkan_hpp;
 // To be used inside the catch part of a try and catch statement
 #define VK_CHECK_EXC(exception) \
     { \
-        std::cerr << "\033[1;33m" << "Vulkan exception: " << exception.what() << "\033[0m" \
-                  << std::endl; \
-        std::exit(EXIT_FAILURE); \
+        std::string err_str = std::string("\033[1;33m + Vulkan exception: ") + exception.what() \
+                              + std::string("\033[0m\n"); \
+        throw std::runtime_error(err_str); \
     }
 
 // #define VK_CHECK_E(x) \
