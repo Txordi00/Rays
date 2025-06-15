@@ -27,9 +27,9 @@ void GraphicsPipelineBuilder::set_shaders(const vk::ShaderModule &vertexShader,
     vertexInfo.setStage(vk::ShaderStageFlagBits::eVertex);
 
     vk::PipelineShaderStageCreateInfo fragmentInfo{};
-    vertexInfo.setModule(fragmentShader);
-    vertexInfo.setPName("main");
-    vertexInfo.setStage(vk::ShaderStageFlagBits::eFragment);
+    fragmentInfo.setModule(fragmentShader);
+    fragmentInfo.setPName("main");
+    fragmentInfo.setStage(vk::ShaderStageFlagBits::eFragment);
 
     shaderStages[0] = vertexInfo;
     shaderStages[1] = fragmentInfo;
