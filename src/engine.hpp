@@ -30,6 +30,31 @@ struct ImageData
     vk::Format format;
 };
 
+struct Buffer
+{
+    vk::Buffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo allocationInfo;
+};
+
+struct Vertex
+{
+    glm::vec3 position;
+    float uvX;
+    glm::vec3 normal;
+    float uvY;
+    glm::vec4 color;
+};
+
+// holds the resources needed for a mesh
+struct MeshBuffer
+{
+    Buffer indexBuffer;
+    Buffer vertexBuffer;
+    vk::DeviceAddress vertexBufferAddress;
+};
+
+
 class Engine
 {
 public:
@@ -86,6 +111,11 @@ private:
     unsigned int frameOverlap;
     vk::Queue graphicsQueue;
     uint32_t graphicsQueueFamilyIndex;
+    vk::Queue transferQueue;
+    uint32_t transferQueueFamilyIndex;
+    vk::Fence transferFence;
+    vk::CommandPool transferCmdPool;
+    vk::CommandBuffer cmdTransfer;
 
     // Descriptors data and functions
     std::unique_ptr<DescriptorPool> descriptorPool;
@@ -98,6 +128,11 @@ private:
     std::vector<ComputePipelineData> computePipelines;
     TrianglePipelineData triangleGraphicsPipeline;
     int currentPipelineIndex{0};
+    TrianglePipelineData triangleMeshGraphicsPipeline;
+
+    // Meshes
+    MeshBuffer rectangle;
+    void init_rect_vertices();
 
     // Draw commands
     void change_background(const vk::CommandBuffer &cmd);
@@ -107,6 +142,14 @@ private:
     vk::DescriptorPool imguiPool;
     void init_imgui();
     void draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView);
+
+    // Buffers
+    Buffer create_buffer(const vk::DeviceSize &size,
+                         const vk::BufferUsageFlags &usageFlags,
+                         const VmaMemoryUsage &memoryUsage,
+                         const VmaAllocationCreateFlags &allocationFlags);
+    void destroy_buffer(const Buffer &buffer);
+    MeshBuffer create_mesh(const std::span<uint32_t> &indices, const std::span<Vertex> &vertices);
 
     // Other data
     bool isInitialized{false};

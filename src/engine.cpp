@@ -40,6 +40,7 @@ void Engine::init()
     init_descriptors();
     init_pipelines();
     init_imgui();
+    init_rect_vertices();
 
     isInitialized = true;
 }
@@ -54,6 +55,10 @@ void Engine::clean()
         device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
+        destroy_buffer(rectangle.vertexBuffer);
+        destroy_buffer(rectangle.indexBuffer);
+        device.destroyPipelineLayout(triangleMeshGraphicsPipeline.trianglePipelineLayout);
+        device.destroyPipeline(triangleMeshGraphicsPipeline.trianglePipeline);
         device.destroyPipelineLayout(triangleGraphicsPipeline.trianglePipelineLayout);
         device.destroyPipeline(triangleGraphicsPipeline.trianglePipeline);
         device.destroyDescriptorPool(imguiPool);
@@ -64,6 +69,8 @@ void Engine::clean()
         descriptorPool->destroyPool();
         device.destroyDescriptorSetLayout(drawImageDescriptorsData.layout);
 
+        device.destroyCommandPool(transferCmdPool);
+        device.destroyFence(transferFence);
         for (int i = 0; i < frameOverlap; i++) {
             device.destroyCommandPool(frames[i].commandPool);
             device.destroyFence(frames[i].renderFence);
@@ -118,6 +125,7 @@ void Engine::init_vulkan()
     features12.descriptorBindingPartiallyBound = vk::True;
     features12.runtimeDescriptorArray = vk::True;
     features12.scalarBlockLayout = vk::True;
+    features12.bufferDeviceAddress = vk::True;
 
     vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchainMaintenance1Features{};
     swapchainMaintenance1Features.setSwapchainMaintenance1(vk::True);
@@ -148,6 +156,8 @@ void Engine::init_vulkan()
     // Load the
     graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     graphicsQueueFamilyIndex = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+    transferQueue = vkbDevice.get_queue(vkb::QueueType::transfer).value();
+    transferQueueFamilyIndex = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
 
     // Initialization of the VMA Allocator
     VmaVulkanFunctions vulkanFunctions{};
@@ -159,7 +169,7 @@ void Engine::init_vulkan()
     allocatorInfo.instance = instance;
     allocatorInfo.physicalDevice = physicalDevice;
     allocatorInfo.device = device;
-    // allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     allocatorInfo.pVulkanFunctions = &vulkanFunctions;
     vmaCreateAllocator(&allocatorInfo, &allocator);
 }
@@ -219,6 +229,15 @@ void Engine::init_commands()
         commandBufferAllocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
         frames[i].mainCommandBuffer = device.allocateCommandBuffers(commandBufferAllocInfo)[0];
     }
+    vk::CommandPoolCreateInfo transferCommandPoolCreateInfo{};
+    transferCommandPoolCreateInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+    transferCommandPoolCreateInfo.setQueueFamilyIndex(transferQueueFamilyIndex);
+    transferCmdPool = device.createCommandPool(transferCommandPoolCreateInfo);
+    vk::CommandBufferAllocateInfo transferBufferAllocInfo{};
+    transferBufferAllocInfo.setCommandPool(transferCmdPool);
+    transferBufferAllocInfo.setCommandBufferCount(1);
+    transferBufferAllocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
+    cmdTransfer = device.allocateCommandBuffers(transferBufferAllocInfo)[0];
 }
 
 void Engine::init_sync_structures()
@@ -235,6 +254,8 @@ void Engine::init_sync_structures()
         // gpu->gpu. will make the render commands wait until the swapchain requests the next image
         frames[i].swapchainSemaphore = device.createSemaphore(semaphoreCreateInfo);
     }
+
+    transferFence = device.createFence(fenceCreateInfo);
 }
 
 void Engine::init_imgui()
@@ -396,6 +417,147 @@ void Engine::init_pipelines()
 {
     computePipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
     triangleGraphicsPipeline = get_triangle_pipeline(device, imageDraw.format);
+    triangleMeshGraphicsPipeline = get_triangle_mesh_pipeline(device, imageDraw.format);
+}
+
+void Engine::init_rect_vertices()
+{
+    std::array<Vertex, 4> rectVertices;
+
+    rectVertices[0].position = {0.5, -0.5, 0};
+    rectVertices[1].position = {0.5, 0.5, 0};
+    rectVertices[2].position = {-0.5, -0.5, 0};
+    rectVertices[3].position = {-0.5, 0.5, 0};
+
+    rectVertices[0].color = {0, 0, 0, 1};
+    rectVertices[1].color = {0.5, 0.5, 0.5, 1};
+    rectVertices[2].color = {1, 0, 0, 1};
+    rectVertices[3].color = {0, 1, 0, 1};
+
+    std::array<uint32_t, 6> rectIndices;
+
+    rectIndices[0] = 0;
+    rectIndices[1] = 1;
+    rectIndices[2] = 2;
+
+    rectIndices[3] = 2;
+    rectIndices[4] = 1;
+    rectIndices[5] = 3;
+
+    rectangle = create_mesh(rectIndices, rectVertices);
+}
+
+Buffer Engine::create_buffer(const vk::DeviceSize &size,
+                             const vk::BufferUsageFlags &usageFlags,
+                             const VmaMemoryUsage &memoryUsage,
+                             const VmaAllocationCreateFlags &allocationFlags)
+{
+    vk::BufferCreateInfo bufferInfo{};
+    bufferInfo.setUsage(usageFlags);
+    bufferInfo.setSize(size);
+
+    VmaAllocationCreateInfo vmaallocInfo{};
+    vmaallocInfo.usage = memoryUsage;
+    vmaallocInfo.flags = allocationFlags;
+
+    Buffer createdBuffer;
+    VK_CHECK_RES(vmaCreateBuffer(allocator,
+                                 (VkBufferCreateInfo *) &bufferInfo,
+                                 &vmaallocInfo,
+                                 (VkBuffer *) &createdBuffer.buffer,
+                                 &createdBuffer.allocation,
+                                 &createdBuffer.allocationInfo));
+
+    return createdBuffer;
+}
+
+void Engine::destroy_buffer(const Buffer &buffer)
+{
+    vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
+}
+
+// OPTIMIZATION: This could be run on a separate thread in order to not force the main thread to wait
+// for fences
+MeshBuffer Engine::create_mesh(const std::span<uint32_t> &indices, const std::span<Vertex> &vertices)
+{
+    const vk::DeviceSize verticesSize = vertices.size() * sizeof(Vertex);
+    const vk::DeviceSize indicesSize = indices.size() * sizeof(uint32_t);
+
+    MeshBuffer mesh;
+
+    mesh.vertexBuffer = create_buffer(verticesSize,
+                                      vk::BufferUsageFlagBits::eStorageBuffer
+                                          | vk::BufferUsageFlagBits::eShaderDeviceAddress
+                                          | vk::BufferUsageFlagBits::eTransferDst,
+                                      VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+    // | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    vk::BufferDeviceAddressInfo vertexAddressInfo{};
+    vertexAddressInfo.setBuffer(mesh.vertexBuffer.buffer);
+    mesh.vertexBufferAddress = device.getBufferAddress(vertexAddressInfo);
+
+    mesh.indexBuffer = create_buffer(indicesSize,
+                                     vk::BufferUsageFlagBits::eIndexBuffer
+                                         | vk::BufferUsageFlagBits::eTransferDst,
+                                     VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                     0);
+
+    Buffer stagingBuffer = create_buffer(verticesSize + indicesSize,
+                                         vk::BufferUsageFlagBits::eTransferSrc,
+                                         VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+                                         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                             | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    void *stagingData = stagingBuffer.allocation->GetMappedData();
+
+    memcpy(stagingData, vertices.data(), verticesSize);
+    memcpy((char *) stagingData + verticesSize, indices.data(), indicesSize);
+
+    // Set info structures to copy from staging to vertex & index buffers
+    vk::CopyBufferInfo2 vertexCopyInfo{};
+    vertexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
+    vertexCopyInfo.setDstBuffer(mesh.vertexBuffer.buffer);
+    vk::BufferCopy2 vertexCopy{};
+    vertexCopy.setSrcOffset(0);
+    vertexCopy.setDstOffset(0);
+    vertexCopy.setSize(verticesSize);
+    vertexCopyInfo.setRegions(vertexCopy);
+
+    vk::CopyBufferInfo2 indexCopyInfo{};
+    indexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
+    indexCopyInfo.setDstBuffer(mesh.indexBuffer.buffer);
+    vk::BufferCopy2 indexCopy{};
+    indexCopy.setSrcOffset(verticesSize);
+    indexCopy.setDstOffset(0);
+    indexCopy.setSize(indicesSize);
+    indexCopyInfo.setRegions(indexCopy);
+
+    // New command buffer to copy in GPU from staging buffer to vertex & index buffers
+    device.resetFences(transferFence);
+
+    vk::CommandBufferBeginInfo cmdBeginInfo{};
+    cmdBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+    cmdTransfer.begin(cmdBeginInfo);
+    cmdTransfer.copyBuffer2(vertexCopyInfo);
+    cmdTransfer.copyBuffer2(indexCopyInfo);
+    cmdTransfer.end();
+
+    vk::CommandBufferSubmitInfo cmdSubmitInfo{};
+    cmdSubmitInfo.setCommandBuffer(cmdTransfer);
+    cmdSubmitInfo.setDeviceMask(1);
+    vk::SubmitInfo2 submitInfo{};
+    submitInfo.setCommandBufferInfos(cmdSubmitInfo);
+
+    try {
+        transferQueue.submit2(submitInfo, transferFence);
+        VK_CHECK_RES(device.waitForFences(transferFence, vk::True, FENCE_TIMEOUT));
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
+    destroy_buffer(stagingBuffer);
+
+    return mesh;
 }
 
 void Engine::run()
@@ -622,10 +784,22 @@ void Engine::draw_triangle(const vk::CommandBuffer &cmd)
         cmd.setViewport(0, viewport);
         cmd.setScissor(0, scissor);
         cmd.draw(3, 1, 0, 0);
-        cmd.endRendering();
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                         triangleMeshGraphicsPipeline.trianglePipeline);
+        TriangleMeshPush pushConstants;
+        pushConstants.worldMatrix = glm::mat4{1.f};
+        pushConstants.vertexBufferAddress = rectangle.vertexBufferAddress;
+        cmd.pushConstants(triangleMeshGraphicsPipeline.trianglePipelineLayout,
+                          vk::ShaderStageFlagBits::eVertex,
+                          0,
+                          sizeof(TriangleMeshPush),
+                          &pushConstants);
+        cmd.bindIndexBuffer(rectangle.indexBuffer.buffer, 0, vk::IndexType::eUint32);
+        cmd.drawIndexed(6, 1, 0, 0, 0);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
+    cmd.endRendering();
 }
 
 void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView)
