@@ -5,6 +5,7 @@ import vulkan_hpp;
 #endif
 
 #include "engine.hpp"
+#include "pipelines_compute.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 #include <SDL3/SDL_vulkan.h>
@@ -30,7 +31,7 @@ void Engine::init()
     // We initialize SDL and create a window with it.
     SDL_Init(SDL_INIT_VIDEO);
 
-    window = SDL_CreateWindow(PROJNAME.c_str(), W, H, SDL_WINDOW_VULKAN);
+    window = SDL_CreateWindow(PROJNAME, W, H, SDL_WINDOW_VULKAN);
 
     init_vulkan();
     create_swapchain(W, H);
@@ -94,7 +95,7 @@ void Engine::init_vulkan()
 {
     // Initialize the vulkan instance
     vkb::InstanceBuilder instBuilder;
-    auto instRet = instBuilder.set_app_name(PROJNAME.c_str())
+    auto instRet = instBuilder.set_app_name(PROJNAME)
                        .require_api_version(API_VERSION[0], API_VERSION[1], API_VERSION[2])
                        // .enable_extensions({VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
                        //                     VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,

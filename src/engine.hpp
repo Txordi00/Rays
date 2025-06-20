@@ -5,7 +5,6 @@
 // import vulkan_hpp;
 // #endif
 #include "descriptors.hpp"
-#include "pipelines_compute.hpp"
 #include "raster_pipelines.hpp"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
@@ -13,69 +12,26 @@
 #include <vector>
 #include <vk_mem_alloc.h>
 
-struct FrameData
-{
-    vk::CommandPool commandPool;
-    vk::CommandBuffer mainCommandBuffer;
-    vk::Semaphore swapchainSemaphore, renderSemaphore;
-    vk::Fence renderFence;
-};
-
-struct ImageData
-{
-    vk::Image image;
-    vk::ImageView imageView;
-    VmaAllocation allocation;
-    vk::Extent3D extent;
-    vk::Format format;
-};
-
-struct Buffer
-{
-    vk::Buffer buffer;
-    VmaAllocation allocation;
-    VmaAllocationInfo allocationInfo;
-};
-
-struct Vertex
-{
-    glm::vec3 position;
-    float uvX;
-    glm::vec3 normal;
-    float uvY;
-    glm::vec4 color;
-};
-
-// holds the resources needed for a mesh
-struct MeshBuffer
-{
-    Buffer indexBuffer;
-    Buffer vertexBuffer;
-    vk::DeviceAddress vertexBufferAddress;
-};
-
-
 class Engine
 {
 public:
     Engine();
-
     ~Engine();
 
-    //draw loop
+    // draw loop
     void draw();
 
-    //run main loop
+    // run main loop
     void run();
 
     // Return frame
     FrameData &get_current_frame() { return frames[frameNumber % frameOverlap]; }
 
 private:
-    //initializes everything in the engine
+    // initializes everything in the engine
     void init();
 
-    //shuts down the engine
+    // shuts down the engine
     void clean();
 
     // First init() calls

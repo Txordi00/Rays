@@ -6,16 +6,8 @@
 import vulkan_hpp;
 #endif
 
+#include "types.hpp"
 #include <glm/glm.hpp>
-
-struct ComputePipelineData
-{
-    std::string name;
-    vk::Pipeline pipeline;
-    vk::PipelineLayout pipelineLayout;
-    void *pushData;
-    uint32_t pushDataSize;
-};
 
 struct GradientColorPush
 {

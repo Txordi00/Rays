@@ -4,6 +4,7 @@
 #else
 import vulkan_hpp;
 #endif
+#include "types.hpp"
 
 class DescriptorSetLayout
 {
@@ -19,13 +20,6 @@ private:
     vk::Device device;
     std::vector<vk::DescriptorSetLayoutBinding> bindings;
     vk::DescriptorSetLayout layout;
-};
-
-struct DescriptorSetData
-{
-    vk::DescriptorSetLayout layout;
-    vk::DescriptorType type;
-    uint32_t descriptorCount;
 };
 
 class DescriptorPool

@@ -4,8 +4,9 @@
 #else
 import vulkan_hpp;
 #endif
-#include <exception>
+#include <glm/glm.hpp>
 #include <iostream>
+#include <vk_mem_alloc.h>
 
 #define VK_CHECK_RES(x) \
     { \
@@ -24,31 +25,78 @@ import vulkan_hpp;
         throw std::runtime_error(err_str); \
     }
 
-// #define VK_CHECK_E(x) \
-//     { \
-//         try { \
-//             x; \
-//         } catch (const std::exception &e) { \
-//             std::cerr << "\033[1;33m" << "Vulkan exception: " << e.what() << "\033[0m" \
-//                       << std::endl; \
-//         } \
-//     }
-
 const unsigned int W = 1000;
 const unsigned int H = 1000;
-const std::string PROJNAME = "LRT";
+#define PROJNAME "LRT"
 const unsigned int API_VERSION[3] = {1, 3, 0};
 
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
 const unsigned int MINIMUM_FRAME_OVERLAP = 3;
 const uint64_t FENCE_TIMEOUT = 1000000000;
 
-const std::string GRADIENT_COMP_SHADER_FP = "shaders/gradient.comp.spv";
-const std::string GRADIENT_COLOR_COMP_SHADER_FP = "shaders/gradient_color.comp.spv";
-const std::string SKY_SHADER_FP = "shaders/sky.comp.spv";
+#define GRADIENT_COMP_SHADER_FP "shaders/gradient.comp.spv"
+#define GRADIENT_COLOR_COMP_SHADER_FP "shaders/gradient_color.comp.spv"
+#define SKY_SHADER_FP "shaders/sky.comp.spv"
 #define TRIANGLE_VERT_SHADER "shaders/triangle.vert.spv"
 #define TRIANGLE_FRAG_SHADER "shaders/triangle.frag.spv"
 #define TRIANGLE_MESH_VERT_SHADER "shaders/triangle_mesh.vert.spv"
+
+struct DescriptorSetData
+{
+    vk::DescriptorSetLayout layout;
+    vk::DescriptorType type;
+    uint32_t descriptorCount;
+};
+
+struct FrameData
+{
+    vk::CommandPool commandPool;
+    vk::CommandBuffer mainCommandBuffer;
+    vk::Semaphore swapchainSemaphore, renderSemaphore;
+    vk::Fence renderFence;
+};
+
+struct ImageData
+{
+    vk::Image image;
+    vk::ImageView imageView;
+    VmaAllocation allocation;
+    vk::Extent3D extent;
+    vk::Format format;
+};
+
+struct Buffer
+{
+    vk::Buffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo allocationInfo;
+};
+
+struct Vertex
+{
+    glm::vec3 position;
+    float uvX;
+    glm::vec3 normal;
+    float uvY;
+    glm::vec4 color;
+};
+
+// holds the resources needed for a mesh
+struct MeshBuffer
+{
+    Buffer indexBuffer;
+    Buffer vertexBuffer;
+    vk::DeviceAddress vertexBufferAddress;
+};
+
+struct ComputePipelineData
+{
+    std::string name;
+    vk::Pipeline pipeline;
+    vk::PipelineLayout pipelineLayout;
+    void *pushData;
+    uint32_t pushDataSize;
+};
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;

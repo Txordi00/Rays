@@ -7,11 +7,11 @@ set(USE_VULKANHPP_CPP20_MODULE OFF)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
-add_compile_options(-Wno-nullability-completeness)
+add_compile_options(-Wno-nullability-completeness -Wno-deprecated-literal-operator)
 
 find_package(Vulkan REQUIRED)
 
-# Require Vulkan version ≥ 1.3.256 (earliest version when the Vulkan module was available)
+# Require Vulkan version ≥ 1.3.256 (earliest version where the Vulkan CXX20 module was available)
 if( ${Vulkan_VERSION} VERSION_LESS "1.3.256" )
   message( FATAL_ERROR "Minimum supported Vulkan version is 1.3.256. "
            "Found ${Vulkan_VERSION}."
@@ -39,6 +39,8 @@ add_library(imgui STATIC "include/imgui/imgui.cpp" "include/imgui/imgui_demo.cpp
   "include/imgui/imgui_draw.cpp" "include/imgui/imgui_tables.cpp" "include/imgui/imgui_widgets.cpp"
   "include/imgui/imgui_impl_sdl3.cpp" "include/imgui/imgui_impl_vulkan.cpp")
 target_link_libraries(imgui PRIVATE Vulkan::Vulkan)
+# Fastgltf
+add_subdirectory("third_party_non_include/fastgltf")
 
 # Vk-bootstrap
 include(FetchContent)
@@ -60,6 +62,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE vk-bootstrap::vk-bootstrap)
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
+target_link_libraries(${PROJECT_NAME} PRIVATE fastgltf::fastgltf)
 
 # Link either vulkan either the vulkan_hpp module
 if(USE_VULKANHPP_CPP20_MODULE)
