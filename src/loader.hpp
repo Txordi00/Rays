@@ -10,11 +10,19 @@ struct GeoSurface
     uint32_t count;
 };
 
-struct MeshAsset
+struct HostMeshAsset
 {
     std::string name;
-    std::vector<GeoSurface> geoSurfaces;
-    // MeshBuffer meshBuffer;
+    std::vector<uint32_t> indices;
+    std::vector<Vertex> vertices;
+    std::vector<GeoSurface> surfaces;
+};
+
+struct DeviceMeshAsset
+{
+    std::string name;
+    std::vector<GeoSurface> surfaces;
+    MeshBuffer meshBuffer;
 };
 
 class GLTFLoader
@@ -22,11 +30,13 @@ class GLTFLoader
 public:
     GLTFLoader() = default;
     ~GLTFLoader() = default;
-    std::vector<std::shared_ptr<MeshAsset>> loadGLTFMeshes(std::filesystem::path fp);
+    std::vector<std::shared_ptr<HostMeshAsset>> loadGLTFMeshes(const std::filesystem::path &fp);
     void loadMesh(const fastgltf::Mesh &mesh,
                   std::vector<uint32_t> &indices,
                   std::vector<Vertex> &vertices,
-                  std::vector<GeoSurface> &geoSurfaces);
+                  std::vector<GeoSurface> &surfaces);
+
+    bool overrideColorsWithNormals = true;
 
 private:
     fastgltf::Asset gltf;

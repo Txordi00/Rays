@@ -5,6 +5,7 @@ import vulkan_hpp;
 #endif
 
 #include "engine.hpp"
+#include "loader.hpp"
 #include "pipelines_compute.hpp"
 #include "types.hpp"
 #include "utils.hpp"
@@ -41,7 +42,7 @@ void Engine::init()
     init_descriptors();
     init_pipelines();
     init_imgui();
-    init_rect_vertices();
+    load_meshes();
 
     isInitialized = true;
 }
@@ -257,6 +258,22 @@ void Engine::init_sync_structures()
     }
 
     transferFence = device.createFence(fenceCreateInfo);
+}
+
+void Engine::load_meshes()
+{
+    init_rect_vertices();
+    GLTFLoader gltfLoader{};
+    gltfLoader.overrideColorsWithNormals = true;
+    std::vector<std::shared_ptr<HostMeshAsset>> cpuMeshes = gltfLoader.loadGLTFMeshes(
+        "../../assets/basicmesh.glb");
+    std::vector<std::shared_ptr<DeviceMeshAsset>> gpuMeshes(cpuMeshes.size());
+    for (int i = 0; i < cpuMeshes.size(); i++) {
+        gpuMeshes[i] = std::make_shared<DeviceMeshAsset>(cpuMeshes[i]->name,
+                                                         cpuMeshes[i]->surfaces,
+                                                         create_mesh(cpuMeshes[i]->indices,
+                                                                     cpuMeshes[i]->vertices));
+    }
 }
 
 void Engine::init_imgui()

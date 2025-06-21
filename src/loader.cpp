@@ -2,7 +2,9 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 
-std::vector<std::shared_ptr<MeshAsset>> GLTFLoader::loadGLTFMeshes(std::filesystem::__cxx11::path fp)
+// I don't think that I will need shared pointers here.
+std::vector<std::shared_ptr<HostMeshAsset>> GLTFLoader::loadGLTFMeshes(
+    const std::filesystem::path &fp)
 {
     std::cout << "Loading GLTF " << fp << std::endl;
 
@@ -26,35 +28,40 @@ std::vector<std::shared_ptr<MeshAsset>> GLTFLoader::loadGLTFMeshes(std::filesyst
     }
     gltf = std::move(gltfTemp.get());
 
-    std::vector<std::shared_ptr<MeshAsset>> meshes;
-    std::vector<uint32_t> indices;
-    std::vector<Vertex> vertices;
+    std::vector<std::shared_ptr<HostMeshAsset>> meshes;
+    meshes.reserve(gltf.meshes.size());
 
     for (fastgltf::Mesh &mesh : gltf.meshes) {
-        MeshAsset meshAsset;
+        HostMeshAsset meshAsset;
         meshAsset.name = mesh.name;
-        std::vector<uint32_t> indices;
-        std::vector<Vertex> vertices;
-        std::vector<GeoSurface> geoSurfaces;
-        loadMesh(mesh, indices, vertices, geoSurfaces);
+        loadMesh(mesh, meshAsset.indices, meshAsset.vertices, meshAsset.surfaces);
+        // display the vertex normals
+        if (overrideColorsWithNormals) {
+            for (Vertex &v : meshAsset.vertices) {
+                v.color = glm::vec4(v.normal, 1.f);
+            }
+        }
+        meshes.emplace_back(std::make_shared<HostMeshAsset>(std::move(meshAsset)));
     }
     // gltf.accessors
+    return meshes;
 }
 
 void GLTFLoader::loadMesh(const fastgltf::Mesh &mesh,
                           std::vector<uint32_t> &indices,
                           std::vector<Vertex> &vertices,
-                          std::vector<GeoSurface> &geoSurfaces)
+                          std::vector<GeoSurface> &surfaces)
 {
     indices.clear();
     vertices.clear();
-    geoSurfaces.reserve(mesh.primitives.size());
+    surfaces.reserve(mesh.primitives.size());
     for (auto &p : mesh.primitives) {
         fastgltf::Accessor &indexAccessor = gltf.accessors[p.indicesAccessor.value()];
 
         GeoSurface surface;
         surface.startIndex = indices.size();
         surface.count = indexAccessor.count;
+        surfaces.push_back(surface);
 
         size_t verticesIndex0 = vertices.size();
         indices.reserve(indices.size() + indexAccessor.count);
@@ -110,6 +117,5 @@ void GLTFLoader::loadMesh(const fastgltf::Mesh &mesh,
                 });
         }
 
-        geoSurfaces.push_back(surface);
     }
 }

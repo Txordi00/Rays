@@ -39,6 +39,7 @@ private:
     void create_draw_data();
     void init_commands();
     void init_sync_structures();
+    void load_meshes();
 
     // Strucutres gotten at init time
     vk::Instance instance;
