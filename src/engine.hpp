@@ -5,6 +5,7 @@
 // import vulkan_hpp;
 // #endif
 #include "descriptors.hpp"
+#include "loader.hpp"
 #include "raster_pipelines.hpp"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
@@ -83,17 +84,16 @@ private:
     // Pipelines
     void init_pipelines();
     std::vector<ComputePipelineData> computePipelines;
-    TrianglePipelineData triangleGraphicsPipeline;
+    SimplePipelineData triangleGraphicsPipeline;
     int currentPipelineIndex{0};
-    TrianglePipelineData triangleMeshGraphicsPipeline;
+    SimplePipelineData simpleMeshGraphicsPipeline;
 
     // Meshes
-    MeshBuffer rectangle;
-    void init_rect_vertices();
+    std::vector<std::shared_ptr<DeviceMeshAsset>> gpuMeshes;
 
     // Draw commands
     void change_background(const vk::CommandBuffer &cmd);
-    void draw_triangle(const vk::CommandBuffer &cmd);
+    void draw_meshes(const vk::CommandBuffer &cmd);
 
     // Imgui
     vk::DescriptorPool imguiPool;

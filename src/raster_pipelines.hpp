@@ -7,24 +7,24 @@ import vulkan_hpp;
 
 #include <glm/glm.hpp>
 
-struct TrianglePipelineData
+struct SimplePipelineData
 {
-    vk::PipelineLayout trianglePipelineLayout;
-    vk::Pipeline trianglePipeline;
+    vk::PipelineLayout pipelineLayout;
+    vk::Pipeline pipeline;
 };
 
 // push constants for our mesh object draws
-struct TriangleMeshPush
+struct MeshPush
 {
     glm::mat4 worldMatrix;
     vk::DeviceAddress vertexBufferAddress;
 };
 
-TrianglePipelineData get_triangle_pipeline(const vk::Device &device,
-                                           const vk::Format &colorImageFormat);
+SimplePipelineData get_triangle_pipeline(const vk::Device &device,
+                                         const vk::Format &colorImageFormat);
 
-TrianglePipelineData get_triangle_mesh_pipeline(const vk::Device &device,
-                                                const vk::Format &colorImageFormat);
+SimplePipelineData get_simple_mesh_pipeline(const vk::Device &device,
+                                            const vk::Format &colorImageFormat);
 
 class GraphicsPipelineBuilder
 {

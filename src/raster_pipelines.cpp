@@ -37,8 +37,6 @@ void GraphicsPipelineBuilder::set_shaders(const vk::ShaderModule &vertexShader,
 void GraphicsPipelineBuilder::set_input_topology(const vk::PrimitiveTopology &topology)
 {
     inputAssembly.setTopology(topology);
-    // we are not going to use primitive restart on the entire tutorial so leave
-    // it on false
     inputAssembly.setPrimitiveRestartEnable(vk::False);
 }
 
@@ -154,10 +152,10 @@ vk::Pipeline GraphicsPipelineBuilder::buildPipeline(const vk::Device &device)
     return pipeline;
 }
 
-TrianglePipelineData get_triangle_pipeline(const vk::Device &device,
-                                           const vk::Format &colorImageFormat)
+SimplePipelineData get_triangle_pipeline(const vk::Device &device,
+                                         const vk::Format &colorImageFormat)
 {
-    TrianglePipelineData trianglePipelineData;
+    SimplePipelineData trianglePipelineData;
 
     vk::ShaderModule vertexShader = utils::load_shader(device, TRIANGLE_VERT_SHADER);
     vk::ShaderModule fragmentShader = utils::load_shader(device, TRIANGLE_FRAG_SHADER);
@@ -168,15 +166,14 @@ TrianglePipelineData get_triangle_pipeline(const vk::Device &device,
     pipelineLayoutInfo.setSetLayouts(nullptr);
 
     try {
-        trianglePipelineData.trianglePipelineLayout = device.createPipelineLayout(
-            pipelineLayoutInfo);
+        trianglePipelineData.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
 
     GraphicsPipelineBuilder pipelineBuilder{};
     //use the triangle layout we created
-    pipelineBuilder.pipelineLayout = trianglePipelineData.trianglePipelineLayout;
+    pipelineBuilder.pipelineLayout = trianglePipelineData.pipelineLayout;
     //connecting the vertex and pixel shaders to the pipeline
     pipelineBuilder.set_shaders(vertexShader, fragmentShader);
     //it will draw triangles
@@ -197,7 +194,7 @@ TrianglePipelineData get_triangle_pipeline(const vk::Device &device,
     pipelineBuilder.set_depth_format(vk::Format::eUndefined);
 
     try {
-        trianglePipelineData.trianglePipeline = pipelineBuilder.buildPipeline(device);
+        trianglePipelineData.pipeline = pipelineBuilder.buildPipeline(device);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
@@ -207,12 +204,12 @@ TrianglePipelineData get_triangle_pipeline(const vk::Device &device,
     return trianglePipelineData;
 }
 
-TrianglePipelineData get_triangle_mesh_pipeline(const vk::Device &device,
-                                                const vk::Format &colorImageFormat)
+SimplePipelineData get_simple_mesh_pipeline(const vk::Device &device,
+                                            const vk::Format &colorImageFormat)
 {
-    TrianglePipelineData trianglePipelineData;
+    SimplePipelineData trianglePipelineData;
 
-    vk::ShaderModule vertexShader = utils::load_shader(device, TRIANGLE_MESH_VERT_SHADER);
+    vk::ShaderModule vertexShader = utils::load_shader(device, SIMPLE_MESH_VERT_SHADER);
     vk::ShaderModule fragmentShader = utils::load_shader(device, TRIANGLE_FRAG_SHADER);
 
     //build the pipeline layout that controls the inputs/outputs of the shader
@@ -220,21 +217,20 @@ TrianglePipelineData get_triangle_mesh_pipeline(const vk::Device &device,
     vk::PushConstantRange pushInfo{};
     pushInfo.setOffset(0);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eVertex);
-    pushInfo.setSize(sizeof(TriangleMeshPush));
+    pushInfo.setSize(sizeof(MeshPush));
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.setSetLayouts(nullptr);
     pipelineLayoutInfo.setPushConstantRanges(pushInfo);
 
     try {
-        trianglePipelineData.trianglePipelineLayout = device.createPipelineLayout(
-            pipelineLayoutInfo);
+        trianglePipelineData.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
 
     GraphicsPipelineBuilder pipelineBuilder{};
     //use the triangle layout we created
-    pipelineBuilder.pipelineLayout = trianglePipelineData.trianglePipelineLayout;
+    pipelineBuilder.pipelineLayout = trianglePipelineData.pipelineLayout;
     //connecting the vertex and pixel shaders to the pipeline
     pipelineBuilder.set_shaders(vertexShader, fragmentShader);
     //it will draw triangles
@@ -255,7 +251,7 @@ TrianglePipelineData get_triangle_mesh_pipeline(const vk::Device &device,
     pipelineBuilder.set_depth_format(vk::Format::eUndefined);
 
     try {
-        trianglePipelineData.trianglePipeline = pipelineBuilder.buildPipeline(device);
+        trianglePipelineData.pipeline = pipelineBuilder.buildPipeline(device);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }

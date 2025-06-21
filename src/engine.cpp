@@ -5,7 +5,6 @@ import vulkan_hpp;
 #endif
 
 #include "engine.hpp"
-#include "loader.hpp"
 #include "pipelines_compute.hpp"
 #include "types.hpp"
 #include "utils.hpp"
@@ -57,12 +56,14 @@ void Engine::clean()
         device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
-        destroy_buffer(rectangle.vertexBuffer);
-        destroy_buffer(rectangle.indexBuffer);
-        device.destroyPipelineLayout(triangleMeshGraphicsPipeline.trianglePipelineLayout);
-        device.destroyPipeline(triangleMeshGraphicsPipeline.trianglePipeline);
-        device.destroyPipelineLayout(triangleGraphicsPipeline.trianglePipelineLayout);
-        device.destroyPipeline(triangleGraphicsPipeline.trianglePipeline);
+        for (auto &m : gpuMeshes) {
+            destroy_buffer(m->meshBuffer.vertexBuffer);
+            destroy_buffer(m->meshBuffer.indexBuffer);
+        }
+        device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
+        device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
+        device.destroyPipelineLayout(triangleGraphicsPipeline.pipelineLayout);
+        device.destroyPipeline(triangleGraphicsPipeline.pipeline);
         device.destroyDescriptorPool(imguiPool);
         for (int i = 0; i < computePipelines.size(); i++) {
             device.destroyPipelineLayout(computePipelines[i].pipelineLayout);
@@ -262,12 +263,11 @@ void Engine::init_sync_structures()
 
 void Engine::load_meshes()
 {
-    init_rect_vertices();
     GLTFLoader gltfLoader{};
     gltfLoader.overrideColorsWithNormals = true;
     std::vector<std::shared_ptr<HostMeshAsset>> cpuMeshes = gltfLoader.loadGLTFMeshes(
         "../../assets/basicmesh.glb");
-    std::vector<std::shared_ptr<DeviceMeshAsset>> gpuMeshes(cpuMeshes.size());
+    gpuMeshes.resize(cpuMeshes.size());
     for (int i = 0; i < cpuMeshes.size(); i++) {
         gpuMeshes[i] = std::make_shared<DeviceMeshAsset>(cpuMeshes[i]->name,
                                                          cpuMeshes[i]->surfaces,
@@ -435,34 +435,7 @@ void Engine::init_pipelines()
 {
     computePipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
     triangleGraphicsPipeline = get_triangle_pipeline(device, imageDraw.format);
-    triangleMeshGraphicsPipeline = get_triangle_mesh_pipeline(device, imageDraw.format);
-}
-
-void Engine::init_rect_vertices()
-{
-    std::array<Vertex, 4> rectVertices;
-
-    rectVertices[0].position = {0.5, -0.5, 0};
-    rectVertices[1].position = {0.5, 0.5, 0};
-    rectVertices[2].position = {-0.5, -0.5, 0};
-    rectVertices[3].position = {-0.5, 0.5, 0};
-
-    rectVertices[0].color = {0, 0, 0, 1};
-    rectVertices[1].color = {0.5, 0.5, 0.5, 1};
-    rectVertices[2].color = {1, 0, 0, 1};
-    rectVertices[3].color = {0, 1, 0, 1};
-
-    std::array<uint32_t, 6> rectIndices;
-
-    rectIndices[0] = 0;
-    rectIndices[1] = 1;
-    rectIndices[2] = 2;
-
-    rectIndices[3] = 2;
-    rectIndices[4] = 1;
-    rectIndices[5] = 3;
-
-    rectangle = create_mesh(rectIndices, rectVertices);
+    simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device, imageDraw.format);
 }
 
 Buffer Engine::create_buffer(const vk::DeviceSize &size,
@@ -677,7 +650,7 @@ void Engine::draw()
                             vk::ImageLayout::eGeneral,
                             vk::ImageLayout::eColorAttachmentOptimal);
 
-    draw_triangle(cmd);
+    draw_meshes(cmd);
 
     // Transition the draw image to be sent and the swapchain image to receive it
     utils::transition_image(cmd,
@@ -769,7 +742,7 @@ void Engine::change_background(const vk::CommandBuffer &cmd)
                  1);
 }
 
-void Engine::draw_triangle(const vk::CommandBuffer &cmd)
+void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 {
     vk::RenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.setImageView(imageDraw.imageView);
@@ -797,23 +770,29 @@ void Engine::draw_triangle(const vk::CommandBuffer &cmd)
 
     try {
         cmd.beginRendering(renderInfo);
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                         triangleGraphicsPipeline.trianglePipeline);
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, triangleGraphicsPipeline.pipeline);
         cmd.setViewport(0, viewport);
         cmd.setScissor(0, scissor);
         cmd.draw(3, 1, 0, 0);
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                         triangleMeshGraphicsPipeline.trianglePipeline);
-        TriangleMeshPush pushConstants;
+
+        int objId = 2;
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, simpleMeshGraphicsPipeline.pipeline);
+        MeshPush pushConstants;
         pushConstants.worldMatrix = glm::mat4{1.f};
-        pushConstants.vertexBufferAddress = rectangle.vertexBufferAddress;
-        cmd.pushConstants(triangleMeshGraphicsPipeline.trianglePipelineLayout,
+        pushConstants.vertexBufferAddress = gpuMeshes[objId]->meshBuffer.vertexBufferAddress;
+        cmd.pushConstants(simpleMeshGraphicsPipeline.pipelineLayout,
                           vk::ShaderStageFlagBits::eVertex,
                           0,
-                          sizeof(TriangleMeshPush),
+                          sizeof(MeshPush),
                           &pushConstants);
-        cmd.bindIndexBuffer(rectangle.indexBuffer.buffer, 0, vk::IndexType::eUint32);
-        cmd.drawIndexed(6, 1, 0, 0, 0);
+        cmd.bindIndexBuffer(gpuMeshes[objId]->meshBuffer.indexBuffer.buffer,
+                            0,
+                            vk::IndexType::eUint32);
+        cmd.drawIndexed(gpuMeshes[objId]->surfaces[0].count,
+                        1,
+                        gpuMeshes[objId]->surfaces[0].startIndex,
+                        0,
+                        0);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }

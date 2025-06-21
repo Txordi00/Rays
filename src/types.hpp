@@ -39,7 +39,7 @@ const uint64_t FENCE_TIMEOUT = 1000000000;
 #define SKY_SHADER_FP "shaders/sky.comp.spv"
 #define TRIANGLE_VERT_SHADER "shaders/triangle.vert.spv"
 #define TRIANGLE_FRAG_SHADER "shaders/triangle.frag.spv"
-#define TRIANGLE_MESH_VERT_SHADER "shaders/triangle_mesh.vert.spv"
+#define SIMPLE_MESH_VERT_SHADER "shaders/triangle_mesh.vert.spv"
 
 struct DescriptorSetData
 {
