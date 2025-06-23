@@ -84,8 +84,7 @@ private:
     // Pipelines
     void init_pipelines();
     std::vector<ComputePipelineData> computePipelines;
-    SimplePipelineData triangleGraphicsPipeline;
-    int currentPipelineIndex{0};
+    int currentBackgroundPipelineIndex{1};
     SimplePipelineData simpleMeshGraphicsPipeline;
 
     // Meshes

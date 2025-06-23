@@ -16,6 +16,12 @@ import vulkan_hpp;
 #define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+#define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_LEFT_HANDED
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/transform.hpp>
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
@@ -62,8 +68,6 @@ void Engine::clean()
         }
         device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
-        device.destroyPipelineLayout(triangleGraphicsPipeline.pipelineLayout);
-        device.destroyPipeline(triangleGraphicsPipeline.pipeline);
         device.destroyDescriptorPool(imguiPool);
         for (int i = 0; i < computePipelines.size(); i++) {
             device.destroyPipelineLayout(computePipelines[i].pipelineLayout);
@@ -434,7 +438,6 @@ void Engine::init_descriptors()
 void Engine::init_pipelines()
 {
     computePipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
-    triangleGraphicsPipeline = get_triangle_pipeline(device, imageDraw.format);
     simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device, imageDraw.format);
 }
 
@@ -584,10 +587,13 @@ void Engine::run()
         ImGui::NewFrame();
 
         if (ImGui::Begin("background")) {
-            ComputePipelineData &currentPipeline = computePipelines[currentPipelineIndex];
+            ComputePipelineData &currentPipeline = computePipelines[currentBackgroundPipelineIndex];
             const std::string text = "Selected background compute shader: " + currentPipeline.name;
             ImGui::Text("%s", text.c_str());
-            ImGui::SliderInt("Shader Index: ", &currentPipelineIndex, 0, computePipelines.size() - 1);
+            ImGui::SliderInt("Shader Index: ",
+                             &currentBackgroundPipelineIndex,
+                             0,
+                             computePipelines.size() - 1);
             glm::vec4 *colorUp = (glm::vec4 *) computePipelines[0].pushData;
             glm::vec4 *colorDown = (glm::vec4 *) ((char *) computePipelines[0].pushData
                                                   + sizeof(glm::vec4));
@@ -726,17 +732,17 @@ void Engine::draw()
 void Engine::change_background(const vk::CommandBuffer &cmd)
 {
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute,
-                     computePipelines[currentPipelineIndex].pipeline);
+                     computePipelines[currentBackgroundPipelineIndex].pipeline);
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                           computePipelines[currentPipelineIndex].pipelineLayout,
+                           computePipelines[currentBackgroundPipelineIndex].pipelineLayout,
                            0,
                            drawImageDescriptors,
                            nullptr);
-    cmd.pushConstants(computePipelines[currentPipelineIndex].pipelineLayout,
+    cmd.pushConstants(computePipelines[currentBackgroundPipelineIndex].pipelineLayout,
                       vk::ShaderStageFlagBits::eCompute,
                       0,
-                      computePipelines[currentPipelineIndex].pushDataSize,
-                      computePipelines[currentPipelineIndex].pushData);
+                      computePipelines[currentBackgroundPipelineIndex].pushDataSize,
+                      computePipelines[currentBackgroundPipelineIndex].pushData);
     cmd.dispatch(std::ceil((float) imageDraw.extent.width / 16.f),
                  std::ceil((float) imageDraw.extent.height / 16.f),
                  1);
@@ -770,15 +776,56 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 
     try {
         cmd.beginRendering(renderInfo);
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, triangleGraphicsPipeline.pipeline);
         cmd.setViewport(0, viewport);
         cmd.setScissor(0, scissor);
-        cmd.draw(3, 1, 0, 0);
 
         int objId = 2;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, simpleMeshGraphicsPipeline.pipeline);
+
+        // The order is translate -> rotate -> scale.
+        // I am confused about the Z-axis here. Why translating in +z makes objects bigger
+        // and not smaller?
+        glm::mat4 modelMat = glm::translate(glm::mat4(1.f),
+                                            glm::vec3(static_cast<float>(frameNumber) * 0.01,
+                                                      0.f,
+                                                      -5.f));
+        // I implement the rotations as quaternions and I accumulate them in quaternion space
+        glm::quat rotQuat = glm::angleAxis(glm::radians(static_cast<float>(frameNumber % 360)),
+                                           glm::vec3(0, 0, -1));
+        // After that I generate the rotation matrix with them. Would be more efficient to send directly
+        // the quaternions + the translations to the shader?
+        glm::mat4 rotMat = glm::toMat4(rotQuat);
+        // This becomes modelMat = T * R
+        modelMat *= rotMat;
+        // modelMat = T * R * S
+        modelMat = glm::scale(modelMat, glm::vec3(0.5f));
+
+        // The order is the opposite since we are actually writing an inverse matrix here.
+        // I don't think that it makes sense to do any scaling in the view matrix
+        glm::quat viewPitchQuat = glm::angleAxis(glm::radians(0.f), glm::vec3(1, 0, 0));
+        // Rotate the camera slightly to the left. The angle is -10 instead of +10 because
+        // the inverse of a rotation \theta is a rotation -\theta
+        glm::quat viewYawQuat = glm::angleAxis(glm::radians(-10.f), glm::vec3(0, 1, 0));
+        glm::quat viewRollQuat = glm::angleAxis(glm::radians(0.f), glm::vec3(0, 0, -1));
+        // No need to normalize. As with complex numbers, the product of quaternions
+        // is unitary
+        glm::quat viewRotQuat = viewPitchQuat * viewYawQuat * viewRollQuat;
+        glm::mat4 viewRotMat = glm::toMat4(viewRotQuat);
+        // I am not sure about wether this translation should go here or before the rotation...
+        glm::mat4 viewMat = glm::translate(viewRotMat, glm::vec3(0.f, 0.f, -.5f));
+
+        // Point-projection matrix. It's cool that GLM has a simple method to write it!
+        glm::mat4 projMat = glm::perspective(glm::radians(70.f),
+                                             static_cast<float>(swapchainExtent.width)
+                                                 / static_cast<float>(swapchainExtent.height),
+                                             0.01f,
+                                             100.f);
+
+        // Final matrix that I send to the vertex shader
+        glm::mat4 mvpMatrix = projMat * viewMat * modelMat;
+
         MeshPush pushConstants;
-        pushConstants.worldMatrix = glm::mat4{1.f};
+        pushConstants.worldMatrix = mvpMatrix;
         pushConstants.vertexBufferAddress = gpuMeshes[objId]->meshBuffer.vertexBufferAddress;
         cmd.pushConstants(simpleMeshGraphicsPipeline.pipelineLayout,
                           vk::ShaderStageFlagBits::eVertex,

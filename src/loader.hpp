@@ -1,4 +1,5 @@
 #pragma once
+#include "fastgltf/core.hpp"
 #include "types.hpp"
 #include <fastgltf/types.hpp>
 #include <filesystem>
@@ -39,5 +40,6 @@ public:
     bool overrideColorsWithNormals = true;
 
 private:
+    fastgltf::Parser parser{};
     fastgltf::Asset gltf;
 };

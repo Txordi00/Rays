@@ -1,5 +1,5 @@
 #include "loader.hpp"
-#include <fastgltf/core.hpp>
+
 #include <fastgltf/tools.hpp>
 
 // I don't think that I will need shared pointers here.
@@ -14,8 +14,6 @@ std::vector<std::shared_ptr<HostMeshAsset>> GLTFLoader::loadGLTFMeshes(
                              + std::string(fastgltf::getErrorMessage(data.error())) + "\n";
         throw std::runtime_error(errStr);
     }
-
-    fastgltf::Parser parser{};
 
     auto gltfTemp = parser.loadGltfBinary(data.get(),
                                           fp.parent_path(),
@@ -43,7 +41,6 @@ std::vector<std::shared_ptr<HostMeshAsset>> GLTFLoader::loadGLTFMeshes(
         }
         meshes.emplace_back(std::make_shared<HostMeshAsset>(std::move(meshAsset)));
     }
-    // gltf.accessors
     return meshes;
 }
 
@@ -78,8 +75,8 @@ void GLTFLoader::loadMesh(const fastgltf::Mesh &mesh,
         fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
             gltf, posAccessor, [&](fastgltf::math::fvec3 v, size_t index) {
                 Vertex vertex;
-                vertex.position = glm::vec3(v.x(), v.y(), v.z());
-                vertex.normal = {1, 0, 0};
+                vertex.position = glm::vec3(v.x(), -v.y(), v.z());
+                vertex.normal = {0, 0, 0};
                 vertex.color = glm::vec4{1.f};
                 vertex.uvX = 0;
                 vertex.uvY = 0;
@@ -92,7 +89,8 @@ void GLTFLoader::loadMesh(const fastgltf::Mesh &mesh,
         if (normals != p.attributes.end()) {
             fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
                 gltf, normAccessor, [&](fastgltf::math::fvec3 v, size_t index) {
-                    vertices[verticesIndex0 + index].normal = glm::vec3(v.x(), v.y(), v.z());
+                    // - at y?
+                    vertices[verticesIndex0 + index].normal = glm::vec3(v.x(), -v.y(), v.z());
                 });
         }
 
@@ -103,7 +101,8 @@ void GLTFLoader::loadMesh(const fastgltf::Mesh &mesh,
             fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
                 gltf, uvAccessor, [&](fastgltf::math::fvec2 v, size_t index) {
                     vertices[verticesIndex0 + index].uvX = v.x();
-                    vertices[verticesIndex0 + index].uvY = v.y();
+                    // - at y?
+                    vertices[verticesIndex0 + index].uvY = -v.y();
                 });
         }
 
