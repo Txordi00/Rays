@@ -16,10 +16,6 @@ import vulkan_hpp;
 #define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#define GLM_ENABLE_EXPERIMENTAL
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_LEFT_HANDED
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 #include <imgui/imgui.h>
@@ -88,6 +84,8 @@ void Engine::clean()
         instance.destroySurfaceKHR(surface);
         device.destroyImageView(imageDraw.imageView);
         vmaDestroyImage(allocator, imageDraw.image, imageDraw.allocation);
+        device.destroyImageView(imageDepth.imageView);
+        vmaDestroyImage(allocator, imageDepth.image, imageDepth.allocation);
         vmaDestroyAllocator(allocator);
         device.destroy();
         vkb::destroy_debug_utils_messenger(instance, debugMessenger);
@@ -190,7 +188,7 @@ void Engine::create_draw_data()
     imageDraw.format = vk::Format::eR16G16B16A16Sfloat;
     imageDraw.extent = drawExtent;
 
-    // Probably have to add Storage and Color Attachment later on
+    // We should be able to erase Storage if we get rid of the background compute pipeline
     vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
                                          | vk::ImageUsageFlagBits::eTransferSrc
                                          | vk::ImageUsageFlagBits::eStorage
@@ -219,6 +217,35 @@ void Engine::create_draw_data()
                                               imageDraw.image,
                                               vk::ImageAspectFlagBits::eColor);
     imageDraw.imageView = device.createImageView(imageViewCreateInfo);
+
+    // The same for the depth image & image view:
+    imageDepth.format = vk::Format::eD32Sfloat;
+    imageDepth.extent = drawExtent;
+
+    vk::ImageUsageFlags depthUsageFlags = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    vk::ImageCreateInfo depthCreateInfo = utils::init::image_create_info(imageDepth.format,
+                                                                         depthUsageFlags,
+                                                                         imageDepth.extent);
+
+    VmaAllocationCreateInfo depthAllocationInfo{};
+    depthAllocationInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    vmaCreateImage(allocator,
+                   (VkImageCreateInfo *) &depthCreateInfo,
+                   &depthAllocationInfo,
+                   (VkImage *) &imageDepth.image,
+                   &imageDepth.allocation,
+                   nullptr);
+
+    vk::ImageViewCreateInfo depthViewInfo
+        = utils::init::image_view_create_info(imageDepth.format,
+                                              imageDepth.image,
+                                              vk::ImageAspectFlagBits::eDepth);
+
+    try {
+        imageDepth.imageView = device.createImageView(depthViewInfo);
+    } catch (const std::exception &e) {
+        VK_CHECK_EXC(e);
+    }
 }
 
 void Engine::init_commands()
@@ -438,7 +465,9 @@ void Engine::init_descriptors()
 void Engine::init_pipelines()
 {
     computePipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
-    simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device, imageDraw.format);
+    simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
+                                                          imageDraw.format,
+                                                          imageDepth.format);
 }
 
 Buffer Engine::create_buffer(const vk::DeviceSize &size,
@@ -656,6 +685,11 @@ void Engine::draw()
                             vk::ImageLayout::eGeneral,
                             vk::ImageLayout::eColorAttachmentOptimal);
 
+    utils::transition_image(cmd,
+                            imageDepth.image,
+                            vk::ImageLayout::eUndefined,
+                            vk::ImageLayout::eDepthAttachmentOptimal);
+
     draw_meshes(cmd);
 
     // Transition the draw image to be sent and the swapchain image to receive it
@@ -756,8 +790,16 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
     colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
     colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
 
+    vk::RenderingAttachmentInfo depthAttachmentInfo{};
+    depthAttachmentInfo.setImageView(imageDepth.imageView);
+    depthAttachmentInfo.setImageLayout(vk::ImageLayout::eDepthAttachmentOptimal);
+    depthAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eClear);
+    depthAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
+    depthAttachmentInfo.setClearValue(vk::ClearValue{vk::ClearDepthStencilValue{1.f}});
+
     vk::RenderingInfo renderInfo{};
     renderInfo.setColorAttachments(colorAttachmentInfo);
+    renderInfo.setPDepthAttachment(&depthAttachmentInfo);
     renderInfo.setLayerCount(1);
     renderInfo.setRenderArea(vk::Rect2D{vk::Offset2D{0, 0}, swapchainExtent});
 
@@ -788,7 +830,7 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         glm::mat4 modelMat = glm::translate(glm::mat4(1.f),
                                             glm::vec3(static_cast<float>(frameNumber) * 0.01,
                                                       0.f,
-                                                      -5.f));
+                                                      5.f));
         // I implement the rotations as quaternions and I accumulate them in quaternion space
         glm::quat rotQuat = glm::angleAxis(glm::radians(static_cast<float>(frameNumber % 360)),
                                            glm::vec3(0, 0, -1));
@@ -803,7 +845,7 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         // The order is the opposite since we are actually writing an inverse matrix here.
         // I don't think that it makes sense to do any scaling in the view matrix
         glm::quat viewPitchQuat = glm::angleAxis(glm::radians(0.f), glm::vec3(1, 0, 0));
-        // Rotate the camera slightly to the left. The angle is -10 instead of +10 because
+        // Rotate the camera slightly to the right. The angle is -10 instead of +10 because
         // the inverse of a rotation \theta is a rotation -\theta
         glm::quat viewYawQuat = glm::angleAxis(glm::radians(-10.f), glm::vec3(0, 1, 0));
         glm::quat viewRollQuat = glm::angleAxis(glm::radians(0.f), glm::vec3(0, 0, -1));
@@ -812,7 +854,7 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         glm::quat viewRotQuat = viewPitchQuat * viewYawQuat * viewRollQuat;
         glm::mat4 viewRotMat = glm::toMat4(viewRotQuat);
         // I am not sure about wether this translation should go here or before the rotation...
-        glm::mat4 viewMat = glm::translate(viewRotMat, glm::vec3(0.f, 0.f, -.5f));
+        glm::mat4 viewMat = glm::translate(viewRotMat, glm::vec3(0.f, 0.f, 0.f));
 
         // Point-projection matrix. It's cool that GLM has a simple method to write it!
         glm::mat4 projMat = glm::perspective(glm::radians(70.f),
@@ -820,6 +862,12 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
                                                  / static_cast<float>(swapchainExtent.height),
                                              0.01f,
                                              100.f);
+        // glm::mat4 projMat
+        //     = utils::get_perspective_projection(glm::radians(70.f),
+        //                                         static_cast<float>(swapchainExtent.width)
+        //                                             / static_cast<float>(swapchainExtent.height),
+        //                                         0.01f,
+        //                                         100.f);
 
         // Final matrix that I send to the vertex shader
         glm::mat4 mvpMatrix = projMat * viewMat * modelMat;

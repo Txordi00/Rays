@@ -62,6 +62,7 @@ private:
 
     // Draw date
     ImageData imageDraw;
+    ImageData imageDepth;
     // vk::Extent2D imageDrawExtent;
 
     // Commands data

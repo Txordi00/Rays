@@ -1,6 +1,7 @@
 #include "loader.hpp"
 
 #include <fastgltf/tools.hpp>
+#include <iostream>
 
 // I don't think that I will need shared pointers here.
 std::vector<std::shared_ptr<HostMeshAsset>> GLTFLoader::loadGLTFMeshes(
@@ -75,7 +76,7 @@ void GLTFLoader::loadMesh(const fastgltf::Mesh &mesh,
         fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
             gltf, posAccessor, [&](fastgltf::math::fvec3 v, size_t index) {
                 Vertex vertex;
-                vertex.position = glm::vec3(v.x(), -v.y(), v.z());
+                vertex.position = glm::vec3(v.x(), -v.y(), -v.z());
                 vertex.normal = {0, 0, 0};
                 vertex.color = glm::vec4{1.f};
                 vertex.uvX = 0;
@@ -90,7 +91,7 @@ void GLTFLoader::loadMesh(const fastgltf::Mesh &mesh,
             fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
                 gltf, normAccessor, [&](fastgltf::math::fvec3 v, size_t index) {
                     // - at y?
-                    vertices[verticesIndex0 + index].normal = glm::vec3(v.x(), -v.y(), v.z());
+                    vertices[verticesIndex0 + index].normal = glm::vec3(v.x(), -v.y(), -v.z());
                 });
         }
 

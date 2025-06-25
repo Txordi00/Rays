@@ -24,7 +24,8 @@ SimplePipelineData get_triangle_pipeline(const vk::Device &device,
                                          const vk::Format &colorImageFormat);
 
 SimplePipelineData get_simple_mesh_pipeline(const vk::Device &device,
-                                            const vk::Format &colorImageFormat);
+                                            const vk::Format &colorImageFormat,
+                                            const vk::Format &depthImageFormat);
 
 class GraphicsPipelineBuilder
 {
@@ -53,6 +54,7 @@ public:
     void set_color_attachment_format(const vk::Format &format);
     void set_depth_format(const vk::Format &format);
     void disable_depthtest();
+    void enable_depthtest();
 
     vk::Pipeline buildPipeline(const vk::Device &device);
 };

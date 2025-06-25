@@ -100,6 +100,19 @@ void GraphicsPipelineBuilder::disable_depthtest()
     depthStencil.setMaxDepthBounds(1.f);
 }
 
+void GraphicsPipelineBuilder::enable_depthtest()
+{
+    depthStencil.setDepthTestEnable(vk::True);
+    depthStencil.setDepthWriteEnable(vk::True);
+    depthStencil.setDepthCompareOp(vk::CompareOp::eLess);
+    depthStencil.setDepthBoundsTestEnable(vk::False);
+    depthStencil.setStencilTestEnable(vk::False);
+    // depthStencil.setFront(vk::StencilOpState{});
+    // depthStencil.setBack(vk::StencilOpState{});
+    depthStencil.setMinDepthBounds(0.f);
+    depthStencil.setMaxDepthBounds(1.f);
+}
+
 vk::Pipeline GraphicsPipelineBuilder::buildPipeline(const vk::Device &device)
 {
     // make viewport state from our stored viewport and scissor.
@@ -205,7 +218,8 @@ SimplePipelineData get_triangle_pipeline(const vk::Device &device,
 }
 
 SimplePipelineData get_simple_mesh_pipeline(const vk::Device &device,
-                                            const vk::Format &colorImageFormat)
+                                            const vk::Format &colorImageFormat,
+                                            const vk::Format &depthImageFormat)
 {
     SimplePipelineData trianglePipelineData;
 
@@ -237,18 +251,20 @@ SimplePipelineData get_simple_mesh_pipeline(const vk::Device &device,
     pipelineBuilder.set_input_topology(vk::PrimitiveTopology::eTriangleList);
     //filled triangles
     pipelineBuilder.set_polygon_mode(vk::PolygonMode::eFill);
+    //set depth testing
+    pipelineBuilder.enable_depthtest();
+    // //no depth testing
+    // pipelineBuilder.disable_depthtest();
     //no backface culling
     pipelineBuilder.set_cull_mode(vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
     //no multisampling
     pipelineBuilder.set_multisampling_none();
     //no blending
     pipelineBuilder.disable_blending();
-    //no depth testing
-    pipelineBuilder.disable_depthtest();
 
     //connect the image format we will draw into, from draw image
     pipelineBuilder.set_color_attachment_format(colorImageFormat);
-    pipelineBuilder.set_depth_format(vk::Format::eUndefined);
+    pipelineBuilder.set_depth_format(depthImageFormat);
 
     try {
         trianglePipelineData.pipeline = pipelineBuilder.buildPipeline(device);

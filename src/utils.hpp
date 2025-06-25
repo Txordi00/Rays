@@ -6,6 +6,8 @@
 import vulkan_hpp;
 #endif
 
+#include <glm/glm.hpp>
+
 namespace utils {
 
 void transition_image(vk::CommandBuffer &cmd,
@@ -20,6 +22,11 @@ void copy_image(vk::CommandBuffer &cmd,
                 const vk::Extent2D &dstRes);
 
 vk::ShaderModule load_shader(const vk::Device &device, const std::string filePath);
+
+glm::mat4 get_perspective_projection(const float fovy,
+                                     const float aspect,
+                                     const float near,
+                                     const float far);
 
 namespace init {
 

@@ -106,6 +106,23 @@ vk::ShaderModule load_shader(const vk::Device &device, const std::string filePat
     return device.createShaderModule(shaderModuleCreateInfo);
 }
 
+glm::mat4 get_perspective_projection(const float fovy,
+                                     const float aspect,
+                                     const float near,
+                                     const float far)
+{
+    assert(std::abs(aspect) > std::numeric_limits<float>::epsilon());
+    const float tanHalfFovy = tan(fovy / 2.f);
+    glm::mat4 projectionMatrix{0.0f};
+    projectionMatrix[0][0] = 1.f / (aspect * tanHalfFovy);
+    projectionMatrix[1][1] = 1.f / (tanHalfFovy);
+    projectionMatrix[2][2] = far / (far - near);
+    projectionMatrix[2][3] = 1.f;
+    projectionMatrix[3][2] = -(far * near) / (far - near);
+
+    return projectionMatrix;
+}
+
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
@@ -143,6 +160,8 @@ vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
 }
 
 } // namespace init
+
+// namespace init
 
 // struct DeletionQueue
 // {
