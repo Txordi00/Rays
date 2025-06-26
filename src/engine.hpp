@@ -4,6 +4,7 @@
 // #else
 // import vulkan_hpp;
 // #endif
+#include "camera.hpp"
 #include "descriptors.hpp"
 #include "loader.hpp"
 #include "raster_pipelines.hpp"
@@ -90,6 +91,9 @@ private:
 
     // Meshes
     std::vector<std::shared_ptr<DeviceMeshAsset>> gpuMeshes;
+
+    // Camera
+    Camera camera{};
 
     // Draw commands
     void change_background(const vk::CommandBuffer &cmd);
