@@ -33,13 +33,14 @@ public:
     void lookLeft(const float &dx);
 
     glm::mat4 getViewMatrix() const { return viewMatrix; };
-    glm::quat getOrientationQuat() const { return orientationQuat; };
     glm::vec3 getPosition() const { return position; };
     glm::mat4 getProjMatrix() const { return projMatrix; };
 
 private:
     glm::mat4 viewMatrix{1.f};
-    glm::quat orientationQuat{glm::angleAxis(glm::radians(0.f), glm::vec3(0, 0, -1))};
+    glm::quat rotationQuat{glm::angleAxis(glm::radians(0.f), glm::vec3(0, 0, -1))};
+    // forward look
+    glm::vec3 orientation{0, 0, -1};
     glm::vec3 position{0.f};
     glm::mat4 projMatrix{1.f};
 };
