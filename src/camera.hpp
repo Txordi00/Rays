@@ -14,8 +14,6 @@ public:
     Camera() = default;
     ~Camera() = default;
 
-    void setPosition(const glm::vec3 &position);
-    void setOrientation(const glm::vec3 &orientation);
     void setViewMatrix();
     void setProjMatrix(
         const float &fov, const float &w, const float &h, const float &near, const float &far);
@@ -32,15 +30,14 @@ public:
     void lookRight(const float &dx);
     void lookLeft(const float &dx);
 
+    void update();
+
     glm::mat4 getViewMatrix() const { return viewMatrix; };
-    glm::vec3 getPosition() const { return position; };
     glm::mat4 getProjMatrix() const { return projMatrix; };
 
 private:
     glm::mat4 viewMatrix{1.f};
-    glm::quat rotationQuat{glm::angleAxis(glm::radians(0.f), glm::vec3(0, 0, -1))};
-    // forward look
-    glm::vec3 orientation{0, 0, -1};
-    glm::vec3 position{0.f};
+    glm::vec3 orientation{0, 0, 1};
+    glm::vec3 translation{0.f};
     glm::mat4 projMatrix{1.f};
 };

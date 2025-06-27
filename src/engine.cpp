@@ -594,8 +594,8 @@ void Engine::run()
                          static_cast<float>(swapchainExtent.height),
                          0.01f,
                          100.f);
-    const float dx = 0.1f;
-    const float dt = glm::radians(1.f);
+    const float dx = 0.5f;
+    const float dt = glm::radians(2.f);
 
     // Main loop
     while (!quit) {
@@ -670,7 +670,6 @@ void Engine::run()
         //make imgui calculate internal draw structures
         ImGui::Render();
         // Draw if not minimized
-
         draw();
     }
 }
@@ -861,20 +860,16 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         // The order is translate -> rotate -> scale.
         // I am confused about the Z-axis here. Why translating in +z makes objects bigger
         // and not smaller?
-        glm::mat4 modelMat = glm::translate(glm::mat4(1.f),
-                                            glm::vec3(static_cast<float>(frameNumber) * 0.f,
-                                                      0.f,
-                                                      5.f));
+        glm::mat4 transMat = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, 7.f));
         // I implement the rotations as quaternions and I accumulate them in quaternion space
-        glm::quat rotQuat = glm::angleAxis(glm::radians(static_cast<float>(frameNumber % 360)),
-                                           glm::vec3(0, 0, -1));
+        glm::quat rotQuat = glm::angleAxis(0.f, glm::vec3(0, 0, -1));
         // After that I generate the rotation matrix with them. Would be more efficient to send directly
         // the quaternions + the translations to the shader?
         glm::mat4 rotMat = glm::toMat4(rotQuat);
         // This becomes modelMat = T * R
-        modelMat *= rotMat;
+        glm::mat4 modelMat = transMat * rotMat;
         // modelMat = T * R * S
-        modelMat = glm::scale(modelMat, glm::vec3(0.5f));
+        // modelMat = glm::scale(modelMat, glm::vec3(0.5f));
 
         // // The order is the opposite since we are actually writing an inverse matrix here.
         // // I don't think that it makes sense to do any scaling in the view matrix
@@ -898,8 +893,9 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         //                                      100.f);
 
         // camera.forward(0.01f);
-        camera.setViewMatrix();
+        // camera.setViewMatrix();
         // Final matrix that I send to the vertex shader
+        camera.update();
         glm::mat4 mvpMatrix = camera.getProjMatrix() * camera.getViewMatrix() * modelMat;
 
         MeshPush pushConstants;
