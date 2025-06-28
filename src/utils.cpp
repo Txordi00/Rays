@@ -123,6 +123,31 @@ glm::mat4 get_perspective_projection(const float fovy,
     return projectionMatrix;
 }
 
+Buffer create_buffer(const VmaAllocator &allocator,
+                     const vk::DeviceSize &size,
+                     const vk::BufferUsageFlags &usageFlags,
+                     const VmaMemoryUsage &memoryUsage,
+                     const VmaAllocationCreateFlags &allocationFlags)
+{
+    vk::BufferCreateInfo bufferInfo{};
+    bufferInfo.setUsage(usageFlags);
+    bufferInfo.setSize(size);
+
+    VmaAllocationCreateInfo vmaallocInfo{};
+    vmaallocInfo.usage = memoryUsage;
+    vmaallocInfo.flags = allocationFlags;
+
+    Buffer createdBuffer;
+    VK_CHECK_RES(vmaCreateBuffer(allocator,
+                                 (VkBufferCreateInfo *) &bufferInfo,
+                                 &vmaallocInfo,
+                                 (VkBuffer *) &createdBuffer.buffer,
+                                 &createdBuffer.allocation,
+                                 &createdBuffer.allocationInfo));
+
+    return createdBuffer;
+}
+
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
@@ -160,24 +185,5 @@ vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
 }
 
 } // namespace init
-
-// namespace init
-
-// struct DeletionQueue
-// {
-//     std::deque<std::function<void()>> deletors;
-
-//     void push_function(std::function<void()> &&function) { deletors.push_back(function); }
-
-//     void flush()
-//     {
-//         // reverse iterate the deletion queue to execute all the functions
-//         for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
-//             (*it)(); //call functors
-//         }
-
-//         deletors.clear();
-//     }
-// };
 
 } // namespace utils

@@ -59,9 +59,8 @@ void Engine::clean()
         device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
-        for (auto &m : gpuMeshes) {
-            destroy_buffer(m->meshBuffer.vertexBuffer);
-            destroy_buffer(m->meshBuffer.indexBuffer);
+        for (auto &m : models) {
+            m->destroyBuffers(allocator);
         }
         device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
@@ -299,38 +298,20 @@ void Engine::load_meshes()
     gltfLoader.overrideColorsWithNormals = true;
     std::vector<std::shared_ptr<HostMeshAsset>> cpuMeshes = gltfLoader.loadGLTFMeshes(
         "../../assets/basicmesh.glb");
-    gpuMeshes.resize(cpuMeshes.size());
     models.resize(cpuMeshes.size());
     for (int i = 0; i < cpuMeshes.size(); i++) {
-        gpuMeshes[i] = std::make_shared<DeviceMeshAsset>(cpuMeshes[i]->name,
-                                                         cpuMeshes[i]->surfaces,
-                                                         create_mesh(cpuMeshes[i]->indices,
-                                                                     cpuMeshes[i]->vertices));
         models[i] = std::make_shared<Model>(*cpuMeshes[i]);
+        models[i]->createGpuMesh(device, allocator, cmdTransfer, transferFence, transferQueue);
     }
 }
 
 void Engine::init_imgui()
 {
-    // 1: create descriptor pool for IMGUI
-    //  the size of the pool is very oversize, but it's copied from imgui demo
-    //  itself.
+    // Create descriptor pool for IMGUI
     std::vector<vk::DescriptorPoolSize> poolSizes = {
         {vk::DescriptorType::eCombinedImageSampler,
          IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE},
     };
-    // std::vector<vk::DescriptorPoolSize> poolSizes
-    //     = {{vk::DescriptorType::eSampler, 1000},
-    //        {vk::DescriptorType::eCombinedImageSampler, 1000},
-    //        {vk::DescriptorType::eSampledImage, 1000},
-    //        {vk::DescriptorType::eStorageImage, 1000},
-    //        {vk::DescriptorType::eUniformTexelBuffer, 1000},
-    //        {vk::DescriptorType::eStorageTexelBuffer, 1000},
-    //        {vk::DescriptorType::eUniformBuffer, 1000},
-    //        {vk::DescriptorType::eStorageBuffer, 1000},
-    //        {vk::DescriptorType::eUniformBufferDynamic, 1000},
-    //        {vk::DescriptorType::eStorageBufferDynamic, 1000},
-    //        {vk::DescriptorType::eInputAttachment, 1000}};
 
     vk::DescriptorPoolCreateInfo poolInfo{};
     poolInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
@@ -473,118 +454,11 @@ void Engine::init_pipelines()
                                                           imageDepth.format);
 }
 
-Buffer Engine::create_buffer(const vk::DeviceSize &size,
-                             const vk::BufferUsageFlags &usageFlags,
-                             const VmaMemoryUsage &memoryUsage,
-                             const VmaAllocationCreateFlags &allocationFlags)
-{
-    vk::BufferCreateInfo bufferInfo{};
-    bufferInfo.setUsage(usageFlags);
-    bufferInfo.setSize(size);
-
-    VmaAllocationCreateInfo vmaallocInfo{};
-    vmaallocInfo.usage = memoryUsage;
-    vmaallocInfo.flags = allocationFlags;
-
-    Buffer createdBuffer;
-    VK_CHECK_RES(vmaCreateBuffer(allocator,
-                                 (VkBufferCreateInfo *) &bufferInfo,
-                                 &vmaallocInfo,
-                                 (VkBuffer *) &createdBuffer.buffer,
-                                 &createdBuffer.allocation,
-                                 &createdBuffer.allocationInfo));
-
-    return createdBuffer;
-}
-
 void Engine::destroy_buffer(const Buffer &buffer)
 {
     vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
 }
 
-// OPTIMIZATION: This could be run on a separate thread in order to not force the main thread to wait
-// for fences
-MeshBuffer Engine::create_mesh(const std::span<uint32_t> &indices, const std::span<Vertex> &vertices)
-{
-    const vk::DeviceSize verticesSize = vertices.size() * sizeof(Vertex);
-    const vk::DeviceSize indicesSize = indices.size() * sizeof(uint32_t);
-
-    MeshBuffer mesh;
-
-    mesh.vertexBuffer = create_buffer(verticesSize,
-                                      vk::BufferUsageFlagBits::eStorageBuffer
-                                          | vk::BufferUsageFlagBits::eShaderDeviceAddress
-                                          | vk::BufferUsageFlagBits::eTransferDst,
-                                      VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-    // | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-    vk::BufferDeviceAddressInfo vertexAddressInfo{};
-    vertexAddressInfo.setBuffer(mesh.vertexBuffer.buffer);
-    mesh.vertexBufferAddress = device.getBufferAddress(vertexAddressInfo);
-
-    mesh.indexBuffer = create_buffer(indicesSize,
-                                     vk::BufferUsageFlagBits::eIndexBuffer
-                                         | vk::BufferUsageFlagBits::eTransferDst,
-                                     VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                     0);
-
-    Buffer stagingBuffer = create_buffer(verticesSize + indicesSize,
-                                         vk::BufferUsageFlagBits::eTransferSrc,
-                                         VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
-                                         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                                             | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-    void *stagingData = stagingBuffer.allocation->GetMappedData();
-
-    memcpy(stagingData, vertices.data(), verticesSize);
-    memcpy((char *) stagingData + verticesSize, indices.data(), indicesSize);
-
-    // Set info structures to copy from staging to vertex & index buffers
-    vk::CopyBufferInfo2 vertexCopyInfo{};
-    vertexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-    vertexCopyInfo.setDstBuffer(mesh.vertexBuffer.buffer);
-    vk::BufferCopy2 vertexCopy{};
-    vertexCopy.setSrcOffset(0);
-    vertexCopy.setDstOffset(0);
-    vertexCopy.setSize(verticesSize);
-    vertexCopyInfo.setRegions(vertexCopy);
-
-    vk::CopyBufferInfo2 indexCopyInfo{};
-    indexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-    indexCopyInfo.setDstBuffer(mesh.indexBuffer.buffer);
-    vk::BufferCopy2 indexCopy{};
-    indexCopy.setSrcOffset(verticesSize);
-    indexCopy.setDstOffset(0);
-    indexCopy.setSize(indicesSize);
-    indexCopyInfo.setRegions(indexCopy);
-
-    // New command buffer to copy in GPU from staging buffer to vertex & index buffers
-    device.resetFences(transferFence);
-
-    vk::CommandBufferBeginInfo cmdBeginInfo{};
-    cmdBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-
-    cmdTransfer.begin(cmdBeginInfo);
-    cmdTransfer.copyBuffer2(vertexCopyInfo);
-    cmdTransfer.copyBuffer2(indexCopyInfo);
-    cmdTransfer.end();
-
-    vk::CommandBufferSubmitInfo cmdSubmitInfo{};
-    cmdSubmitInfo.setCommandBuffer(cmdTransfer);
-    cmdSubmitInfo.setDeviceMask(1);
-    vk::SubmitInfo2 submitInfo{};
-    submitInfo.setCommandBufferInfos(cmdSubmitInfo);
-
-    try {
-        transferQueue.submit2(submitInfo, transferFence);
-        VK_CHECK_RES(device.waitForFences(transferFence, vk::True, FENCE_TIMEOUT));
-    } catch (const std::exception &e) {
-        VK_CHECK_EXC(e);
-    }
-    destroy_buffer(stagingBuffer);
-
-    return mesh;
-}
 
 void Engine::run()
 {
@@ -684,7 +558,6 @@ void Engine::run()
 void Engine::draw()
 {
     // Wait max 1s until the gpu finished rendering the last frame
-    // VK_CHECK(device.waitForFences(get_current_frame().renderFence, vk::True, FENCE_TIMEOUT));
     auto resWaitFences = device.waitForFences(get_current_frame().renderFence,
                                               vk::True,
                                               FENCE_TIMEOUT);
@@ -870,18 +743,18 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 
         MeshPush pushConstants;
         pushConstants.worldMatrix = mvpMatrix;
-        pushConstants.vertexBufferAddress = gpuMeshes[objId]->meshBuffer.vertexBufferAddress;
+        pushConstants.vertexBufferAddress = models[objId]->gpuMesh.meshBuffer.vertexBufferAddress;
         cmd.pushConstants(simpleMeshGraphicsPipeline.pipelineLayout,
                           vk::ShaderStageFlagBits::eVertex,
                           0,
                           sizeof(MeshPush),
                           &pushConstants);
-        cmd.bindIndexBuffer(gpuMeshes[objId]->meshBuffer.indexBuffer.buffer,
+        cmd.bindIndexBuffer(models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
                             0,
                             vk::IndexType::eUint32);
-        cmd.drawIndexed(gpuMeshes[objId]->surfaces[0].count,
+        cmd.drawIndexed(models[objId]->gpuMesh.surfaces[0].count,
                         1,
-                        gpuMeshes[objId]->surfaces[0].startIndex,
+                        models[objId]->gpuMesh.surfaces[0].startIndex,
                         0,
                         0);
     } catch (const std::exception &e) {

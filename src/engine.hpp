@@ -91,7 +91,6 @@ private:
     SimplePipelineData simpleMeshGraphicsPipeline;
 
     // Meshes
-    std::vector<std::shared_ptr<DeviceMeshAsset>> gpuMeshes;
     std::vector<std::shared_ptr<Model>> models;
 
     // Camera
@@ -107,10 +106,6 @@ private:
     void draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView);
 
     // Buffers
-    Buffer create_buffer(const vk::DeviceSize &size,
-                         const vk::BufferUsageFlags &usageFlags,
-                         const VmaMemoryUsage &memoryUsage,
-                         const VmaAllocationCreateFlags &allocationFlags);
     void destroy_buffer(const Buffer &buffer);
     MeshBuffer create_mesh(const std::span<uint32_t> &indices, const std::span<Vertex> &vertices);
 
