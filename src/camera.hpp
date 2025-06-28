@@ -14,7 +14,6 @@ public:
     Camera() = default;
     ~Camera() = default;
 
-    void setViewMatrix();
     void setProjMatrix(
         const float &fov, const float &w, const float &h, const float &near, const float &far);
 
@@ -32,10 +31,6 @@ public:
 
     void update();
 
-    glm::mat4 getViewMatrix() const { return viewMatrix; };
-    glm::mat4 getProjMatrix() const { return projMatrix; };
-
-private:
     glm::mat4 viewMatrix{1.f};
     glm::vec3 orientation{0, 0, 1};
     glm::vec3 translation{0.f};

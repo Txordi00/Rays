@@ -300,11 +300,13 @@ void Engine::load_meshes()
     std::vector<std::shared_ptr<HostMeshAsset>> cpuMeshes = gltfLoader.loadGLTFMeshes(
         "../../assets/basicmesh.glb");
     gpuMeshes.resize(cpuMeshes.size());
+    models.resize(cpuMeshes.size());
     for (int i = 0; i < cpuMeshes.size(); i++) {
         gpuMeshes[i] = std::make_shared<DeviceMeshAsset>(cpuMeshes[i]->name,
                                                          cpuMeshes[i]->surfaces,
                                                          create_mesh(cpuMeshes[i]->indices,
                                                                      cpuMeshes[i]->vertices));
+        models[i] = std::make_shared<Model>(*cpuMeshes[i]);
     }
 }
 
@@ -596,10 +598,15 @@ void Engine::run()
                          100.f);
     const float dx = 0.5f;
     const float dt = glm::radians(2.f);
+    models[2]->position = glm::vec3(0.f, 0.f, 7.f);
+    models[2]->updateModelMatrix();
+
+    int numKeys;
+    const bool *keyStates = SDL_GetKeyboardState(&numKeys);
 
     // Main loop
     while (!quit) {
-        SDL_Keycode key = 0;
+        // SDL_Keycode key = 0;
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
             case SDL_EVENT_QUIT:
@@ -613,26 +620,26 @@ void Engine::run()
                 stopRendering = false;
 
             case SDL_EVENT_KEY_DOWN:
-                key = e.key.key;
-                if (key == SDLK_W)
+                // key = e.key.key;
+                if (keyStates[SDL_SCANCODE_W])
                     camera.forward(dx);
-                else if (key == SDLK_S)
+                if (keyStates[SDL_SCANCODE_S])
                     camera.backwards(dx);
-                else if (key == SDLK_A)
+                if (keyStates[SDL_SCANCODE_A])
                     camera.left(dx);
-                else if (key == SDLK_D)
+                if (keyStates[SDL_SCANCODE_D])
                     camera.right(dx);
-                else if (key == SDLK_Q)
+                if (keyStates[SDL_SCANCODE_Q])
                     camera.down(dx);
-                else if (key == SDLK_E)
+                if (keyStates[SDL_SCANCODE_E])
                     camera.up(dx);
-                else if (key == SDLK_UP)
+                if (keyStates[SDL_SCANCODE_UP])
                     camera.lookUp(dt);
-                else if (key == SDLK_DOWN)
+                if (keyStates[SDL_SCANCODE_DOWN])
                     camera.lookDown(dt);
-                else if (key == SDLK_LEFT)
+                if (keyStates[SDL_SCANCODE_LEFT])
                     camera.lookLeft(dt);
-                else if (key == SDLK_RIGHT)
+                if (keyStates[SDL_SCANCODE_RIGHT])
                     camera.lookRight(dt);
             }
             //send SDL event to imgui for handling
@@ -857,46 +864,9 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         int objId = 2;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, simpleMeshGraphicsPipeline.pipeline);
 
-        // The order is translate -> rotate -> scale.
-        // I am confused about the Z-axis here. Why translating in +z makes objects bigger
-        // and not smaller?
-        glm::mat4 transMat = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, 7.f));
-        // I implement the rotations as quaternions and I accumulate them in quaternion space
-        glm::quat rotQuat = glm::angleAxis(0.f, glm::vec3(0, 0, -1));
-        // After that I generate the rotation matrix with them. Would be more efficient to send directly
-        // the quaternions + the translations to the shader?
-        glm::mat4 rotMat = glm::toMat4(rotQuat);
-        // This becomes modelMat = T * R
-        glm::mat4 modelMat = transMat * rotMat;
-        // modelMat = T * R * S
-        // modelMat = glm::scale(modelMat, glm::vec3(0.5f));
-
-        // // The order is the opposite since we are actually writing an inverse matrix here.
-        // // I don't think that it makes sense to do any scaling in the view matrix
-        // glm::quat viewPitchQuat = glm::angleAxis(glm::radians(0.f), glm::vec3(1, 0, 0));
-        // // Rotate the camera slightly to the right. The angle is -10 instead of +10 because
-        // // the inverse of a rotation \theta is a rotation -\theta
-        // glm::quat viewYawQuat = glm::angleAxis(glm::radians(-10.f), glm::vec3(0, 1, 0));
-        // glm::quat viewRollQuat = glm::angleAxis(glm::radians(0.f), glm::vec3(0, 0, -1));
-        // // No need to normalize. As with complex numbers, the product of quaternions
-        // // is unitary
-        // glm::quat viewRotQuat = viewPitchQuat * viewYawQuat * viewRollQuat;
-        // glm::mat4 viewRotMat = glm::toMat4(viewRotQuat);
-        // // I am not sure about wether this translation should go here or before the rotation...
-        // glm::mat4 viewMat = glm::translate(viewRotMat, glm::vec3(0.f, 0.f, 0.f));
-
-        // // Point-projection matrix. It's cool that GLM has a simple method to write it!
-        // glm::mat4 projMat = glm::perspective(glm::radians(70.f),
-        //                                      static_cast<float>(swapchainExtent.width)
-        //                                          / static_cast<float>(swapchainExtent.height),
-        //                                      0.01f,
-        //                                      100.f);
-
-        // camera.forward(0.01f);
-        // camera.setViewMatrix();
-        // Final matrix that I send to the vertex shader
+        // models[2]->updateModelMatrix();
         camera.update();
-        glm::mat4 mvpMatrix = camera.getProjMatrix() * camera.getViewMatrix() * modelMat;
+        glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix * models[2]->modelMatrix;
 
         MeshPush pushConstants;
         pushConstants.worldMatrix = mvpMatrix;

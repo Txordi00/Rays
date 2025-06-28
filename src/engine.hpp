@@ -7,6 +7,7 @@
 #include "camera.hpp"
 #include "descriptors.hpp"
 #include "loader.hpp"
+#include "model.hpp"
 #include "raster_pipelines.hpp"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
@@ -91,6 +92,7 @@ private:
 
     // Meshes
     std::vector<std::shared_ptr<DeviceMeshAsset>> gpuMeshes;
+    std::vector<std::shared_ptr<Model>> models;
 
     // Camera
     Camera camera{};

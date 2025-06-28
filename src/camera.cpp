@@ -2,11 +2,6 @@
 #include <glm/ext.hpp>
 
 
-void Camera::setViewMatrix()
-{
-    viewMatrix = glm::lookAt(translation, translation + orientation, glm::vec3(0, 1, 0));
-}
-
 void Camera::setProjMatrix(
     const float &fov, const float &w, const float &h, const float &near, const float &far)
 {
@@ -71,5 +66,5 @@ void Camera::lookLeft(const float &dx)
 
 void Camera::update()
 {
-    setViewMatrix();
+    viewMatrix = glm::lookAt(translation, translation + orientation, glm::vec3(0, 1, 0));
 }
