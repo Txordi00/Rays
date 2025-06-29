@@ -644,7 +644,7 @@ void Engine::draw()
     cmdInfo.setCommandBuffer(cmd);
     vk::SemaphoreSubmitInfo semaphoreWaitInfo{};
     semaphoreWaitInfo.setSemaphore(get_current_frame().swapchainSemaphore);
-    semaphoreWaitInfo.setStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+    semaphoreWaitInfo.setStageMask(vk::PipelineStageFlagBits2::eAllGraphics);
     semaphoreWaitInfo.setDeviceIndex(0);
     semaphoreWaitInfo.setValue(1);
     vk::SemaphoreSubmitInfo semaphoreSignalInfo{};

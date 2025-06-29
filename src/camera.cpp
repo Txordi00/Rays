@@ -54,13 +54,13 @@ void Camera::lookDown(const float &dx)
 
 void Camera::lookRight(const float &dx)
 {
-    glm::quat dr = glm::angleAxis(dx, glm::cross(glm::vec3(-1, 0, 0), orientation));
+    glm::quat dr = glm::angleAxis(dx, glm::vec3(0, 1, 0));
     orientation = dr * orientation;
 }
 
 void Camera::lookLeft(const float &dx)
 {
-    glm::quat dr = glm::angleAxis(dx, glm::cross(glm::vec3(1, 0, 0), orientation));
+    glm::quat dr = glm::angleAxis(dx, glm::vec3(0, -1, 0));
     orientation = dr * orientation;
 }
 
