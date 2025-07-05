@@ -6,9 +6,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(${PROJECT_NAME} main.cpp)
+# CImg
 target_include_directories(${PROJECT_NAME} PRIVATE "include")
 
+# Required for CImg
 find_package(PNG REQUIRED)
 find_package(X11 REQUIRED)
 include_directories(${X11_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PNG_LIBRARY} ${X11_LIBRARIES})
+
+# GLM
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
