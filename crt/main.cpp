@@ -16,6 +16,18 @@ const unsigned int W = 1920;
 const unsigned int H = 1080;
 // Aspect ratio
 const float AR = float(W) / float(H);
+// Background color
+const float BKGCOLOR[3] = {0.f, 0.f, 0.1f};
+
+struct PointLight
+{
+    PointLight(const glm::vec3 &position, const float &intensity)
+        : position(position)
+        , intensity(intensity)
+    {}
+    glm::vec3 position;
+    float intensity;
+};
 
 struct Sphere
 {
@@ -36,7 +48,7 @@ struct Sphere
     // db - (output) distance to the second intersection, i.e. a = o + da*d, b = o + db*d
     // d needs to be inputed normalized for performance reasons.
     // Returns true + da or da+db if intersects, false if not
-    bool ray_intersects(const glm::vec3 &o, const glm::vec3 &d, float &da, float &db)
+    bool ray_intersects(const glm::vec3 &o, const glm::vec3 &d, float &da, float &db) const
     {
         // default values
         da = -1.f;
@@ -84,13 +96,56 @@ struct Sphere
             return true;
         }
     }
+
+    // Computes the color (outColor) of a ray if there is an intersection
+    bool trace_ray(const glm::vec3 &o,
+                   const glm::vec3 &d,
+                   const std::vector<PointLight> &pointLights,
+                   glm::vec3 &outColor,
+                   float &da,
+                   float &db)
+    {
+        if (ray_intersects(o, d, da, db)) {
+            // Intersection point of the ray with the sphere
+            glm::vec3 a = o + da * d;
+            // Normal to the surface of the sphere
+            glm::vec3 normal = glm::normalize(a - c);
+            // Intensity of diffuse light
+            float diffuseIntensity = 0.f;
+            for (const PointLight &pl : pointLights) {
+                // vector from the ray intersection with the sphere to the point light
+                glm::vec3 plaDir = glm::normalize(a - pl.position);
+                // Accumulate intensity wrt to the amount of overlapping of the pointlight
+                // direction with the normal (dot product).
+                diffuseIntensity += pl.intensity * std::max(0.f, glm::dot(normal, plaDir));
+            }
+            outColor = color * diffuseIntensity;
+            return true;
+        }
+        // No intersection
+        return false;
+    }
 };
 
 int main()
 {
     glm::vec3 origin{0.f};
-    Sphere s{glm::vec3{-1.f, 0.f, 5.f}, 2.f, glm::vec3{0.2, 0.4, 0.2}};
+    std::vector<Sphere> spheres;
+    spheres.push_back(Sphere{glm::vec3{-1.f, 0.f, 5.f}, 2.f, glm::vec3{0.2, 0.4, 0.2}});
+    spheres.push_back(Sphere{glm::vec3{0.f, 2.f, 10.f}, 3.f, glm::vec3{0.4, 0.2, 0.2}});
+    // Sort the vector of spheres by distance to the camera
+    std::ranges::sort(spheres, [origin](const Sphere &s0, const Sphere &s1) {
+        return glm::length(s0.c - origin) > glm::length(s1.c - origin);
+    });
+
+    std::vector<PointLight> pointLights;
+    pointLights.push_back(PointLight(glm::vec3(-20.f, 20.f, 20.f), 2.f));
+
     CImg<float> img(W, H, 1, 3);
+    // Fill each channel‐slice for setting the background:
+    img.get_shared_slice(0).fill(BKGCOLOR[0]); // red
+    img.get_shared_slice(1).fill(BKGCOLOR[1]); // green
+    img.get_shared_slice(2).fill(BKGCOLOR[2]); // blue
 
     // I compute these here for performance reasons
     const float Hm1 = float(H) - 1.f;
@@ -107,23 +162,23 @@ int main()
         float y = (-1.f + 2.f * (float(i) + 0.5f) / Hm1) * Ft;
         float x = (-1.f + 2.f * (float(j) + 0.5f) / Wm1) * ARFt;
         glm::vec3 d = glm::normalize(glm::vec3{x, y, 1.f});
-        float da, db;
-        if (s.ray_intersects(origin, d, da, db)) {
-            img(j, i, 0, 0) = s.color.x;
-            img(j, i, 0, 1) = s.color.y;
-            img(j, i, 0, 2) = s.color.z;
-        } else {
-            img(j, i, 0, 0) = 0.05f;
-            img(j, i, 0, 1) = 0.05f;
-            img(j, i, 0, 2) = 0.2f;
+        for (Sphere &s : spheres) {
+            float da, db;
+            glm::vec3 color;
+            // Change the color only if there was an intersection
+            if (s.trace_ray(origin, d, pointLights, color, da, db)) {
+                img(j, i, 0, 0) = color.x;
+                img(j, i, 0, 1) = color.y;
+                img(j, i, 0, 2) = color.z;
+            }
         }
     }
     auto t1 = std::chrono::high_resolution_clock::now();
     auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
     std::cout << dt.count() << " ms." << std::endl;
     img.display("crt");
-    // img *= 255.f;
-    // img.save("crt.png");
+    img *= 255.f;
+    img.save("crt.png");
 
     return 0;
 }
