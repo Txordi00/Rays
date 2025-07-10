@@ -19,7 +19,7 @@ const unsigned int H = 1080;
 // Aspect ratio
 const float AR = float(W) / float(H);
 // Background color
-const float BKGCOLOR[3] = {0.f, 0.f, 0.0f};
+const glm::vec3 BKGCOLOR = {0.f, 0.f, 0.0f};
 
 glm::vec3 normalizeL1(const glm::vec3 &v)
 {
@@ -137,18 +137,30 @@ struct Sphere
             glm::vec3 normal = glm::normalize(a - c);
             // Intensity of diffuse light
             float diffuseIntensity = 0.f;
+            float specularIntensity = 0.f;
             for (const PointLight &pl : pointLights) {
                 // vector from the ray intersection with the sphere to the point light
                 glm::vec3 plaDir = pl.position - a;
-                float lightDist = glm::l1Norm(plaDir);
+                float lightDist = glm::l2Norm(plaDir);
                 plaDir /= lightDist;
                 float attenuation = 1.f / lightDist;
                 // Accumulate intensity wrt to the amount of overlapping of the pointlight
                 // direction with the normal (dot product).
-                diffuseIntensity += pl.intensity * attenuation
-                                    * std::max(0.f, glm::dot(normal, plaDir));
+                float normalPlaOverlap = glm::dot(normal, plaDir);
+                diffuseIntensity += pl.intensity * attenuation * std::max(0.f, normalPlaOverlap);
+
+                glm::vec3 reflectionDir = glm::normalize(-2.f * normalPlaOverlap * normal + plaDir);
+                float reflectionOverlap = glm::dot(d, reflectionDir);
+                float specularFactor = (reflectionOverlap > 0.f)
+                                           ? std::pow(reflectionOverlap * reflectionOverlap,
+                                                      material.shininessN)
+                                           : 0.f;
+                specularIntensity += pl.intensity * attenuation * specularFactor;
             }
-            outColor = material.color * diffuseIntensity;
+            outColor = (material.color + BKGCOLOR) * material.ambientR
+                       + material.color
+                             * (material.diffuseR * diffuseIntensity
+                                + material.specularR * specularIntensity);
             return true;
         }
         // No intersection
@@ -162,8 +174,16 @@ int main()
     std::vector<Sphere> spheres;
     Material m1{};
     m1.color = glm::vec3{0.2, 0.4, 0.2};
+    m1.diffuseR = 1.f;
+    m1.specularR = 1.f;
+    m1.shininessN = 9;
+    m1.ambientR = 0.3f;
     Material m2{};
     m2.color = glm::vec3{0.4, 0.2, 0.2};
+    m2.diffuseR = 1.f;
+    m2.specularR = 1.f;
+    m2.shininessN = 4;
+    m2.ambientR = 0.3f;
     spheres.push_back(Sphere{glm::vec3{-1.f, 0.f, 5.f}, 2.f, m1});
     spheres.push_back(Sphere{glm::vec3{0.f, 2.f, 10.f}, 3.f, m2});
     // Sort the vector of spheres by distance to the camera
@@ -172,13 +192,13 @@ int main()
     });
 
     std::vector<PointLight> pointLights;
-    pointLights.push_back(PointLight(glm::vec3(0.f, -10.f, 5.f), 10.f));
+    pointLights.push_back(PointLight(glm::vec3(0.f, -3.f, 3.f), 10.f));
 
     CImg<float> img(W, H, 1, 3);
     // Fill each channel‐slice for setting the background:
-    img.get_shared_slice(0).fill(BKGCOLOR[0]); // red
-    img.get_shared_slice(1).fill(BKGCOLOR[1]); // green
-    img.get_shared_slice(2).fill(BKGCOLOR[2]); // blue
+    img.get_shared_slice(0).fill(BKGCOLOR.x); // red
+    img.get_shared_slice(1).fill(BKGCOLOR.y); // green
+    img.get_shared_slice(2).fill(BKGCOLOR.z); // blue
 
     // I compute these here for performance reasons
     const float Hm1 = float(H) - 1.f;
@@ -209,7 +229,7 @@ int main()
     auto t1 = std::chrono::high_resolution_clock::now();
     auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
     std::cout << dt.count() << " ms." << std::endl;
-    img.display("crt");
+    img.display("crt", false);
     img *= 255.f;
     img.save("crt.png");
 
