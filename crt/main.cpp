@@ -19,7 +19,7 @@ const unsigned int H = 1080;
 // Aspect ratio
 const float AR = float(W) / float(H);
 // Background color
-const glm::vec3 BKGCOLOR = {0.f, 0.f, 0.0f};
+const glm::vec3 BKGCOLOR = {0.f, 0.f, 0.f};
 
 glm::vec3 normalizeL1(const glm::vec3 &v)
 {
@@ -60,12 +60,15 @@ struct Sphere
     float r;
     // color
     Material material;
+    glm::vec3 ambientColor;
 
     Sphere(const glm::vec3 &c, const float &r, const Material &material)
         : c{c}
         , r{r}
         , material{material}
-    {}
+    {
+        ambientColor = (material.color + BKGCOLOR) * material.ambientR;
+    }
 
     // o - origin, d - direction, da - (output) distance to the first intersection,
     // db - (output) distance to the second intersection, i.e. a = o + da*d, b = o + db*d
@@ -78,6 +81,10 @@ struct Sphere
         db = -1.f;
         // Vector from the origin to the center of the sphere
         glm::vec3 oc = c - o;
+        // If the intersection is backwards, do not count it
+        float dotdoc = glm::dot(d, oc);
+        if (dotdoc < 0.f)
+            return false;
         // Vector from the origin to the projection p of oc on d
         glm::vec3 op = d * glm::dot(d, oc);
         float opN = glm::length(op);
@@ -93,7 +100,7 @@ struct Sphere
         // If the projection is out of the sphere there is not intersection
         if (cpN > r)
             return false;
-        // Probably use epsilons here, this is when the intersection is on the border
+        // Probably use epsilons here, this is when the projection is on the border
         // of the sphere
         else if (std::abs(cpN - r) < std::numeric_limits<float>::epsilon()) {
             // std::cout << "border" << std::endl;
@@ -116,7 +123,8 @@ struct Sphere
                 // std::cout << "inside" << std::endl;
                 // If it is "before" the centre, return the distance 'till p + the distance
                 // 'till from p to a. If it is "after", then erase the distance 'till p.
-                da = (glm::dot(d, -cp) > 0) ? opN + apN : apN - opN;
+                // da = (glm::dot(d, -cp) > 0) ? opN + apN : apN - opN;
+                return false;
             }
             return true;
         }
@@ -125,6 +133,7 @@ struct Sphere
     // Computes the color (outColor) of a ray if there is an intersection
     bool trace_ray(const glm::vec3 &o,
                    const glm::vec3 &d,
+                   const std::vector<Sphere> &spheres,
                    const std::vector<PointLight> &pointLights,
                    glm::vec3 &outColor,
                    float &da,
@@ -141,9 +150,36 @@ struct Sphere
             for (const PointLight &pl : pointLights) {
                 // vector from the ray intersection with the sphere to the point light
                 glm::vec3 plaDir = pl.position - a;
-                float lightDist = glm::l2Norm(plaDir);
+                float lightDist = glm::length(plaDir);
                 plaDir /= lightDist;
+                // SHADOWS
+                // Displace the point through the normal in order to avoid self intersection
+                // glm::vec3 aDisp = (glm::dot(plaDir, normal) > 0) ? a + 0.001f * normal
+                //                                                  : a - 0.001f * normal;
+                bool inShadow = false;
+                // Break the loop if there is any sphere on the way to the light
+                for (const Sphere &s : spheres) {
+                    // This is done as an optimization and in order to avoid self-intersections.
+                    if (s.c == c)
+                        continue;
+                    float datmp, dbtmp;
+                    if (s.ray_intersects(a, plaDir, datmp, dbtmp)) {
+                        if (datmp < lightDist) {
+                            inShadow = true;
+                            break;
+                        }
+                    }
+                }
+                // inShadow = false;
+                if (inShadow) {
+                    // std::cout << "shadow" << std::endl;
+                    // outColor = ambientColor;
+                    continue;
+                }
+
+                // std::cout << "do i arrive here?" << std::endl;
                 float attenuation = 1.f / lightDist;
+                // attenuation = 1.f;
                 // Accumulate intensity wrt to the amount of overlapping of the pointlight
                 // direction with the normal (dot product).
                 float normalPlaOverlap = glm::dot(normal, plaDir);
@@ -157,7 +193,8 @@ struct Sphere
                                            : 0.f;
                 specularIntensity += pl.intensity * attenuation * specularFactor;
             }
-            outColor = (material.color + BKGCOLOR) * material.ambientR
+
+            outColor = ambientColor
                        + material.color
                              * (material.diffuseR * diffuseIntensity
                                 + material.specularR * specularIntensity);
@@ -174,25 +211,37 @@ int main()
     std::vector<Sphere> spheres;
     Material m1{};
     m1.color = glm::vec3{0.2, 0.4, 0.2};
-    m1.diffuseR = 1.f;
-    m1.specularR = 1.f;
-    m1.shininessN = 9;
-    m1.ambientR = 0.3f;
+    m1.diffuseR = 0.2f;
+    m1.specularR = 0.8f;
+    m1.shininessN = 3;
+    m1.ambientR = 0.6f;
     Material m2{};
     m2.color = glm::vec3{0.4, 0.2, 0.2};
-    m2.diffuseR = 1.f;
-    m2.specularR = 1.f;
-    m2.shininessN = 4;
-    m2.ambientR = 0.3f;
+    m2.diffuseR = 0.7;
+    m2.specularR = 0.3f;
+    m2.shininessN = 1;
+    m2.ambientR = 0.5f;
     spheres.push_back(Sphere{glm::vec3{-1.f, 0.f, 5.f}, 2.f, m1});
-    spheres.push_back(Sphere{glm::vec3{0.f, 2.f, 10.f}, 3.f, m2});
+    spheres.push_back(Sphere{glm::vec3{2.f, 2.f, 10.f}, 3.f, m2});
+    spheres.push_back(Sphere{glm::vec3{-2.f, 1.f, 3.f}, 1.f, m2});
+    spheres.push_back(Sphere{glm::vec3{3.f, -3.f, 6.f}, 1.f, m1});
+
     // Sort the vector of spheres by distance to the camera
     std::ranges::sort(spheres, [origin](const Sphere &s0, const Sphere &s1) {
         return glm::length(s0.c - origin) > glm::length(s1.c - origin);
     });
 
     std::vector<PointLight> pointLights;
-    pointLights.push_back(PointLight(glm::vec3(0.f, -3.f, 3.f), 10.f));
+    glm::vec3 lightDirection = glm::normalize(spheres[0].c - spheres[1].c);
+    glm::vec3 lightPosition = spheres[1].c - lightDirection * 3.f;
+    // pointLights.push_back(PointLight(lightPosition - glm::vec3(1.f, 0.f, 0.f), 15.f));
+    // pointLights.push_back(PointLight(lightPosition + glm::vec3(3.f, 0.f, 0.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(0.f, -4.f, 0.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(-2.f, -4.f, 0.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(2.f, -4.f, 0.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(0.f, -4.f, 5.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(-2.f, -4.f, 5.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(-2.f, -4.f, 5.f), 15.f));
 
     CImg<float> img(W, H, 1, 3);
     // Fill each channel‐slice for setting the background:
@@ -219,7 +268,7 @@ int main()
             float da, db;
             glm::vec3 color;
             // Change the color only if there was an intersection
-            if (s.trace_ray(origin, d, pointLights, color, da, db)) {
+            if (s.trace_ray(origin, d, spheres, pointLights, color, da, db)) {
                 img(j, i, 0, 0) = color.x;
                 img(j, i, 0, 1) = color.y;
                 img(j, i, 0, 2) = color.z;
