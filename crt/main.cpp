@@ -21,11 +21,14 @@ const float AR = float(W) / float(H);
 // Background color
 const glm::vec3 BKGCOLOR = {0.f, 0.f, 0.f};
 
+// I am not using it at the moment, but it could speed up things later on
+// because the sqrt in the L2 norm is an expensive operation
 glm::vec3 normalizeL1(const glm::vec3 &v)
 {
     return v / glm::l1Norm(v);
 }
 
+// TODO: Add color and a way to draw them
 struct PointLight
 {
     PointLight(const glm::vec3 &position, const float &intensity)
@@ -100,8 +103,7 @@ struct Sphere
         // If the projection is out of the sphere there is not intersection
         if (cpN > r)
             return false;
-        // Probably use epsilons here, this is when the projection is on the border
-        // of the sphere
+        // Case when the projection is on the border of the sphere
         else if (std::abs(cpN - r) < std::numeric_limits<float>::epsilon()) {
             // std::cout << "border" << std::endl;
             da = opN;
@@ -118,7 +120,8 @@ struct Sphere
                 da = opN - apN;
                 // Advance 2 units of apN 'till the second intersection
                 db = da + 2 * apN;
-                // Case where o is inside the sphere
+                return true;
+                // Case where o is inside the sphere. For now I am counting it as a non-intersection
             } else {
                 // std::cout << "inside" << std::endl;
                 // If it is "before" the centre, return the distance 'till p + the distance
@@ -126,11 +129,10 @@ struct Sphere
                 // da = (glm::dot(d, -cp) > 0) ? opN + apN : apN - opN;
                 return false;
             }
-            return true;
         }
     }
 
-    // Computes the color (outColor) of a ray if there is an intersection
+    // Computes the color (outColor) of an intersection
     bool trace_ray(const glm::vec3 &o,
                    const glm::vec3 &d,
                    const std::vector<Sphere> &spheres,
@@ -142,6 +144,13 @@ struct Sphere
         if (ray_intersects(o, d, da, db)) {
             // Intersection point of the ray with the sphere
             glm::vec3 a = o + da * d;
+
+            // Avoid overlappings
+            for (const Sphere &s : spheres) {
+                if (c != s.c && glm::length(a - s.c) < s.r)
+                    return false;
+            }
+
             // Normal to the surface of the sphere
             glm::vec3 normal = glm::normalize(a - c);
             // Intensity of diffuse light
@@ -152,41 +161,45 @@ struct Sphere
                 glm::vec3 plaDir = pl.position - a;
                 float lightDist = glm::length(plaDir);
                 plaDir /= lightDist;
+
                 // SHADOWS
-                // Displace the point through the normal in order to avoid self intersection
+                // NOT NEEDED ANYMORE: Displace the point through the normal
+                // in order to avoid self intersection
                 // glm::vec3 aDisp = (glm::dot(plaDir, normal) > 0) ? a + 0.001f * normal
                 //                                                  : a - 0.001f * normal;
-                bool inShadow = false;
                 // Break the loop if there is any sphere on the way to the light
+                bool inShadow = false;
                 for (const Sphere &s : spheres) {
                     // This is done as an optimization and in order to avoid self-intersections.
-                    if (s.c == c)
-                        continue;
                     float datmp, dbtmp;
-                    if (s.ray_intersects(a, plaDir, datmp, dbtmp)) {
-                        if (datmp < lightDist) {
-                            inShadow = true;
-                            break;
-                        }
+                    // First check: Avoid self-intersection. Third check: Test only from the point a
+                    // until the light, and not further
+                    if (c != s.c && s.ray_intersects(a, plaDir, datmp, dbtmp) && datmp < lightDist) {
+                        inShadow = true;
+                        break;
                     }
                 }
-                // inShadow = false;
-                if (inShadow) {
-                    // std::cout << "shadow" << std::endl;
-                    // outColor = ambientColor;
+                // Skip light if we are in a shadow
+                if (inShadow)
                     continue;
-                }
 
-                // std::cout << "do i arrive here?" << std::endl;
+                // Attenuation factor depending on the distance to the light
                 float attenuation = 1.f / lightDist;
                 // attenuation = 1.f;
+
+                // DIFFUSE LIGHTING
                 // Accumulate intensity wrt to the amount of overlapping of the pointlight
                 // direction with the normal (dot product).
                 float normalPlaOverlap = glm::dot(normal, plaDir);
                 diffuseIntensity += pl.intensity * attenuation * std::max(0.f, normalPlaOverlap);
 
+                // SPECULAR LIGHTING
+                // Vector from a to the light
                 glm::vec3 reflectionDir = glm::normalize(-2.f * normalPlaOverlap * normal + plaDir);
+                // Overlap of the reflection direction with the primary ray direction (view direction)
                 float reflectionOverlap = glm::dot(d, reflectionDir);
+                // Specular factor computed as in the first approximation in wikipedia:
+                // https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
                 float specularFactor = (reflectionOverlap > 0.f)
                                            ? std::pow(reflectionOverlap * reflectionOverlap,
                                                       material.shininessN)
@@ -213,18 +226,18 @@ int main()
     m1.color = glm::vec3{0.2, 0.4, 0.2};
     m1.diffuseR = 0.2f;
     m1.specularR = 0.8f;
-    m1.shininessN = 3;
-    m1.ambientR = 0.6f;
+    m1.shininessN = 5;
+    m1.ambientR = 1.f;
     Material m2{};
     m2.color = glm::vec3{0.4, 0.2, 0.2};
     m2.diffuseR = 0.7;
     m2.specularR = 0.3f;
     m2.shininessN = 1;
-    m2.ambientR = 0.5f;
-    spheres.push_back(Sphere{glm::vec3{-1.f, 0.f, 5.f}, 2.f, m1});
-    spheres.push_back(Sphere{glm::vec3{2.f, 2.f, 10.f}, 3.f, m2});
-    spheres.push_back(Sphere{glm::vec3{-2.f, 1.f, 3.f}, 1.f, m2});
-    spheres.push_back(Sphere{glm::vec3{3.f, -3.f, 6.f}, 1.f, m1});
+    m2.ambientR = 1.f;
+    spheres.push_back(Sphere{glm::vec3{-2.f, -1.f, 4.f}, 1.f, m1});
+    spheres.push_back(Sphere{glm::vec3{-1.f, 0.f, 5.f}, 1.f, m2});
+    spheres.push_back(Sphere{glm::vec3{1.f, 0.f, 5.f}, 1.f, m1});
+    spheres.push_back(Sphere{glm::vec3{2.f, 1.f, 6.f}, 1.f, m1});
 
     // Sort the vector of spheres by distance to the camera
     std::ranges::sort(spheres, [origin](const Sphere &s0, const Sphere &s1) {
@@ -234,14 +247,12 @@ int main()
     std::vector<PointLight> pointLights;
     glm::vec3 lightDirection = glm::normalize(spheres[0].c - spheres[1].c);
     glm::vec3 lightPosition = spheres[1].c - lightDirection * 3.f;
-    // pointLights.push_back(PointLight(lightPosition - glm::vec3(1.f, 0.f, 0.f), 15.f));
-    // pointLights.push_back(PointLight(lightPosition + glm::vec3(3.f, 0.f, 0.f), 15.f));
-    pointLights.push_back(PointLight(glm::vec3(0.f, -4.f, 0.f), 15.f));
-    pointLights.push_back(PointLight(glm::vec3(-2.f, -4.f, 0.f), 15.f));
-    pointLights.push_back(PointLight(glm::vec3(2.f, -4.f, 0.f), 15.f));
-    pointLights.push_back(PointLight(glm::vec3(0.f, -4.f, 5.f), 15.f));
-    pointLights.push_back(PointLight(glm::vec3(-2.f, -4.f, 5.f), 15.f));
-    pointLights.push_back(PointLight(glm::vec3(-2.f, -4.f, 5.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(0.f, -5.f, 1.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(-3.f, -5.f, 1.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(3.f, -5.f, 1.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(0.f, -5.f, 6.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(-3.f, -5.f, 6.f), 15.f));
+    pointLights.push_back(PointLight(glm::vec3(3.f, -5.f, 6.f), 15.f));
 
     CImg<float> img(W, H, 1, 3);
     // Fill each channel‐slice for setting the background:
