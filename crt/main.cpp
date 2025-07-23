@@ -22,7 +22,7 @@ const float AR = float(W) / float(H);
 // Background color
 const glm::vec3 BKGCOLOR = {0.f, 0.f, 0.f};
 // Maximum number of light bounces
-const unsigned int MAXDEPTH = 2;
+const unsigned int MAXDEPTH = 3;
 
 // I am not using it at the moment, but it could speed up things later on
 // because the sqrt in the L2 norm is an expensive operation
@@ -58,6 +58,19 @@ struct Material
     int shininessN;
     // Reflectiveness
     float reflectiveness;
+    // Refractiveness
+    float refractiveness;
+    // Refractive index. n_2 in https://en.wikipedia.org/wiki/Snell's_law
+    float refractiveIndex;
+    void normalize_factors()
+    {
+        float normFactor = specularR + diffuseR + ambientR + reflectiveness + refractiveness;
+        specularR /= normFactor;
+        diffuseR /= normFactor;
+        ambientR /= normFactor;
+        reflectiveness /= normFactor;
+        refractiveness /= normFactor;
+    }
 };
 
 struct Sphere
@@ -146,7 +159,7 @@ struct Sphere
                    glm::vec3 &outColor,
                    unsigned int depth = 0) const
     {
-        // Depth is used for reflections
+        // Depth is used for reflections and refractions
         float da, db;
         if (depth < MAXDEPTH && ray_intersects(o, d, da, db)) {
             // Intersection point of the ray with the sphere
@@ -221,7 +234,14 @@ struct Sphere
                 }
             }
 
-            // REFLECTION
+            // This is a trick to access the spheres in an increasing order of distance
+            std::vector<size_t> indices(spheres.size());
+            std::iota(indices.begin(), indices.end(), 0);
+            std::ranges::stable_sort(indices, [a, spheres](const size_t &i0, const size_t &i1) {
+                return glm::length(spheres[i0].c - a) < glm::length(spheres[i1].c - a);
+            });
+
+            // REFLECTIONS
             glm::vec3 reflectionColor{0.f};
 
             if (material.reflectiveness > 0.f) {
@@ -229,16 +249,8 @@ struct Sphere
                 glm::vec3 dReflected = (d - 2.f * glm::dot(d, normal) * normal);
                 // if (material.reflectiveness > 0.f)
 
-                // Access the spheres in an increasing order of distance
-                std::vector<size_t> indices(spheres.size());
-                std::iota(indices.begin(), indices.end(), 0);
-                std::ranges::stable_sort(indices, [a, spheres](const size_t &i0, const size_t &i1) {
-                    return glm::length(spheres[i0].c - a) < glm::length(spheres[i1].c - a);
-                });
-
                 // Trace rays up to maxDepth to get the reflection color
-                // Skip the first sphere since it will always be the current one
-                for (int id = 1; id < indices.size(); id++) {
+                for (int id = 0; id < indices.size(); id++) {
                     if (spheres[indices[id]].trace_ray(a,
                                                        dReflected,
                                                        spheres,
@@ -249,12 +261,37 @@ struct Sphere
                 }
             }
 
+            // REFRACTION. Snell's law: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+            glm::vec3 refractionColor{0.f};
+            if (material.refractiveness > 0.f) {
+                float n1 = 1.f;
+                float n2 = material.refractiveIndex;
+                float n = n1 / n2;
+                float cos1 = -glm::dot(d, normal);
+                for (int id = 0; id < indices.size(); id++) {
+                    // Avoid self-intersections
+                    if (c == spheres[indices[id]].c)
+                        continue;
+                    float cos2 = std::sqrt(1.f - n * n * (1.f - cos1 * cos1));
+                    glm::vec3 dRefracted = n * d + (n * cos1 - cos2) * normal;
+                    if (spheres[indices[id]].trace_ray(a,
+                                                       dRefracted,
+                                                       spheres,
+                                                       pointLights,
+                                                       refractionColor,
+                                                       depth + 1)) {
+                        break;
+                    }
+                }
+            }
+
             // Combination of the different lightings
             outColor = ambientColor
                        + material.color
                              * (material.diffuseR * diffuseIntensity
                                 + material.specularR * specularIntensity)
-                       + reflectionColor * material.reflectiveness;
+                       + reflectionColor * material.reflectiveness
+                       + refractionColor * material.refractiveness;
             return true;
         }
         // No intersection
@@ -270,29 +307,38 @@ int main()
     m1.color = glm::vec3{0.2, 0.4, 0.2};
     m1.diffuseR = 0.2f;
     m1.specularR = 0.8f;
-    m1.shininessN = 5;
+    m1.shininessN = 4;
     m1.ambientR = 1.f;
     m1.reflectiveness = 0.5f;
+    m1.refractiveness = 0.f;
+    m1.refractiveIndex = 1.f;
+    m1.normalize_factors();
     Material m2{};
     m2.color = glm::vec3{0.4f, 0.2f, 0.2f};
-    m2.diffuseR = 0.7;
+    m2.diffuseR = 0.7f;
     m2.specularR = 0.3f;
     m2.shininessN = 1;
     m2.ambientR = 1.f;
     m2.reflectiveness = 0.f;
+    m2.refractiveness = 0.f;
+    m2.refractiveIndex = 1.f;
+    m2.normalize_factors();
     Material m3{};
-    m3.color = glm::vec3{0.8f, 0.8f, 0.8f};
+    m3.color = glm::vec3{1.f, 1.f, 1.f};
     m3.diffuseR = 0.f;
-    m3.specularR = 0.2f;
+    m3.specularR = 0.3f;
     m3.shininessN = 5;
     m3.ambientR = 1.f;
-    m3.reflectiveness = 1.f;
+    m3.reflectiveness = 0.5f;
+    m3.refractiveness = 1.f;
+    m3.refractiveIndex = 1.1f;
+    m3.normalize_factors();
 
     spheres.push_back(Sphere{glm::vec3{-2.f, -1.5f, 4.f}, 1.f, m1});
     spheres.push_back(Sphere{glm::vec3{-1.f, -0.5f, 5.f}, 1.f, m2});
-    spheres.push_back(Sphere{glm::vec3{1.f, -0.5f, 5.f}, 1.f, m1});
+    spheres.push_back(Sphere{glm::vec3{1.f, 1.7f, 5.f}, 1.f, m1});
     spheres.push_back(Sphere{glm::vec3{2.f, 0.5f, 6.f}, 1.f, m2});
-    spheres.push_back(Sphere{glm::vec3{0.f, 2.f, 5.5f}, 1.3f, m3});
+    spheres.push_back(Sphere{glm::vec3{0.f, 0.3f, 3.f}, 0.7f, m3});
 
     // Sort the vector of spheres by distance to the camera
     std::ranges::stable_sort(spheres, [origin](const Sphere &s0, const Sphere &s1) {
