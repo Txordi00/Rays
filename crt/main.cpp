@@ -21,8 +21,13 @@ const unsigned int H = 1080;
 const float AR = float(W) / float(H);
 // Background color
 const glm::vec3 BKGCOLOR = {0.f, 0.f, 0.f};
+// Origin
+const glm::vec3 ORIGIN = {0.f, 0.f, 0.f};
+
 // Maximum number of light bounces
 const unsigned int MAXDEPTH = 3;
+// Epsilon
+const float EPS = 1.e-5f;
 
 // I am not using it at the moment, but it could speed up things later on
 // because the sqrt in the L2 norm is an expensive operation
@@ -150,29 +155,35 @@ struct Sphere
             }
         }
     }
+};
 
-    // Computes the color (outColor) of an intersection
-    bool trace_ray(const glm::vec3 &o,
-                   const glm::vec3 &d,
-                   const std::vector<Sphere> &spheres,
-                   const std::vector<PointLight> &pointLights,
-                   glm::vec3 &outColor,
-                   unsigned int depth = 0) const
-    {
+// POSSIBLE OPTIMIZATION: Use L1 norm in some places to avoid the slow sqrt()
+glm::vec3 trace_ray(const glm::vec3 &o,
+                    const glm::vec3 &d,
+                    const std::vector<Sphere> &spheres,
+                    const std::vector<PointLight> &pointLights,
+                    unsigned int depth = 0)
+{
+    // This is a trick to access the spheres in an increasing order of distance. Only compute it when we are
+    // not in the origin, from where they are ordered already in the main() function
+    std::vector<size_t> indices(spheres.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    if (o != ORIGIN)
+        std::ranges::stable_sort(indices, [o, spheres](const size_t &i0, const size_t &i1) {
+            return glm::length(spheres[i0].c - o) < glm::length(spheres[i1].c - o);
+        });
+
+    glm::vec3 outColor{BKGCOLOR};
+    for (const size_t &id : indices) {
+        const Sphere &s = spheres[id];
         // Depth is used for reflections and refractions
         float da, db;
-        if (depth < MAXDEPTH && ray_intersects(o, d, da, db)) {
+        if (depth < MAXDEPTH && s.ray_intersects(o, d, da, db)) {
             // Intersection point of the ray with the sphere
             glm::vec3 a = o + da * d;
 
-            // Avoid overlappings
-            for (const Sphere &s : spheres) {
-                if (c != s.c && glm::length(a - s.c) < s.r)
-                    return false;
-            }
-
             // Normal to the surface of the sphere
-            glm::vec3 normal = glm::normalize(a - c);
+            glm::vec3 normal = glm::normalize(a - s.c);
 
             // Intensity of diffuse light
             float diffuseIntensity = 0.f;
@@ -184,18 +195,18 @@ struct Sphere
                 plaDir /= lightDist;
 
                 // SHADOWS
-                // NOT NEEDED ANYMORE: Displace the point through the normal
+                // Displace the point through the normal
                 // in order to avoid self intersection
-                // glm::vec3 aDisp = (glm::dot(plaDir, normal) > 0) ? a + 0.001f * normal
-                //                                                  : a - 0.001f * normal;
-                // Break the loop if there is any sphere on the way to the light
+                glm::vec3 aDisp = (glm::dot(plaDir, normal) > 0) ? a + EPS * normal
+                                                                 : a - EPS * normal;
+                // Break the loop over point lights if there is any sphere on the way to the light
                 bool inShadow = false;
                 for (const Sphere &s : spheres) {
                     // This is done as an optimization and in order to avoid self-intersections.
                     float datmp, dbtmp;
                     // First check: Avoid self-intersection. Third check: Test only from the point a
                     // until the light, and not further
-                    if (c != s.c && s.ray_intersects(a, plaDir, datmp, dbtmp) && datmp < lightDist) {
+                    if (s.ray_intersects(aDisp, plaDir, datmp, dbtmp) && datmp < lightDist) {
                         inShadow = true;
                         break;
                     }
@@ -212,7 +223,7 @@ struct Sphere
                 // Accumulate intensity wrt to the amount of overlapping of the pointlight
                 // direction with the normal (dot product).
                 float normalPlaOverlap = glm::dot(normal, plaDir);
-                if (material.diffuseR > 0.f) {
+                if (s.material.diffuseR > 0.f) {
                     diffuseIntensity += pl.intensity * attenuation
                                         * std::max(0.f, normalPlaOverlap);
                 }
@@ -220,7 +231,7 @@ struct Sphere
                 // SPECULAR LIGHTING
                 // Vector from a to the light. This is the reflection of plaDir along normal.
                 // Can be checked that this is a unitary vector, so no need to normalize
-                if (material.specularR > 0.f) {
+                if (s.material.specularR > 0.f) {
                     glm::vec3 reflectionDir = (-2.f * normalPlaOverlap * normal + plaDir);
                     // Overlap of the reflection direction with the primary ray direction (view direction)
                     float reflectionOverlap = glm::dot(d, reflectionDir);
@@ -228,80 +239,55 @@ struct Sphere
                     // https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
                     float specularFactor = (reflectionOverlap > 0.f)
                                                ? std::pow(reflectionOverlap * reflectionOverlap,
-                                                          material.shininessN)
+                                                          s.material.shininessN)
                                                : 0.f;
                     specularIntensity += pl.intensity * attenuation * specularFactor;
                 }
-            }
 
-            // This is a trick to access the spheres in an increasing order of distance
-            std::vector<size_t> indices(spheres.size());
-            std::iota(indices.begin(), indices.end(), 0);
-            std::ranges::stable_sort(indices, [a, spheres](const size_t &i0, const size_t &i1) {
-                return glm::length(spheres[i0].c - a) < glm::length(spheres[i1].c - a);
-            });
+                // REFLECTIONS
+                glm::vec3 reflectionColor{0.f};
+                if (s.material.reflectiveness > 0.f) {
+                    // Reflection of d along normal
+                    glm::vec3 dReflected = (d - 2.f * glm::dot(d, normal) * normal);
+                    // if (material.reflectiveness > 0.f)
 
-            // REFLECTIONS
-            glm::vec3 reflectionColor{0.f};
-
-            if (material.reflectiveness > 0.f) {
-                // Reflection of d along normal
-                glm::vec3 dReflected = (d - 2.f * glm::dot(d, normal) * normal);
-                // if (material.reflectiveness > 0.f)
-
-                // Trace rays up to maxDepth to get the reflection color
-                for (int id = 0; id < indices.size(); id++) {
-                    if (spheres[indices[id]].trace_ray(a,
-                                                       dReflected,
-                                                       spheres,
-                                                       pointLights,
-                                                       reflectionColor,
-                                                       depth + 1))
-                        break;
+                    // Trace rays up to maxDepth to get the reflection color
+                    reflectionColor = trace_ray(a, dReflected, spheres, pointLights, depth + 1);
                 }
-            }
 
-            // REFRACTION. Snell's law: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
-            glm::vec3 refractionColor{0.f};
-            if (material.refractiveness > 0.f) {
-                float n1 = 1.f;
-                float n2 = material.refractiveIndex;
-                float n = n1 / n2;
-                float cos1 = -glm::dot(d, normal);
-                for (int id = 0; id < indices.size(); id++) {
-                    // Avoid self-intersections
-                    if (c == spheres[indices[id]].c)
-                        continue;
+                // REFRACTION. Snell's law: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+                glm::vec3 refractionColor{0.f};
+                if (s.material.refractiveness > 0.f) {
+                    float n1 = 1.f;
+                    float n2 = s.material.refractiveIndex;
+                    float n = n1 / n2;
+                    float cos1 = -glm::dot(d, normal);
                     float cos2 = std::sqrt(1.f - n * n * (1.f - cos1 * cos1));
                     glm::vec3 dRefracted = n * d + (n * cos1 - cos2) * normal;
-                    if (spheres[indices[id]].trace_ray(a,
-                                                       dRefracted,
-                                                       spheres,
-                                                       pointLights,
-                                                       refractionColor,
-                                                       depth + 1)) {
-                        break;
-                    }
+                    // Again displace the intersection over the normal in order to avoid self-intersecion
+                    glm::vec3 aDisp = (glm::dot(dRefracted, normal) > 0) ? a + EPS * normal
+                                                                         : a - EPS * normal;
+                    refractionColor = trace_ray(aDisp, dRefracted, spheres, pointLights, depth + 1);
                 }
-            }
 
-            // Combination of the different lightings
-            outColor = ambientColor
-                       + material.color
-                             * (material.diffuseR * diffuseIntensity
-                                + material.specularR * specularIntensity)
-                       + reflectionColor * material.reflectiveness
-                       + refractionColor * material.refractiveness;
-            return true;
+                // Combination of the different lightings
+                outColor = s.ambientColor
+                           + s.material.color
+                                 * (s.material.diffuseR * diffuseIntensity
+                                    + s.material.specularR * specularIntensity)
+                           + reflectionColor * s.material.reflectiveness
+                           + refractionColor * s.material.refractiveness;
+            }
+            // Break the loop once an intersection has been found. No need to search for more.
+            break;
         }
-        // No intersection
-        return false;
     }
-};
+
+    return outColor;
+}
 
 int main()
 {
-    glm::vec3 origin{0.f};
     std::vector<Sphere> spheres;
     Material m1{};
     m1.color = glm::vec3{0.2, 0.4, 0.2};
@@ -341,8 +327,8 @@ int main()
     spheres.push_back(Sphere{glm::vec3{0.f, 0.3f, 3.f}, 0.7f, m3});
 
     // Sort the vector of spheres by distance to the camera
-    std::ranges::stable_sort(spheres, [origin](const Sphere &s0, const Sphere &s1) {
-        return glm::length(s0.c - origin) > glm::length(s1.c - origin);
+    std::ranges::stable_sort(spheres, [](const Sphere &s0, const Sphere &s1) {
+        return glm::length(s0.c - ORIGIN) < glm::length(s1.c - ORIGIN);
     });
 
     std::vector<PointLight> pointLights;
@@ -374,22 +360,16 @@ int main()
         float y = (-1.f + 2.f * (float(i) + 0.5f) / Hm1) * Ft;
         float x = (-1.f + 2.f * (float(j) + 0.5f) / Wm1) * ARFt;
         glm::vec3 d = glm::normalize(glm::vec3{x, y, 1.f});
-        for (Sphere &s : spheres) {
-            glm::vec3 color;
-            // Change the color only if there was an intersection
-            if (s.trace_ray(origin, d, spheres, pointLights, color)) {
-                img(j, i, 0, 0) = color.x;
-                img(j, i, 0, 1) = color.y;
-                img(j, i, 0, 2) = color.z;
-            }
-        }
+        glm::vec3 color = trace_ray(ORIGIN, d, spheres, pointLights);
+        img(j, i, 0, 0) = color.x;
+        img(j, i, 0, 1) = color.y;
+        img(j, i, 0, 2) = color.z;
     }
     auto t1 = std::chrono::high_resolution_clock::now();
     auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
     std::cout << dt.count() << " ms." << std::endl;
     img.display("crt", false);
-    img *= 255.f;
-    img.save("crt.png");
+    // img.save("crt.png");
 
     return 0;
 }
