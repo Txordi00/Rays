@@ -83,7 +83,7 @@ struct Sphere
     // center
     glm::vec3 c;
     //radius
-    float r;
+    float r, r2;
     // color
     Material material;
     glm::vec3 ambientColor;
@@ -94,6 +94,7 @@ struct Sphere
         , material{material}
     {
         ambientColor = (material.color + BKGCOLOR) * material.ambientR;
+        r2 = r * r;
     }
 
     // o - origin, d - direction, da - (output) distance to the first intersection,
@@ -114,7 +115,7 @@ struct Sphere
             return false;
         // Vector from the origin to the projection p of oc on d
         glm::vec3 op = d * glm::dot(d, oc);
-        float opN = glm::length(op);
+        float opN2 = glm::length2(op);
 
         // Vector from c to the projection p
         // glm::vec3 p = o + op;
@@ -123,25 +124,25 @@ struct Sphere
         glm::vec3 cp = oc - op;
 
         // L2 norm of cp
-        float cpN = glm::length(cp);
+        float cpN2 = glm::length2(cp);
         // If the projection is out of the sphere there is not intersection
-        if (cpN > r)
+        if (cpN2 > r2)
             return false;
         // Case when the projection is on the border of the sphere
-        else if (std::abs(cpN - r) < std::numeric_limits<float>::epsilon()) {
+        else if (std::abs(cpN2 - r2) < EPS) {
             // std::cout << "border" << std::endl;
-            da = opN;
+            da = std::sqrtf(opN2);
             return true;
             // Handle the cases where the line defined by d intersects the sphere two times
         } else {
             // Norm of oc
-            float ocN = glm::length(oc);
+            float ocN2 = glm::length2(oc);
             // Norm of the vector from the first intersection a to the projection p
-            float apN = std::sqrt(r * r - cpN * cpN);
+            float apN = std::sqrtf(r2 - cpN2);
             // Case where o is outside of the sphere
-            if (ocN > r) {
+            if (ocN2 > r2) {
                 // The distance to a is the distance from o to p minus apN
-                da = opN - apN;
+                da = std::sqrtf(opN2) - apN;
                 // Advance 2 units of apN 'till the second intersection
                 db = da + 2 * apN;
                 return true;
@@ -170,7 +171,7 @@ glm::vec3 trace_ray(const glm::vec3 &o,
     std::iota(indices.begin(), indices.end(), 0);
     if (o != ORIGIN)
         std::ranges::stable_sort(indices, [o, spheres](const size_t &i0, const size_t &i1) {
-            return glm::length(spheres[i0].c - o) < glm::length(spheres[i1].c - o);
+            return glm::length2(spheres[i0].c - o) < glm::length2(spheres[i1].c - o);
         });
 
     glm::vec3 outColor{BKGCOLOR};
@@ -204,7 +205,7 @@ glm::vec3 trace_ray(const glm::vec3 &o,
                 for (const Sphere &s : spheres) {
                     // This is done as an optimization and in order to avoid self-intersections.
                     float datmp, dbtmp;
-                    // First check: Avoid self-intersection. Third check: Test only from the point a
+                    // First check: Avoid self-intersection. Second check: Test only from the point a
                     // until the light, and not further
                     if (s.ray_intersects(aDisp, plaDir, datmp, dbtmp) && datmp < lightDist) {
                         inShadow = true;
@@ -262,7 +263,7 @@ glm::vec3 trace_ray(const glm::vec3 &o,
                     float n2 = s.material.refractiveIndex;
                     float n = n1 / n2;
                     float cos1 = -glm::dot(d, normal);
-                    float cos2 = std::sqrt(1.f - n * n * (1.f - cos1 * cos1));
+                    float cos2 = std::sqrtf(1.f - n * n * (1.f - cos1 * cos1));
                     glm::vec3 dRefracted = n * d + (n * cos1 - cos2) * normal;
                     // Again displace the intersection over the normal in order to avoid self-intersecion
                     glm::vec3 aDisp = (glm::dot(dRefracted, normal) > 0) ? a + EPS * normal
