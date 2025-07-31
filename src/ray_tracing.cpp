@@ -49,9 +49,9 @@ vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
                                              VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                                              0);
 
-    vk::BufferDeviceAddressInfo blasAddrInfo{};
-    blasAddrInfo.setBuffer(blasBuffer.buffer);
-    vk::DeviceAddress blasAdrr = device.getBufferAddress(blasAddrInfo);
+    // vk::BufferDeviceAddressInfo blasAddrInfo{};
+    // blasAddrInfo.setBuffer(blasBuffer.buffer);
+    // vk::DeviceAddress blasAdrr = device.getBufferAddress(blasAddrInfo);
 
     // 4. Create the acceleration structure object
     vk::AccelerationStructureCreateInfoKHR asInfo{};
@@ -76,32 +76,28 @@ vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
     buildInfo.setDstAccelerationStructure(blas);
     buildInfo.setScratchData(vk::DeviceOrHostAddressKHR{scratchAddr});
 
-    VkAccelerationStructureBuildRangeInfoKHR range{};
-    range.primitiveCount = primCount;
+    vk::AccelerationStructureBuildRangeInfoKHR rangeInfo{};
+    rangeInfo.setPrimitiveCount(primCount);
 
-    const VkAccelerationStructureBuildRangeInfoKHR *pRange = &range;
-    vkCmdBuildAccelerationStructuresKHR(cmd, 1, &buildInfo, &pRange);
+    asCmd.buildAccelerationStructuresKHR(buildInfo, &rangeInfo);
 
     // 7. Barrier: BLAS build writes → TLAS read later
-    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
-    vkCmdPipelineBarrier(cmd,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         0,
-                         1,
-                         &barrier,
-                         0,
-                         nullptr,
-                         0,
-                         nullptr);
+    vk::MemoryBarrier barrier{};
+    barrier.setSrcAccessMask(vk::AccessFlagBits::eAccelerationStructureWriteKHR);
+    barrier.setDstAccessMask(vk::AccessFlagBits::eAccelerationStructureReadKHR);
+    // vk::DependencyInfo depInfo{};
+    // asCmd.pipelineBarrier2(depInfo)
+    asCmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                          vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                          vk::DependencyFlags{},
+                          barrier,
+                          nullptr,
+                          nullptr);
 
     // 8. Device address (needed by TLAS)
-    VkAccelerationStructureDeviceAddressInfoKHR addrInfo{
-        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-    addrInfo.accelerationStructure = blas;
-    VkDeviceAddress blasAddr = vkGetAccelerationStructureDeviceAddressKHR(device, &addrInfo);
+    vk::AccelerationStructureDeviceAddressInfoKHR blasAddrInfo{};
+    blasAddrInfo.setAccelerationStructure(blas);
+    VkDeviceAddress blasAddr = device.getAccelerationStructureAddressKHR(blasAddrInfo);
 
     // you may store blasAddr in a struct for TLAS creation later
 
