@@ -6,6 +6,14 @@
 
 class Model
 {
+    struct BlasInput
+    {
+        // Data used to build acceleration structure geometry
+        std::vector<vk::AccelerationStructureGeometryKHR> asGeometry;
+        std::vector<vk::AccelerationStructureBuildRangeInfoKHR> asBuildRangeInfo;
+        vk::BuildAccelerationStructureFlagsKHR flags{};
+    };
+
 public:
     Model(HostMeshAsset &cpuMesh)
         : cpuMesh{cpuMesh}
@@ -20,11 +28,7 @@ public:
                        vk::Fence &transferFence,
                        vk::Queue &transferQueue);
 
-    MeshBuffer create_mesh(const vk::Device &device,
-                           const VmaAllocator &allocator,
-                           vk::CommandBuffer &cmdTransfer,
-                           vk::Fence &transferFence,
-                           vk::Queue &transferQueue);
+
     void cleanHost();
 
     void destroyBuffers(const VmaAllocator &allocator);
@@ -34,8 +38,18 @@ public:
     glm::mat4 modelMatrix{1.f};
 
     DeviceMeshAsset gpuMesh;
+    BlasInput blasInput;
     std::string name;
 
-private:
     HostMeshAsset &cpuMesh;
+
+private:
+    MeshBuffer create_mesh(const vk::Device &device,
+                           const VmaAllocator &allocator,
+                           vk::CommandBuffer &cmdTransfer,
+                           vk::Fence &transferFence,
+                           vk::Queue &transferQueue);
+
+    void buildBlasInput();
+
 };

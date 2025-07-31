@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 add_compile_options(-Wno-nullability-completeness -Wno-deprecated-literal-operator)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math")
 
 find_package(Vulkan REQUIRED)
 
@@ -47,7 +48,7 @@ include(FetchContent)
 FetchContent_Declare(
     fetch_vk_bootstrap
     GIT_REPOSITORY "https://github.com/charles-lunarg/vk-bootstrap"
-    GIT_TAG        "v1.4.315" #suggest using a tag so the library doesn't update whenever new commits are pushed to a branch
+    GIT_TAG        "v1.4.321" #suggest using a tag so the library doesn't update whenever new commits are pushed to a branch
 )
 FetchContent_MakeAvailable(fetch_vk_bootstrap)
 

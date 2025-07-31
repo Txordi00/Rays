@@ -91,6 +91,7 @@ struct MeshBuffer
     Buffer indexBuffer;
     Buffer vertexBuffer;
     vk::DeviceAddress vertexBufferAddress;
+    vk::DeviceAddress indexBufferAddress;
 };
 
 struct ComputePipelineData

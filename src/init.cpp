@@ -22,6 +22,7 @@ Init::Init()
     window = SDL_CreateWindow(PROJNAME, W, H, SDL_WINDOW_VULKAN);
 
     init_vulkan();
+    init_rt();
     create_swapchain(W, H);
     create_draw_data();
     init_commands();
@@ -112,19 +113,31 @@ void Init::init_vulkan()
     features12.scalarBlockLayout = vk::True;
     features12.bufferDeviceAddress = vk::True;
 
-    vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchainMaintenance1Features{};
-    swapchainMaintenance1Features.setSwapchainMaintenance1(vk::True);
+    // NOT SUPPORTED YET! ENABLE AS IT GETS SUPPORTED
+    // vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR unifiedImageLayoutsFeatures{};
+    // unifiedImageLayoutsFeatures.setUnifiedImageLayouts(vk::False);
+    // unifiedImageLayoutsFeatures.setUnifiedImageLayoutsVideo(vk::False);
 
+    std::vector<const char *> rtExtensions = {VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+                                              VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+                                              VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME};
+    vk::PhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{};
+    vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
     // Select a GPU
     vkb::PhysicalDeviceSelector physDevSelector{vkbInstance};
     vkb::PhysicalDevice vkbPhysDev
         = physDevSelector.set_minimum_version(API_VERSION[0], API_VERSION[1])
               .set_required_features_13(features13)
               .set_required_features_12(features12)
+              // .add_required_extension(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) // NOT SUPPORTED YET
+              // .add_required_extension_features(unifiedImageLayoutsFeatures)
               // .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
               // .add_required_extension_features(
               //     static_cast<VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT>(
               //         swapchainMaintenance1Features))
+              .add_required_extensions(rtExtensions)
+              .add_required_extension_features(asFeatures)
+              .add_required_extension_features(rtPipelineFeatures)
               .set_surface(surface)
               .select()
               .value();
@@ -408,6 +421,13 @@ void Init::init_imgui()
     ImGui_ImplVulkan_Init(&initInfo);
 
     // ImGui_ImplVulkan_CreateFontsTexture();
+}
+
+void Init::init_rt()
+{
+    vk::PhysicalDeviceProperties2 physDevProp2{};
+    physDevProp2.pNext = &rtProperties;
+    physicalDevice.getProperties2(&physDevProp2);
 }
 
 void Init::load_meshes()

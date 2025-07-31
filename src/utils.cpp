@@ -162,6 +162,8 @@ vk::ImageCreateInfo image_create_info(const vk::Format &format,
     imageCreateInfo.setArrayLayers(1);
     imageCreateInfo.setSamples(vk::SampleCountFlagBits::e1);
     imageCreateInfo.setTiling(vk::ImageTiling::eOptimal);
+    // ENABLE when the driver will support VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION
+    // imageCreateInfo.setInitialLayout(vk::ImageLayout::eGeneral);
     return imageCreateInfo;
 }
 

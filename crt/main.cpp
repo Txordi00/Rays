@@ -15,8 +15,8 @@ const float F = 1.f;
 // Field of view
 const float FOV = glm::radians(70.f);
 // Resolution
-const unsigned int W = 1920;
-const unsigned int H = 1080;
+const unsigned int W = 4000;
+const unsigned int H = 2000;
 // Aspect ratio
 const float AR = float(W) / float(H);
 // Background color
@@ -25,7 +25,7 @@ const glm::vec3 BKGCOLOR = {0.f, 0.f, 0.f};
 const glm::vec3 ORIGIN = {0.f, 0.f, 0.f};
 
 // Maximum number of light bounces
-const unsigned int MAXDEPTH = 3;
+const unsigned int MAXDEPTH = 5;
 // Epsilon
 const float EPS = 1.e-5f;
 

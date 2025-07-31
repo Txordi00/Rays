@@ -65,6 +65,9 @@ public:
     // Imgui
     vk::DescriptorPool imguiPool;
 
+    // Ray tracing
+    vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtProperties{};
+
     // Meshes
     std::vector<std::shared_ptr<Model>> models;
 
@@ -80,6 +83,7 @@ private:
     void init_pipelines();
     void init_imgui();
     void load_meshes();
+    void init_rt();
 
     void destroy_swapchain();
     void destroy_buffer(const Buffer &buffer);
