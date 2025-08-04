@@ -127,7 +127,8 @@ Buffer create_buffer(const VmaAllocator &allocator,
                      const vk::DeviceSize &size,
                      const vk::BufferUsageFlags &usageFlags,
                      const VmaMemoryUsage &memoryUsage,
-                     const VmaAllocationCreateFlags &allocationFlags)
+                     const VmaAllocationCreateFlags &allocationFlags,
+                     const vk::DeviceSize alignment)
 {
     vk::BufferCreateInfo bufferInfo{};
     bufferInfo.setUsage(usageFlags);
@@ -138,14 +139,29 @@ Buffer create_buffer(const VmaAllocator &allocator,
     vmaallocInfo.flags = allocationFlags;
 
     Buffer createdBuffer;
-    VK_CHECK_RES(vmaCreateBuffer(allocator,
-                                 (VkBufferCreateInfo *) &bufferInfo,
-                                 &vmaallocInfo,
-                                 (VkBuffer *) &createdBuffer.buffer,
-                                 &createdBuffer.allocation,
-                                 &createdBuffer.allocationInfo));
+    if (alignment == 0) {
+        VK_CHECK_RES(vmaCreateBuffer(allocator,
+                                     (VkBufferCreateInfo *) &bufferInfo,
+                                     &vmaallocInfo,
+                                     (VkBuffer *) &createdBuffer.buffer,
+                                     &createdBuffer.allocation,
+                                     &createdBuffer.allocationInfo));
+    } else {
+        vmaCreateBufferWithAlignment(allocator,
+                                     (VkBufferCreateInfo *) &bufferInfo,
+                                     &vmaallocInfo,
+                                     alignment,
+                                     (VkBuffer *) &createdBuffer.buffer,
+                                     &createdBuffer.allocation,
+                                     &createdBuffer.allocationInfo);
+    }
 
     return createdBuffer;
+}
+
+void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer)
+{
+    vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
 }
 
 namespace init {

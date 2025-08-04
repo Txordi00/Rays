@@ -26,7 +26,10 @@ Buffer create_buffer(const VmaAllocator &allocator,
                      const vk::DeviceSize &size,
                      const vk::BufferUsageFlags &usageFlags,
                      const VmaMemoryUsage &memoryUsage,
-                     const VmaAllocationCreateFlags &allocationFlags);
+                     const VmaAllocationCreateFlags &allocationFlags,
+                     const vk::DeviceSize alignment = 0);
+
+void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
 
 vk::ShaderModule load_shader(const vk::Device &device, const std::string filePath);
 

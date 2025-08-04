@@ -6,13 +6,13 @@
 
 class Model
 {
-    struct BlasInput
-    {
-        // Data used to build acceleration structure geometry
-        std::vector<vk::AccelerationStructureGeometryKHR> asGeometry;
-        std::vector<vk::AccelerationStructureBuildRangeInfoKHR> asBuildRangeInfo;
-        vk::BuildAccelerationStructureFlagsKHR flags{};
-    };
+    // struct BlasInput
+    // {
+    //     // Data used to build acceleration structure geometry
+    //     std::vector<vk::AccelerationStructureGeometryKHR> asGeometry;
+    //     std::vector<vk::AccelerationStructureBuildRangeInfoKHR> asBuildRangeInfo;
+    //     vk::BuildAccelerationStructureFlagsKHR flags{};
+    // };
 
 public:
     Model(HostMeshAsset &cpuMesh)
@@ -38,7 +38,7 @@ public:
     glm::mat4 modelMatrix{1.f};
 
     DeviceMeshAsset gpuMesh;
-    BlasInput blasInput;
+    // BlasInput blasInput;
     std::string name;
 
     HostMeshAsset &cpuMesh;
@@ -50,6 +50,5 @@ private:
                            vk::Fence &transferFence,
                            vk::Queue &transferQueue);
 
-    void buildBlasInput();
-
+    // void buildBlasInput();
 };

@@ -67,6 +67,7 @@ public:
 
     // Ray tracing
     vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtProperties{};
+    vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties{};
 
     // Meshes
     std::vector<std::shared_ptr<Model>> models;
@@ -86,5 +87,4 @@ private:
     void init_rt();
 
     void destroy_swapchain();
-    void destroy_buffer(const Buffer &buffer);
 };

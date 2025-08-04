@@ -32,42 +32,42 @@ void Model::createGpuMesh(const vk::Device &device,
     gpuMesh.meshBuffer = create_mesh(device, allocator, cmdTransfer, transferFence, transferQueue);
     gpuMesh.name = name;
     gpuMesh.surfaces = cpuMesh.surfaces;
-    buildBlasInput();
+    // buildBlasInput();
 }
 
-void Model::buildBlasInput()
-{
-    // Describe buffer as array of VertexObj.
-    vk::AccelerationStructureGeometryTrianglesDataKHR triangles{};
-    triangles.setVertexFormat(vk::Format::eR32G32B32Sfloat); // vec3 vertex position data.
-    triangles.setVertexData(vk::DeviceOrHostAddressConstKHR{gpuMesh.meshBuffer.vertexBufferAddress});
-    triangles.setVertexStride(sizeof(Vertex));
-    // Describe index data (32-bit unsigned int)
-    triangles.setIndexType(vk::IndexType::eUint32);
-    triangles.setIndexData(vk::DeviceOrHostAddressConstKHR{gpuMesh.meshBuffer.indexBufferAddress});
-    // Indicate identity transform by setting transformData to null device pointer.
-    //triangles.transformData = {};
-    triangles.setMaxVertex(cpuMesh.vertices.size() - 1);
+// void Model::buildBlasInput()
+// {
+//     // Describe buffer as array of VertexObj.
+//     vk::AccelerationStructureGeometryTrianglesDataKHR triangles{};
+//     triangles.setVertexFormat(vk::Format::eR32G32B32Sfloat); // vec3 vertex position data.
+//     triangles.setVertexData(vk::DeviceOrHostAddressConstKHR{gpuMesh.meshBuffer.vertexBufferAddress});
+//     triangles.setVertexStride(sizeof(Vertex));
+//     // Describe index data (32-bit unsigned int)
+//     triangles.setIndexType(vk::IndexType::eUint32);
+//     triangles.setIndexData(vk::DeviceOrHostAddressConstKHR{gpuMesh.meshBuffer.indexBufferAddress});
+//     // Indicate identity transform by setting transformData to null device pointer.
+//     //triangles.transformData = {};
+//     triangles.setMaxVertex(cpuMesh.vertices.size() - 1);
 
-    // Identify the above data as containing opaque triangles.
-    vk::AccelerationStructureGeometryKHR asGeom{};
-    asGeom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
-    asGeom.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
-    asGeom.setGeometry(vk::AccelerationStructureGeometryDataKHR{triangles});
+//     // Identify the above data as containing opaque triangles.
+//     vk::AccelerationStructureGeometryKHR asGeom{};
+//     asGeom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
+//     asGeom.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+//     asGeom.setGeometry(vk::AccelerationStructureGeometryDataKHR{triangles});
 
-    // The entire array will be used to build the BLAS.
-    uint32_t maxPrimitiveCount = cpuMesh.indices.size() / 3;
-    vk::AccelerationStructureBuildRangeInfoKHR offset;
-    offset.setFirstVertex(0);
-    offset.setPrimitiveCount(maxPrimitiveCount);
-    offset.setPrimitiveOffset(0);
-    offset.setTransformOffset(0);
+//     // The entire array will be used to build the BLAS.
+//     uint32_t maxPrimitiveCount = cpuMesh.indices.size() / 3;
+//     vk::AccelerationStructureBuildRangeInfoKHR offset;
+//     offset.setFirstVertex(0);
+//     offset.setPrimitiveCount(maxPrimitiveCount);
+//     offset.setPrimitiveOffset(0);
+//     offset.setTransformOffset(0);
 
-    // Our blas is made from only one geometry, but could be made of many geometries
+//     // Our blas is made from only one geometry, but could be made of many geometries
 
-    blasInput.asGeometry.emplace_back(asGeom);
-    blasInput.asBuildRangeInfo.emplace_back(offset);
-}
+//     blasInput.asGeometry.emplace_back(asGeom);
+//     blasInput.asBuildRangeInfo.emplace_back(offset);
+// }
 
 // OPTIMIZATION: This could be run on a separate thread in order to not force the main thread to wait
 // for fences
@@ -82,25 +82,27 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
 
     MeshBuffer mesh;
 
-    mesh.vertexBuffer = utils::create_buffer(allocator,
-                                             verticesSize,
-                                             vk::BufferUsageFlagBits::eStorageBuffer
-                                                 | vk::BufferUsageFlagBits::eShaderDeviceAddress
-                                                 | vk::BufferUsageFlagBits::eTransferDst,
-                                             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+    mesh.vertexBuffer = utils::create_buffer(
+        allocator,
+        verticesSize,
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress
+            | vk::BufferUsageFlagBits::eTransferDst
+            | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
     // | VMA_ALLOCATION_CREATE_MAPPED_BIT);
     vk::BufferDeviceAddressInfo vertexAddressInfo{};
     vertexAddressInfo.setBuffer(mesh.vertexBuffer.buffer);
     mesh.vertexBufferAddress = device.getBufferAddress(vertexAddressInfo);
 
-    mesh.indexBuffer = utils::create_buffer(allocator,
-                                            indicesSize,
-                                            vk::BufferUsageFlagBits::eIndexBuffer
-                                                | vk::BufferUsageFlagBits::eShaderDeviceAddress
-                                                | vk::BufferUsageFlagBits::eTransferDst,
-                                            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                            0);
+    mesh.indexBuffer = utils::create_buffer(
+        allocator,
+        indicesSize,
+        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress
+            | vk::BufferUsageFlagBits::eTransferDst
+            | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+        0);
     vk::BufferDeviceAddressInfo indexAddressInfo{};
     indexAddressInfo.setBuffer(mesh.indexBuffer.buffer);
     mesh.indexBufferAddress = device.getBufferAddress(indexAddressInfo);

@@ -5,6 +5,7 @@ import vulkan_hpp;
 #endif
 
 #include "engine.hpp"
+#include "ray_tracing.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 #include <imgui/imgui_impl_sdl3.h>
@@ -21,12 +22,6 @@ Engine::~Engine()
     I->clean();
 }
 
-void Engine::destroy_buffer(const Buffer &buffer)
-{
-    vmaDestroyBuffer(I->allocator, buffer.buffer, buffer.allocation);
-}
-
-
 void Engine::run()
 {
     SDL_Event e;
@@ -42,8 +37,14 @@ void Engine::run()
     I->models[2]->position = glm::vec3(0.f, 0.f, 7.f);
     I->models[2]->updateModelMatrix();
 
+    ASBuilder asBuilder{I->device, I->allocator, I->graphicsQueueFamilyIndex, I->asProperties};
+    auto blas = asBuilder.buildBLAS(*I->models[2]);
+
     int numKeys;
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);
+
+    I->device.destroyAccelerationStructureKHR(blas.blasAS);
+    utils::destroy_buffer(I->allocator, blas.blasBuffer);
 
     // Main loop
     while (!quit) {

@@ -3,15 +3,22 @@
 
 ASBuilder::ASBuilder(const vk::Device &device,
                      const VmaAllocator &allocator,
-                     const uint32_t graphicsQueueFamilyIndex)
+                     const uint32_t graphicsQueueFamilyIndex,
+                     const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties)
     : device{device}
     , allocator{allocator}
     , queueFamilyIndex{graphicsQueueFamilyIndex}
+    , asProperties{asProperties}
 {
     init();
 }
 
-vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
+ASBuilder::~ASBuilder()
+{
+    device.destroyCommandPool(asPool);
+}
+
+ASBuilder::Blas ASBuilder::buildBLAS(const Model &model)
 {
     // 1. Geometry description (single triangle array)
     vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
@@ -33,6 +40,7 @@ vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
     buildInfo.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
     buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+    buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
     buildInfo.setGeometries(geom);
 
     uint32_t primCount = model.cpuMesh.indices.size() / 3;
@@ -49,10 +57,6 @@ vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
                                              VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                                              0);
 
-    // vk::BufferDeviceAddressInfo blasAddrInfo{};
-    // blasAddrInfo.setBuffer(blasBuffer.buffer);
-    // vk::DeviceAddress blasAdrr = device.getBufferAddress(blasAddrInfo);
-
     // 4. Create the acceleration structure object
     vk::AccelerationStructureCreateInfoKHR asInfo{};
     asInfo.setBuffer(blasBuffer.buffer);
@@ -62,12 +66,14 @@ vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
     vk::AccelerationStructureKHR blas = device.createAccelerationStructureKHR(asInfo);
 
     // 5. Allocate scratch buffer
-    Buffer scratchBuffer = utils::create_buffer(allocator,
-                                                sizeInfo.buildScratchSize,
-                                                vk::BufferUsageFlagBits::eStorageBuffer
-                                                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                                                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                                0);
+    Buffer scratchBuffer
+        = utils::create_buffer(allocator,
+                               sizeInfo.buildScratchSize,
+                               vk::BufferUsageFlagBits::eStorageBuffer
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               0,
+                               asProperties.minAccelerationStructureScratchOffsetAlignment);
     vk::BufferDeviceAddressInfo scratchAddrInfo{};
     scratchAddrInfo.setBuffer(scratchBuffer.buffer);
     vk::DeviceAddress scratchAddr = device.getBufferAddress(scratchAddrInfo);
@@ -78,6 +84,13 @@ vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
 
     vk::AccelerationStructureBuildRangeInfoKHR rangeInfo{};
     rangeInfo.setPrimitiveCount(primCount);
+
+    asCmd.reset();
+
+    // Record the next set of commands
+    vk::CommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    asCmd.begin(commandBufferBeginInfo);
 
     asCmd.buildAccelerationStructuresKHR(buildInfo, &rangeInfo);
 
@@ -102,9 +115,18 @@ vk::AccelerationStructureKHR ASBuilder::buildBLAS(const Model &model)
     // you may store blasAddr in a struct for TLAS creation later
 
     // 9. scratch buffer can be destroyed after queue finishes
-    // (queue submit & fence not shown for brevity)
+    utils::destroy_buffer(allocator, scratchBuffer);
 
-    return blas;
+    // Queue submit
+    asCmd.end();
+    vk::SubmitInfo2 submitInfo{};
+    vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
+    submitInfo.setCommandBufferInfos(cmdInfo);
+    queue.submit2(submitInfo);
+    queue.waitIdle();
+    device.freeCommandBuffers(asPool, asCmd);
+
+    return Blas{blas, blasBuffer, blasAddr};
 }
 
 void ASBuilder::init()

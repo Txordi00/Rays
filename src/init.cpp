@@ -122,6 +122,8 @@ void Init::init_vulkan()
                                               VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
                                               VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME};
     vk::PhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{};
+    asFeatures.setAccelerationStructure(vk::True);
+    // asFeatures.setDescriptorBindingAccelerationStructureUpdateAfterBind(vk::True);
     vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
     // Select a GPU
     vkb::PhysicalDeviceSelector physDevSelector{vkbInstance};
@@ -425,6 +427,7 @@ void Init::init_imgui()
 
 void Init::init_rt()
 {
+    rtProperties.pNext = &asProperties;
     vk::PhysicalDeviceProperties2 physDevProp2{};
     physDevProp2.pNext = &rtProperties;
     physicalDevice.getProperties2(&physDevProp2);
@@ -453,7 +456,3 @@ void Init::destroy_swapchain()
     swapchainImages.clear();
 }
 
-void Init::destroy_buffer(const Buffer &buffer)
-{
-    vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
-}

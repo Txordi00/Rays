@@ -38,8 +38,8 @@ private:
     void draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView);
 
     // Buffers
-    void destroy_buffer(const Buffer &buffer);
-    MeshBuffer create_mesh(const std::span<uint32_t> &indices, const std::span<Vertex> &vertices);
+    // void destroy_buffer(const Buffer &buffer);
+    // MeshBuffer create_mesh(const std::span<uint32_t> &indices, const std::span<Vertex> &vertices);
 
     // Other data
     uint64_t frameNumber{0};
