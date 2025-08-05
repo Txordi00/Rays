@@ -38,7 +38,7 @@ void Engine::run()
     I->models[2]->updateModelMatrix();
 
     ASBuilder asBuilder{I->device, I->allocator, I->graphicsQueueFamilyIndex, I->asProperties};
-    auto blas = asBuilder.buildBLAS(*I->models[2]);
+    auto blas = asBuilder.buildBLAS(I->models[2]);
 
     int numKeys;
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);

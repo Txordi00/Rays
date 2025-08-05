@@ -1,5 +1,6 @@
 #include "ray_tracing.hpp"
 #include "utils.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
 ASBuilder::ASBuilder(const vk::Device &device,
                      const VmaAllocator &allocator,
@@ -18,18 +19,20 @@ ASBuilder::~ASBuilder()
     device.destroyCommandPool(asPool);
 }
 
-ASBuilder::Blas ASBuilder::buildBLAS(const Model &model)
+// NEED TO OPTIMIZE: Build for a vector of Model in batches, use a single (or a lower amount of)
+// scractch buffers.
+Blas ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 {
     // 1. Geometry description (single triangle array)
     vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
     triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
     triData.setVertexData(
-        vk::DeviceOrHostAddressConstKHR{model.gpuMesh.meshBuffer.vertexBufferAddress});
+        vk::DeviceOrHostAddressConstKHR{model->gpuMesh.meshBuffer.vertexBufferAddress});
     triData.setVertexStride(sizeof(Vertex));
-    triData.setMaxVertex(model.cpuMesh.vertices.size() - 1); // conservative
+    triData.setMaxVertex(model->cpuMesh.vertices.size() - 1); // conservative
     triData.setIndexType(vk::IndexType::eUint32);
     triData.setIndexData(
-        vk::DeviceOrHostAddressConstKHR{model.gpuMesh.meshBuffer.indexBufferAddress});
+        vk::DeviceOrHostAddressConstKHR{model->gpuMesh.meshBuffer.indexBufferAddress});
 
     vk::AccelerationStructureGeometryKHR geom{};
     geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
@@ -43,7 +46,7 @@ ASBuilder::Blas ASBuilder::buildBLAS(const Model &model)
     buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
     buildInfo.setGeometries(geom);
 
-    uint32_t primCount = model.cpuMesh.indices.size() / 3;
+    uint32_t primCount = model->cpuMesh.indices.size() / 3;
     vk::AccelerationStructureBuildSizesInfoKHR sizeInfo
         = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
                                                        buildInfo,
@@ -129,6 +132,70 @@ ASBuilder::Blas ASBuilder::buildBLAS(const Model &model)
     return Blas{blas, blasBuffer, blasAddr};
 }
 
+// NEED TO OPTIMIZE: Do instances of a single model.
+void ASBuilder::buildTLAS(const std::vector<Blas> &blases)
+{
+    std::vector<vk::AccelerationStructureInstanceKHR> instances;
+    instances.reserve(blases.size());
+    for (const Blas &b : blases) {
+        vk::AccelerationStructureInstanceKHR tlas{};
+        glm::mat3x4 idGlm(1.f);
+        vk::TransformMatrixKHR idVk;
+        memcpy(&idVk, glm::value_ptr(idGlm), sizeof(vk::TransformMatrixKHR));
+        tlas.setTransform(idVk);
+        tlas.setInstanceCustomIndex(0); // gl_InstanceCustomIndexEXT
+        tlas.setAccelerationStructureReference(b.blasAddr);
+        tlas.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
+        tlas.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
+        tlas.setInstanceShaderBindingTableRecordOffset(
+            0); // We will use the same hit group for all objects
+        instances.emplace_back(tlas);
+    }
+
+    asCmd.reset();
+
+    // Create a buffer holding the actual instance data (matrices++) for use by the AS builder
+    vk::DeviceSize instancesSize = static_cast<vk::DeviceSize>(
+        sizeof(vk::AccelerationStructureInstanceKHR) * instances.size());
+    // Buffer of instances containing the matrices and BLAS ids
+    Buffer instancesBuffer
+        = utils::create_buffer(allocator,
+                               instancesSize,
+                               vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                   | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    vk::BufferDeviceAddressInfo bufferInfo{instancesBuffer.buffer};
+    vk::DeviceAddress instBufferAddr = device.getBufferAddress(bufferInfo);
+
+    // Fill the buffer
+    memcpy(instancesBuffer.allocationInfo.pMappedData, instances.data(), instancesSize);
+
+    // Wraps a device pointer to the above uploaded instances.
+    vk::AccelerationStructureGeometryInstancesDataKHR instancesGeom{};
+    instancesGeom.setData(vk::DeviceOrHostAddressConstKHR{instBufferAddr});
+
+    // Put the above into a VkAccelerationStructureGeometryKHR. We need to put the instances struct in a union and label it as instance data.
+    vk::AccelerationStructureGeometryKHR topASGeometry{};
+    topASGeometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
+    topASGeometry.setGeometry(instancesGeom);
+
+    // Find sizes
+    vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
+    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+    buildInfo.setGeometries(topASGeometry);
+    buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
+    buildInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);
+    buildInfo.setSrcAccelerationStructure(nullptr);
+
+    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo
+        = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
+                                                       buildInfo,
+                                                       instances.size());
+}
+
 void ASBuilder::init()
 {
     vk::CommandPoolCreateInfo commandPoolCreateInfo{};
@@ -138,7 +205,7 @@ void ASBuilder::init()
     asPool = device.createCommandPool(commandPoolCreateInfo);
     vk::DeviceQueueInfo2 queueInfo{};
     queueInfo.setQueueFamilyIndex(queueFamilyIndex);
-    // queueInfo.setQueueIndex(1);
+    queueInfo.setQueueIndex(0); // Why I cannot use index 1?
     queue = device.getQueue2(queueInfo);
 
     vk::CommandBufferAllocateInfo cmdAllocInfo{};
