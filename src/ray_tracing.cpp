@@ -17,11 +17,17 @@ ASBuilder::ASBuilder(const vk::Device &device,
 ASBuilder::~ASBuilder()
 {
     device.destroyCommandPool(asPool);
+    if (blases.size() > 0) {
+        for (auto &b : blases) {
+            device.destroyAccelerationStructureKHR(b.AS);
+            utils::destroy_buffer(allocator, b.buffer);
+        }
+    }
 }
 
 // NEED TO OPTIMIZE: Build for a vector of Model in batches, use a single (or a lower amount of)
 // scractch buffers.
-Blas ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
+AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 {
     // 1. Geometry description (single triangle array)
     vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
@@ -117,9 +123,6 @@ Blas ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 
     // you may store blasAddr in a struct for TLAS creation later
 
-    // 9. scratch buffer can be destroyed after queue finishes
-    utils::destroy_buffer(allocator, scratchBuffer);
-
     // Queue submit
     asCmd.end();
     vk::SubmitInfo2 submitInfo{};
@@ -129,22 +132,25 @@ Blas ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     queue.waitIdle();
     device.freeCommandBuffers(asPool, asCmd);
 
-    return Blas{blas, blasBuffer, blasAddr};
+    // 9. scratch buffer can be destroyed after queue finishes
+    utils::destroy_buffer(allocator, scratchBuffer);
+
+    return AccelerationStructure{blas, blasBuffer, blasAddr};
 }
 
 // NEED TO OPTIMIZE: Do instances of a single model.
-void ASBuilder::buildTLAS(const std::vector<Blas> &blases)
+AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructure> &blases)
 {
     std::vector<vk::AccelerationStructureInstanceKHR> instances;
     instances.reserve(blases.size());
-    for (const Blas &b : blases) {
+    for (const AccelerationStructure &b : blases) {
         vk::AccelerationStructureInstanceKHR tlas{};
         glm::mat3x4 idGlm(1.f);
         vk::TransformMatrixKHR idVk;
         memcpy(&idVk, glm::value_ptr(idGlm), sizeof(vk::TransformMatrixKHR));
         tlas.setTransform(idVk);
         tlas.setInstanceCustomIndex(0); // gl_InstanceCustomIndexEXT
-        tlas.setAccelerationStructureReference(b.blasAddr);
+        tlas.setAccelerationStructureReference(b.addr);
         tlas.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
         tlas.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
         tlas.setInstanceShaderBindingTableRecordOffset(
@@ -194,6 +200,77 @@ void ASBuilder::buildTLAS(const std::vector<Blas> &blases)
         = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
                                                        buildInfo,
                                                        instances.size());
+
+    // Create acceleration structure, not building it yet
+    // NOT GETTING THE SHADER ADDRESS AT THE MOMENT
+    Buffer tlasBuffer
+        = utils::create_buffer(allocator,
+                               sizeInfo.accelerationStructureSize,
+                               vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               0);
+
+    // 4. Create the acceleration structure object
+    vk::AccelerationStructureCreateInfoKHR asInfo{};
+    asInfo.setBuffer(tlasBuffer.buffer);
+    asInfo.setSize(sizeInfo.accelerationStructureSize);
+    asInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);
+
+    vk::AccelerationStructureKHR tlas = device.createAccelerationStructureKHR(asInfo);
+
+    // 5. Allocate scratch buffer
+    Buffer scratchBuffer
+        = utils::create_buffer(allocator,
+                               sizeInfo.buildScratchSize,
+                               vk::BufferUsageFlagBits::eStorageBuffer
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               0,
+                               asProperties.minAccelerationStructureScratchOffsetAlignment);
+    vk::BufferDeviceAddressInfo scratchAddrInfo{};
+    scratchAddrInfo.setBuffer(scratchBuffer.buffer);
+    vk::DeviceAddress scratchAddr = device.getBufferAddress(scratchAddrInfo);
+
+    // Update build information
+    buildInfo.setSrcAccelerationStructure(nullptr);
+    buildInfo.setDstAccelerationStructure(tlas);
+    buildInfo.setScratchData(vk::DeviceOrHostAddressKHR{scratchAddr});
+
+    // Build Offsets info: n instances
+    vk::AccelerationStructureBuildRangeInfoKHR buildRangeInfo{};
+    buildRangeInfo.setPrimitiveCount(instances.size());
+
+    // Build the TLAS
+    // Record the next set of commands
+    vk::CommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    asCmd.begin(commandBufferBeginInfo);
+
+    asCmd.buildAccelerationStructuresKHR(buildInfo, &buildRangeInfo);
+
+    asCmd.end();
+    vk::SubmitInfo2 submitInfo{};
+    vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
+    submitInfo.setCommandBufferInfos(cmdInfo);
+    queue.submit2(submitInfo);
+    queue.waitIdle();
+    device.freeCommandBuffers(asPool, asCmd);
+
+    // 9. scratch buffer can be destroyed after queue finishes
+    utils::destroy_buffer(allocator, scratchBuffer);
+    utils::destroy_buffer(allocator, instancesBuffer);
+
+    return AccelerationStructure{.AS = tlas, .buffer = tlasBuffer};
+}
+
+AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Model> > &models)
+{
+    blases.clear();
+    blases.resize(models.size());
+    for (int i = 0; i < models.size(); i++) {
+        blases[i] = buildBLAS(models[i]);
+    }
+    return buildTLAS(blases);
 }
 
 void ASBuilder::init()

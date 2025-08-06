@@ -38,13 +38,14 @@ void Engine::run()
     I->models[2]->updateModelMatrix();
 
     ASBuilder asBuilder{I->device, I->allocator, I->graphicsQueueFamilyIndex, I->asProperties};
-    auto blas = asBuilder.buildBLAS(I->models[2]);
+    auto tlas = asBuilder.buildTLAS(I->models);
+
+    I->device.destroyAccelerationStructureKHR(tlas.AS);
+    utils::destroy_buffer(I->allocator, tlas.buffer);
 
     int numKeys;
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);
 
-    I->device.destroyAccelerationStructureKHR(blas.blasAS);
-    utils::destroy_buffer(I->allocator, blas.blasBuffer);
 
     // Main loop
     while (!quit) {

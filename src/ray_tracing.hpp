@@ -1,11 +1,11 @@
 #pragma once
 #include "model.hpp"
 
-struct Blas
+struct AccelerationStructure
 {
-    vk::AccelerationStructureKHR blasAS;
-    Buffer blasBuffer;
-    VkDeviceAddress blasAddr;
+    vk::AccelerationStructureKHR AS;
+    Buffer buffer;
+    VkDeviceAddress addr;
 };
 
 class ASBuilder
@@ -17,8 +17,10 @@ public:
               const uint32_t graphicsQueueFamilyIndex,
               const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
     ~ASBuilder();
-    Blas buildBLAS(const std::shared_ptr<Model> &model);
-    void buildTLAS(const std::vector<Blas> &blases);
+    AccelerationStructure buildBLAS(const std::shared_ptr<Model> &model);
+    AccelerationStructure buildTLAS(const std::vector<AccelerationStructure> &blases);
+
+    AccelerationStructure buildTLAS(const std::vector<std::shared_ptr<Model>> &models);
 
 private:
     const vk::Device &device;
@@ -31,4 +33,6 @@ private:
     vk::CommandBuffer asCmd;
 
     void init();
+
+    std::vector<AccelerationStructure> blases;
 };
