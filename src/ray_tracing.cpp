@@ -273,8 +273,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Mod
     for (int i = 0; i < models.size(); i++) {
         blases[i] = buildBLAS(models[i]);
     }
-    AccelerationStructure tlas = buildTLAS(blases);
-    return tlas;
+    return buildTLAS(blases);
 }
 
 void ASBuilder::init()
