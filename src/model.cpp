@@ -35,57 +35,22 @@ void Model::updateModelMatrix()
 
 void Model::createGpuMesh(const vk::Device &device,
                           const VmaAllocator &allocator,
-                          vk::CommandBuffer &cmdTransfer,
-                          vk::Fence &transferFence,
-                          vk::Queue &transferQueue)
+                          const vk::CommandBuffer &cmdTransfer,
+                          const vk::Fence &transferFence,
+                          const vk::Queue &transferQueue)
 {
     gpuMesh.meshBuffer = create_mesh(device, allocator, cmdTransfer, transferFence, transferQueue);
     gpuMesh.name = name;
-    // gpuMesh.surfaces = cpuMesh.surfaces;
-    // buildBlasInput();
 }
 
-// void Model::buildBlasInput()
-// {
-//     // Describe buffer as array of VertexObj.
-//     vk::AccelerationStructureGeometryTrianglesDataKHR triangles{};
-//     triangles.setVertexFormat(vk::Format::eR32G32B32Sfloat); // vec3 vertex position data.
-//     triangles.setVertexData(vk::DeviceOrHostAddressConstKHR{gpuMesh.meshBuffer.vertexBufferAddress});
-//     triangles.setVertexStride(sizeof(Vertex));
-//     // Describe index data (32-bit unsigned int)
-//     triangles.setIndexType(vk::IndexType::eUint32);
-//     triangles.setIndexData(vk::DeviceOrHostAddressConstKHR{gpuMesh.meshBuffer.indexBufferAddress});
-//     // Indicate identity transform by setting transformData to null device pointer.
-//     //triangles.transformData = {};
-//     triangles.setMaxVertex(cpuMesh.vertices.size() - 1);
-
-//     // Identify the above data as containing opaque triangles.
-//     vk::AccelerationStructureGeometryKHR asGeom{};
-//     asGeom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
-//     asGeom.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
-//     asGeom.setGeometry(vk::AccelerationStructureGeometryDataKHR{triangles});
-
-//     // The entire array will be used to build the BLAS.
-//     uint32_t maxPrimitiveCount = cpuMesh.indices.size() / 3;
-//     vk::AccelerationStructureBuildRangeInfoKHR offset;
-//     offset.setFirstVertex(0);
-//     offset.setPrimitiveCount(maxPrimitiveCount);
-//     offset.setPrimitiveOffset(0);
-//     offset.setTransformOffset(0);
-
-//     // Our blas is made from only one geometry, but could be made of many geometries
-
-//     blasInput.asGeometry.emplace_back(asGeom);
-//     blasInput.asBuildRangeInfo.emplace_back(offset);
-// }
 
 // OPTIMIZATION: This could be run on a separate thread in order to not force the main thread to wait
 // for fences
 MeshBuffer Model::create_mesh(const vk::Device &device,
                               const VmaAllocator &allocator,
-                              vk::CommandBuffer &cmdTransfer,
-                              vk::Fence &transferFence,
-                              vk::Queue &transferQueue)
+                              const vk::CommandBuffer &cmdTransfer,
+                              const vk::Fence &transferFence,
+                              const vk::Queue &transferQueue)
 {
     const vk::DeviceSize verticesSize = numVertices * sizeof(Vertex);
     const vk::DeviceSize indicesSize = numIndices * sizeof(uint32_t);
@@ -175,11 +140,6 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
 
     return mesh;
 }
-
-// void Model::cleanHost()
-// {
-//     cpuMesh = HostMeshAsset{};
-// }
 
 void Model::destroyBuffers(const VmaAllocator &allocator)
 {

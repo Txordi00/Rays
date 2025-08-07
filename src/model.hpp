@@ -6,14 +6,6 @@
 
 class Model
 {
-    // struct BlasInput
-    // {
-    //     // Data used to build acceleration structure geometry
-    //     std::vector<vk::AccelerationStructureGeometryKHR> asGeometry;
-    //     std::vector<vk::AccelerationStructureBuildRangeInfoKHR> asBuildRangeInfo;
-    //     vk::BuildAccelerationStructureFlagsKHR flags{};
-    // };
-
 public:
     Model(const HostMeshAsset &cpuMesh);
     ~Model() = default;
@@ -22,11 +14,9 @@ public:
 
     void createGpuMesh(const vk::Device &device,
                        const VmaAllocator &allocator,
-                       vk::CommandBuffer &cmdTransfer,
-                       vk::Fence &transferFence,
-                       vk::Queue &transferQueue);
-
-    // void cleanHost();
+                       const vk::CommandBuffer &cmdTransfer,
+                       const vk::Fence &transferFence,
+                       const vk::Queue &transferQueue);
 
     void destroyBuffers(const VmaAllocator &allocator);
 
@@ -35,7 +25,6 @@ public:
     glm::mat4 modelMatrix{1.f};
 
     DeviceMeshAsset gpuMesh;
-    // BlasInput blasInput;
     std::string name;
 
     uint32_t numVertices;
@@ -44,12 +33,10 @@ public:
 private:
     MeshBuffer create_mesh(const vk::Device &device,
                            const VmaAllocator &allocator,
-                           vk::CommandBuffer &cmdTransfer,
-                           vk::Fence &transferFence,
-                           vk::Queue &transferQueue);
+                           const vk::CommandBuffer &cmdTransfer,
+                           const vk::Fence &transferFence,
+                           const vk::Queue &transferQueue);
 
     const void *verticesData;
     const void *indicesData;
-
-    // void buildBlasInput();
 };
