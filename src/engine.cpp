@@ -34,8 +34,11 @@ void Engine::run()
                          100.f);
     const float dx = 0.5f;
     const float dt = glm::radians(2.f);
+    I->models[0]->position = glm::vec3(-5.f, 0.f, 7.f);
+    I->models[1]->position = glm::vec3(5.f, 0.f, 7.f);
     I->models[2]->position = glm::vec3(0.f, 0.f, 7.f);
-    I->models[2]->updateModelMatrix();
+    for (const auto &m : I->models)
+        m->updateModelMatrix();
 
     ASBuilder asBuilder{I->device, I->allocator, I->graphicsQueueFamilyIndex, I->asProperties};
     auto tlas = asBuilder.buildTLAS(I->models);
@@ -304,29 +307,31 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         cmd.setViewport(0, viewport);
         cmd.setScissor(0, scissor);
 
-        int objId = 2;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, I->simpleMeshGraphicsPipeline.pipeline);
 
-        // models[2]->updateModelMatrix();
         camera.update();
-        glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix * I->models[2]->modelMatrix;
+        for (int objId = 0; objId < I->models.size(); objId++) {
+            glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix
+                                  * I->models[objId]->modelMatrix;
 
-        MeshPush pushConstants;
-        pushConstants.worldMatrix = mvpMatrix;
-        pushConstants.vertexBufferAddress = I->models[objId]->gpuMesh.meshBuffer.vertexBufferAddress;
-        cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
-                          vk::ShaderStageFlagBits::eVertex,
-                          0,
-                          sizeof(MeshPush),
-                          &pushConstants);
-        cmd.bindIndexBuffer(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
+            MeshPush pushConstants;
+            pushConstants.worldMatrix = mvpMatrix;
+            pushConstants.vertexBufferAddress = I->models[objId]
+                                                    ->gpuMesh.meshBuffer.vertexBufferAddress;
+            cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
+                              vk::ShaderStageFlagBits::eVertex,
+                              0,
+                              sizeof(MeshPush),
+                              &pushConstants);
+            cmd.bindIndexBuffer(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
+                                0,
+                                vk::IndexType::eUint32);
+            cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
+                            1,
+                            I->models[objId]->gpuMesh.surfaces[0].startIndex,
                             0,
-                            vk::IndexType::eUint32);
-        cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
-                        1,
-                        I->models[objId]->gpuMesh.surfaces[0].startIndex,
-                        0,
-                        0);
+                            0);
+        }
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }

@@ -29,7 +29,7 @@ ASBuilder::~ASBuilder()
 
 // NEED TO OPTIMIZE: Build for a vector of Model in batches, use a single (or a lower amount of)
 // scractch buffers.
-AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> model)
+AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 {
     VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
     device.resetFences(asFence);
