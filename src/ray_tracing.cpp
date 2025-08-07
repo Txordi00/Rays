@@ -16,6 +16,8 @@ ASBuilder::ASBuilder(const vk::Device &device,
 
 ASBuilder::~ASBuilder()
 {
+    device.freeCommandBuffers(asPool, asCmd);
+    device.destroyFence(asFence);
     device.destroyCommandPool(asPool);
     if (blases.size() > 0) {
         for (auto &b : blases) {
@@ -27,15 +29,17 @@ ASBuilder::~ASBuilder()
 
 // NEED TO OPTIMIZE: Build for a vector of Model in batches, use a single (or a lower amount of)
 // scractch buffers.
-AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
+AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> model)
 {
+    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
+    device.resetFences(asFence);
     // 1. Geometry description (single triangle array)
     vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
     triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
     triData.setVertexData(
         vk::DeviceOrHostAddressConstKHR{model->gpuMesh.meshBuffer.vertexBufferAddress});
     triData.setVertexStride(sizeof(Vertex));
-    triData.setMaxVertex(model->cpuMesh.vertices.size() - 1); // conservative
+    triData.setMaxVertex(model->numVertices - 1); // conservative
     triData.setIndexType(vk::IndexType::eUint32);
     triData.setIndexData(
         vk::DeviceOrHostAddressConstKHR{model->gpuMesh.meshBuffer.indexBufferAddress});
@@ -52,7 +56,7 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
     buildInfo.setGeometries(geom);
 
-    uint32_t primCount = model->cpuMesh.indices.size() / 3;
+    uint32_t primCount = model->numIndices / 3;
     vk::AccelerationStructureBuildSizesInfoKHR sizeInfo
         = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
                                                        buildInfo,
@@ -121,16 +125,13 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     blasAddrInfo.setAccelerationStructure(blas);
     VkDeviceAddress blasAddr = device.getAccelerationStructureAddressKHR(blasAddrInfo);
 
-    // you may store blasAddr in a struct for TLAS creation later
-
     // Queue submit
     asCmd.end();
     vk::SubmitInfo2 submitInfo{};
     vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
     submitInfo.setCommandBufferInfos(cmdInfo);
-    queue.submit2(submitInfo);
-    queue.waitIdle();
-    device.freeCommandBuffers(asPool, asCmd);
+    queue.submit2(submitInfo, asFence);
+    // queue.waitIdle();
 
     // 9. scratch buffer can be destroyed after queue finishes
     utils::destroy_buffer(allocator, scratchBuffer);
@@ -141,6 +142,9 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 // NEED TO OPTIMIZE: Do instances of a single model.
 AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructure> &blases)
 {
+    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
+    device.resetFences(asFence);
+
     std::vector<vk::AccelerationStructureInstanceKHR> instances;
     instances.reserve(blases.size());
     for (const AccelerationStructure &b : blases) {
@@ -252,9 +256,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
     vk::SubmitInfo2 submitInfo{};
     vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
     submitInfo.setCommandBufferInfos(cmdInfo);
-    queue.submit2(submitInfo);
+    queue.submit2(submitInfo, asFence);
     queue.waitIdle();
-    device.freeCommandBuffers(asPool, asCmd);
 
     // 9. scratch buffer can be destroyed after queue finishes
     utils::destroy_buffer(allocator, scratchBuffer);
@@ -270,7 +273,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Mod
     for (int i = 0; i < models.size(); i++) {
         blases[i] = buildBLAS(models[i]);
     }
-    return buildTLAS(blases);
+    AccelerationStructure tlas = buildTLAS(blases);
+    return tlas;
 }
 
 void ASBuilder::init()
@@ -290,4 +294,8 @@ void ASBuilder::init()
     cmdAllocInfo.setCommandBufferCount(1);
     cmdAllocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
     asCmd = device.allocateCommandBuffers(cmdAllocInfo)[0];
+
+    vk::FenceCreateInfo fenceInfo{};
+    fenceInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
+    asFence = device.createFence(fenceInfo);
 }

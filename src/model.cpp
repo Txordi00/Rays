@@ -5,6 +5,16 @@
 #include <glm/gtx/transform.hpp>
 #include <vk_mem_alloc.h>
 
+Model::Model(const HostMeshAsset &cpuMesh)
+{
+    name = cpuMesh.name;
+    numVertices = cpuMesh.vertices.size();
+    numIndices = cpuMesh.indices.size();
+    gpuMesh.surfaces = cpuMesh.surfaces;
+    verticesData = cpuMesh.vertices.data();
+    indicesData = cpuMesh.indices.data();
+}
+
 void Model::updateModelMatrix()
 {
     // The order is translate -> rotate -> scale.
@@ -31,7 +41,7 @@ void Model::createGpuMesh(const vk::Device &device,
 {
     gpuMesh.meshBuffer = create_mesh(device, allocator, cmdTransfer, transferFence, transferQueue);
     gpuMesh.name = name;
-    gpuMesh.surfaces = cpuMesh.surfaces;
+    // gpuMesh.surfaces = cpuMesh.surfaces;
     // buildBlasInput();
 }
 
@@ -77,8 +87,8 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
                               vk::Fence &transferFence,
                               vk::Queue &transferQueue)
 {
-    const vk::DeviceSize verticesSize = cpuMesh.vertices.size() * sizeof(Vertex);
-    const vk::DeviceSize indicesSize = cpuMesh.indices.size() * sizeof(uint32_t);
+    const vk::DeviceSize verticesSize = numVertices * sizeof(Vertex);
+    const vk::DeviceSize indicesSize = numIndices * sizeof(uint32_t);
 
     MeshBuffer mesh;
 
@@ -116,8 +126,8 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
 
     void *stagingData = stagingBuffer.allocationInfo.pMappedData;
 
-    memcpy(stagingData, cpuMesh.vertices.data(), verticesSize);
-    memcpy((char *) stagingData + verticesSize, cpuMesh.indices.data(), indicesSize);
+    memcpy(stagingData, verticesData, verticesSize);
+    memcpy((char *) stagingData + verticesSize, indicesData, indicesSize);
 
     // Set info structures to copy from staging to vertex & index buffers
     vk::CopyBufferInfo2 vertexCopyInfo{};
@@ -166,10 +176,10 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     return mesh;
 }
 
-void Model::cleanHost()
-{
-    cpuMesh = HostMeshAsset{};
-}
+// void Model::cleanHost()
+// {
+//     cpuMesh = HostMeshAsset{};
+// }
 
 void Model::destroyBuffers(const VmaAllocator &allocator)
 {

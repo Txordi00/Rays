@@ -15,9 +15,7 @@ class Model
     // };
 
 public:
-    Model(HostMeshAsset &cpuMesh)
-        : cpuMesh{cpuMesh}
-        , name{cpuMesh.name} {};
+    Model(const HostMeshAsset &cpuMesh);
     ~Model() = default;
 
     void updateModelMatrix();
@@ -28,8 +26,7 @@ public:
                        vk::Fence &transferFence,
                        vk::Queue &transferQueue);
 
-
-    void cleanHost();
+    // void cleanHost();
 
     void destroyBuffers(const VmaAllocator &allocator);
 
@@ -41,7 +38,8 @@ public:
     // BlasInput blasInput;
     std::string name;
 
-    HostMeshAsset &cpuMesh;
+    uint32_t numVertices;
+    uint32_t numIndices;
 
 private:
     MeshBuffer create_mesh(const vk::Device &device,
@@ -49,6 +47,9 @@ private:
                            vk::CommandBuffer &cmdTransfer,
                            vk::Fence &transferFence,
                            vk::Queue &transferQueue);
+
+    const void *verticesData;
+    const void *indicesData;
 
     // void buildBlasInput();
 };
