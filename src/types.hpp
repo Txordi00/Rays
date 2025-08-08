@@ -74,6 +74,7 @@ struct Buffer
     vk::Buffer buffer;
     VmaAllocation allocation;
     VmaAllocationInfo allocationInfo;
+    uint32_t bufferId;
 };
 
 struct Vertex
