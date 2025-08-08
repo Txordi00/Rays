@@ -3,6 +3,7 @@
 #include "model.hpp"
 #include "raster_pipelines.hpp"
 #include "types.hpp"
+#include "uniform_buffers.hpp"
 #include <SDL3/SDL.h>
 #include <memory>
 #include <vk_mem_alloc.h>
@@ -58,6 +59,13 @@ public:
     vk::DescriptorSet drawImageDescriptors;
     DescriptorSetData drawImageDescriptorsData;
 
+    // Uniform buffers
+    std::unique_ptr<Ubo> ubo;
+    vk::DescriptorSetLayout uboDescriptorSetLayout;
+    std::vector<vk::DescriptorSet> uboDescriptorSets;
+    vk::PipelineLayout pipelineLayout;
+    std::vector<Buffer> uniformBuffers;
+
     // Pipelines
     std::vector<ComputePipelineData> computePipelines;
     SimplePipelineData simpleMeshGraphicsPipeline;
@@ -80,7 +88,8 @@ private:
     void create_draw_data();
     void init_commands();
     void init_sync_structures();
-    void init_descriptors();
+    void init_compute_descriptors();
+    void init_ub_descriptors();
     void init_pipelines();
     void init_imgui();
     void load_meshes();

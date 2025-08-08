@@ -1,10 +1,14 @@
-#include "ubo.hpp"
+#include "uniform_buffers.hpp"
 
 Ubo::Ubo(const vk::Device &device)
     : device{device}
 {}
 
-Ubo::~Ubo() {}
+Ubo::~Ubo()
+{
+    if (pool)
+        device.destroyDescriptorPool(pool);
+}
 
 void Ubo::create_descriptor_pool(const uint32_t maxDescriptorCount, const uint32_t maxSets)
 {
@@ -65,12 +69,14 @@ vk::PipelineLayout Ubo::create_pipeline_layout(const vk::PushConstantRange &push
     return device.createPipelineLayout(createInfo);
 }
 
-Buffer Ubo::create_buffer(const uint32_t bufferId) {}
-
-void Ubo::update_buffer(const Buffer &buffer, const void *data) {}
+void Ubo::update_buffer(const Buffer &buffer, const void *data)
+{
+    assert(buffer.allocationInfo.pMappedData && "Cannot copy to unmapped buffer");
+    memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
+}
 
 void Ubo::update_descriptor_sets(const std::vector<Buffer> &buffers,
-                                 const std::vector<VkDescriptorSet> &descriptorSets)
+                                 const std::vector<vk::DescriptorSet> &descriptorSets)
 {
     assert(buffers.size() == descriptorSets.size()
            && "Number of buffers != number of descriptor sets");

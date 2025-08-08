@@ -27,7 +27,7 @@ Init::Init()
     create_draw_data();
     init_commands();
     init_sync_structures();
-    init_descriptors();
+    init_compute_descriptors();
     init_pipelines();
     init_imgui();
     load_meshes();
@@ -322,7 +322,7 @@ void Init::init_sync_structures()
     transferFence = device.createFence(fenceCreateInfo);
 }
 
-void Init::init_descriptors()
+void Init::init_compute_descriptors()
 {
     // Set the descriptor set properties for the gradient compute shader layout
     vk::DescriptorType drawImageDescriptorSetType = vk::DescriptorType::eStorageImage;
@@ -362,6 +362,33 @@ void Init::init_descriptors()
     descriptorImageDrawWrite.setDstSet(drawImageDescriptors);
 
     device.updateDescriptorSets(descriptorImageDrawWrite, nullptr);
+}
+
+void Init::init_ub_descriptors()
+{
+    ubo = std::make_unique<Ubo>(device);
+    ubo->create_descriptor_pool(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffers,
+                                frameOverlap);
+    uboDescriptorSetLayout = ubo->create_descriptor_set_layout(vk::ShaderStageFlagBits::eVertex);
+    vk::PushConstantRange pushRange{};
+    pushRange.setStageFlags(vk::ShaderStageFlagBits::eVertex);
+    pushRange.setOffset(0);
+    pushRange.setSize(sizeof(MeshPush));
+    ubo->create_pipeline_layout(pushRange, uboDescriptorSetLayout);
+    uboDescriptorSets = ubo->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
+    pipelineLayout = ubo->create_pipeline_layout(pushRange, uboDescriptorSetLayout);
+
+    uniformBuffers.reserve(frameOverlap);
+    for (int i = 0; i < frameOverlap; i++)
+        uniformBuffers.emplace_back(
+            utils::create_buffer(allocator,
+                                 vk::DeviceSize(sizeof(UniformData)),
+                                 vk::BufferUsageFlagBits::eUniformBuffer,
+                                 VMA_MEMORY_USAGE_AUTO,
+                                 VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                     | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+
+    ubo->update_descriptor_sets(uniformBuffers, uboDescriptorSets);
 }
 
 void Init::init_pipelines()

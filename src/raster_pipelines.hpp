@@ -13,13 +13,6 @@ struct SimplePipelineData
     vk::Pipeline pipeline;
 };
 
-// push constants for our mesh object draws
-struct MeshPush
-{
-    glm::mat4 worldMatrix;
-    vk::DeviceAddress vertexBufferAddress;
-};
-
 SimplePipelineData get_triangle_pipeline(const vk::Device &device,
                                          const vk::Format &colorImageFormat);
 

@@ -95,6 +95,19 @@ struct MeshBuffer
     vk::DeviceAddress indexBufferAddress;
 };
 
+// push constants for our mesh object draws
+struct MeshPush
+{
+    glm::mat4 worldMatrix;
+    vk::DeviceAddress vertexBufferAddress;
+};
+
+// push constants for our mesh object draws
+struct UniformData
+{
+    glm::mat4 worldMatrix;
+};
+
 struct ComputePipelineData
 {
     std::string name;
