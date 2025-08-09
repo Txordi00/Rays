@@ -28,6 +28,7 @@ Init::Init()
     init_commands();
     init_sync_structures();
     init_compute_descriptors();
+    init_ub_descriptors();
     init_pipelines();
     init_imgui();
     load_meshes();
@@ -44,6 +45,8 @@ void Init::clean()
         for (auto &m : models) {
             m->destroyBuffers(allocator);
         }
+        for (auto &b : uniformBuffers)
+            utils::destroy_buffer(allocator, b);
         device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
         device.destroyDescriptorPool(imguiPool);
@@ -52,7 +55,9 @@ void Init::clean()
             device.destroyPipeline(computePipelines[i].pipeline);
         }
         descriptorPool->destroyPool();
+        ubo->destroy();
         device.destroyDescriptorSetLayout(drawImageDescriptorsData.layout);
+        device.destroyDescriptorSetLayout(uboDescriptorSetLayout);
 
         device.destroyCommandPool(transferCmdPool);
         device.destroyFence(transferFence);
@@ -370,23 +375,24 @@ void Init::init_ub_descriptors()
     ubo->create_descriptor_pool(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffers,
                                 frameOverlap);
     uboDescriptorSetLayout = ubo->create_descriptor_set_layout(vk::ShaderStageFlagBits::eVertex);
-    vk::PushConstantRange pushRange{};
-    pushRange.setStageFlags(vk::ShaderStageFlagBits::eVertex);
-    pushRange.setOffset(0);
-    pushRange.setSize(sizeof(MeshPush));
-    ubo->create_pipeline_layout(pushRange, uboDescriptorSetLayout);
+    // vk::PushConstantRange pushRange{};
+    // pushRange.setStageFlags(vk::ShaderStageFlagBits::eVertex);
+    // pushRange.setOffset(0);
+    // pushRange.setSize(sizeof(MeshPush));
+    // ubo->create_pipeline_layout(pushRange, uboDescriptorSetLayout);
     uboDescriptorSets = ubo->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
-    pipelineLayout = ubo->create_pipeline_layout(pushRange, uboDescriptorSetLayout);
 
     uniformBuffers.reserve(frameOverlap);
-    for (int i = 0; i < frameOverlap; i++)
-        uniformBuffers.emplace_back(
-            utils::create_buffer(allocator,
-                                 vk::DeviceSize(sizeof(UniformData)),
-                                 vk::BufferUsageFlagBits::eUniformBuffer,
-                                 VMA_MEMORY_USAGE_AUTO,
-                                 VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                                     | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    for (int i = 0; i < frameOverlap; i++) {
+        Buffer b = utils::create_buffer(allocator,
+                                        vk::DeviceSize(sizeof(UniformData)),
+                                        vk::BufferUsageFlagBits::eUniformBuffer,
+                                        VMA_MEMORY_USAGE_AUTO,
+                                        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                            | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+        b.bufferId = i;
+        uniformBuffers.emplace_back(b);
+    }
 
     ubo->update_descriptor_sets(uniformBuffers, uboDescriptorSets);
 }
@@ -394,9 +400,11 @@ void Init::init_ub_descriptors()
 void Init::init_pipelines()
 {
     computePipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
+
     simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
                                                           imageDraw.format,
-                                                          imageDepth.format);
+                                                          imageDepth.format,
+                                                          {uboDescriptorSetLayout});
 }
 
 void Init::init_imgui()

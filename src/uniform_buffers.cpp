@@ -4,19 +4,18 @@ Ubo::Ubo(const vk::Device &device)
     : device{device}
 {}
 
-Ubo::~Ubo()
+void Ubo::destroy()
 {
-    if (pool)
-        device.destroyDescriptorPool(pool);
+    device.destroyDescriptorPool(pool);
 }
 
 void Ubo::create_descriptor_pool(const uint32_t maxDescriptorCount, const uint32_t maxSets)
 {
     maxDescriptors = maxDescriptorCount;
-    vk::PhysicalDeviceProperties pdProperties{};
-    vk::DescriptorPoolSize poolSizes{};
-    poolSizes.setType(vk::DescriptorType::eUniformBuffer);
-    poolSizes.setDescriptorCount(maxDescriptorCount);
+    vk::DescriptorPoolSize poolSize{};
+    poolSize.setType(vk::DescriptorType::eUniformBuffer);
+    poolSize.setDescriptorCount(maxDescriptorCount);
+    std::vector<vk::DescriptorPoolSize> poolSizes(maxSets, poolSize);
 
     vk::DescriptorPoolCreateInfo poolCreateInfo{};
     poolCreateInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind);
@@ -53,21 +52,22 @@ std::vector<vk::DescriptorSet> Ubo::allocate_descriptor_sets(
 {
     vk::DescriptorSetAllocateInfo allocInfo{};
     allocInfo.setDescriptorPool(pool);
-    allocInfo.setDescriptorSetCount(descriptorSetCount);
-    allocInfo.setSetLayouts(descriptorSetLayout);
+    std::vector<vk::DescriptorSetLayout> descriptorSetLayouts(descriptorSetCount,
+                                                              descriptorSetLayout);
+    allocInfo.setSetLayouts(descriptorSetLayouts);
 
     return device.allocateDescriptorSets(allocInfo);
 }
 
-vk::PipelineLayout Ubo::create_pipeline_layout(const vk::PushConstantRange &pushRange,
-                                               const vk::DescriptorSetLayout &descriptorSetLayout)
-{
-    vk::PipelineLayoutCreateInfo createInfo{};
-    createInfo.setSetLayouts(descriptorSetLayout);
-    createInfo.setPushConstantRanges(pushRange);
+// vk::PipelineLayout Ubo::create_pipeline_layout(const vk::PushConstantRange &pushRange,
+//                                                const vk::DescriptorSetLayout &descriptorSetLayout)
+// {
+//     vk::PipelineLayoutCreateInfo createInfo{};
+//     createInfo.setSetLayouts(descriptorSetLayout);
+//     createInfo.setPushConstantRanges(pushRange);
 
-    return device.createPipelineLayout(createInfo);
-}
+//     return device.createPipelineLayout(createInfo);
+// }
 
 void Ubo::update_buffer(const Buffer &buffer, const void *data)
 {
@@ -97,7 +97,7 @@ void Ubo::update_descriptor_sets(const std::vector<Buffer> &buffers,
         descriptorWrite.setDescriptorCount(1);
         descriptorWrite.setBufferInfo(
             bufferInfo); // Weird that I can input multiple buffer infos here
-        descriptorWrites.emplace_back(descriptorWrite);
+        descriptorWrites[i] = descriptorWrite;
     }
 
     device.updateDescriptorSets(descriptorWrites, nullptr);

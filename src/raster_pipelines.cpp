@@ -217,9 +217,11 @@ SimplePipelineData get_triangle_pipeline(const vk::Device &device,
     return trianglePipelineData;
 }
 
-SimplePipelineData get_simple_mesh_pipeline(const vk::Device &device,
-                                            const vk::Format &colorImageFormat,
-                                            const vk::Format &depthImageFormat)
+SimplePipelineData get_simple_mesh_pipeline(
+    const vk::Device &device,
+    const vk::Format &colorImageFormat,
+    const vk::Format &depthImageFormat,
+    const std::vector<vk::DescriptorSetLayout> &descriptorLayouts)
 {
     SimplePipelineData trianglePipelineData;
 
@@ -233,7 +235,7 @@ SimplePipelineData get_simple_mesh_pipeline(const vk::Device &device,
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eVertex);
     pushInfo.setSize(sizeof(MeshPush));
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.setSetLayouts(nullptr);
+    pipelineLayoutInfo.setSetLayouts(descriptorLayouts);
     pipelineLayoutInfo.setPushConstantRanges(pushInfo);
 
     try {

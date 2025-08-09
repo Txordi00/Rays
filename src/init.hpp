@@ -63,7 +63,6 @@ public:
     std::unique_ptr<Ubo> ubo;
     vk::DescriptorSetLayout uboDescriptorSetLayout;
     std::vector<vk::DescriptorSet> uboDescriptorSets;
-    vk::PipelineLayout pipelineLayout;
     std::vector<Buffer> uniformBuffers;
 
     // Pipelines
