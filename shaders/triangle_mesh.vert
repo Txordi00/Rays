@@ -1,5 +1,8 @@
 #version 460
 #extension GL_EXT_buffer_reference : require
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_nonuniform_qualifier : enable
+
 
 layout (location = 0) out vec3 outColor;
 layout (location = 1) out vec2 outUV;
@@ -16,20 +19,24 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer{
     Vertex vertices[];
 };
 
+layout(scalar, binding = 0) uniform Ubo{
+  mat4 worldMatrix;
+} ubo[];
+
 //push constants block
-layout( push_constant ) uniform constants
+layout(scalar, push_constant) uniform constants
 {
-    mat4 renderMatrix;
+    uint objId;
     VertexBuffer vertexBuffer;
-} PushConstants;
+} push;
 
 void main()
 {
     //load vertex data from device adress
-    Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
+    Vertex v = push.vertexBuffer.vertices[gl_VertexIndex];
     
     //output data
-    gl_Position = PushConstants.renderMatrix * vec4(v.position, 1.0f);
+    gl_Position = ubo[push.objId].worldMatrix * vec4(v.position, 1.0f);
     outColor = v.color.xyz;
     outUV.x = v.uv_x;
     outUV.y = v.uv_y;

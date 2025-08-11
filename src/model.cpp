@@ -5,7 +5,8 @@
 #include <glm/gtx/transform.hpp>
 #include <vk_mem_alloc.h>
 
-Model::Model(const HostMeshAsset &cpuMesh)
+Model::Model(const HostMeshAsset &cpuMesh, const VmaAllocator &allocator)
+    : allocator{allocator}
 {
     name = cpuMesh.name;
     numVertices = cpuMesh.vertices.size();
@@ -13,6 +14,8 @@ Model::Model(const HostMeshAsset &cpuMesh)
     gpuMesh.surfaces = cpuMesh.surfaces;
     verticesData = cpuMesh.vertices.data();
     indicesData = cpuMesh.indices.data();
+
+    allocate_uniform_buffer();
 }
 
 void Model::updateModelMatrix()
@@ -34,7 +37,6 @@ void Model::updateModelMatrix()
 }
 
 void Model::createGpuMesh(const vk::Device &device,
-                          const VmaAllocator &allocator,
                           const vk::CommandBuffer &cmdTransfer,
                           const vk::Fence &transferFence,
                           const vk::Queue &transferQueue)
@@ -141,7 +143,17 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     return mesh;
 }
 
-void Model::destroyBuffers(const VmaAllocator &allocator)
+void Model::allocate_uniform_buffer()
+{
+    uniformBuffer = utils::create_buffer(allocator,
+                                         vk::DeviceSize(sizeof(UniformData)),
+                                         vk::BufferUsageFlagBits::eUniformBuffer,
+                                         VMA_MEMORY_USAGE_AUTO,
+                                         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                             | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+}
+
+void Model::destroyBuffers()
 {
     vmaDestroyBuffer(allocator,
                      gpuMesh.meshBuffer.vertexBuffer.buffer,
@@ -149,4 +161,6 @@ void Model::destroyBuffers(const VmaAllocator &allocator)
     vmaDestroyBuffer(allocator,
                      gpuMesh.meshBuffer.indexBuffer.buffer,
                      gpuMesh.meshBuffer.indexBuffer.allocation);
+
+    vmaDestroyBuffer(allocator, uniformBuffer.buffer, uniformBuffer.allocation);
 }

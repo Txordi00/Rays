@@ -21,7 +21,7 @@ public:
     void run();
 
     // Return frame
-    FrameData &get_current_frame() { return I->frames[frameNumber % I->frameOverlap]; }
+    FrameData &get_current_frame() { return I->frames[frameNumber]; }
 
 private:
     // initializes everything in the engine
@@ -43,6 +43,7 @@ private:
 
     // Other data
     uint64_t frameNumber{0};
+    uint32_t swapchainImageIndex{0};
     bool stopRendering{false};
     int currentBackgroundPipelineIndex{1};
 };

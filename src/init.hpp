@@ -48,6 +48,7 @@ public:
     vk::Extent2D swapchainExtent;
     std::vector<vk::Image> swapchainImages;
     std::vector<vk::ImageView> swapchainImageViews;
+    std::vector<vk::Semaphore> swapchainSemaphores;
 
     // Draw date
     ImageData imageDraw;
@@ -63,7 +64,7 @@ public:
     std::unique_ptr<Ubo> ubo;
     vk::DescriptorSetLayout uboDescriptorSetLayout;
     std::vector<vk::DescriptorSet> uboDescriptorSets;
-    std::vector<Buffer> uniformBuffers;
+    // std::vector<Buffer> uniformBuffers;
 
     // Pipelines
     std::vector<ComputePipelineData> computePipelines;

@@ -32,10 +32,10 @@ import vulkan_hpp;
 const unsigned int W = 1000;
 const unsigned int H = 1000;
 #define PROJNAME "LRT"
-const unsigned int API_VERSION[3] = {1, 3, 0};
+const unsigned int API_VERSION[3] = {1, 4, 0};
 
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
-const unsigned int MINIMUM_FRAME_OVERLAP = 3;
+const unsigned int MINIMUM_FRAME_OVERLAP = 2;
 const uint64_t FENCE_TIMEOUT = 1000000000;
 
 #define GRADIENT_COMP_SHADER_FP "shaders/gradient.comp.spv"
@@ -56,7 +56,7 @@ struct FrameData
 {
     vk::CommandPool commandPool;
     vk::CommandBuffer mainCommandBuffer;
-    vk::Semaphore swapchainSemaphore, renderSemaphore;
+    vk::Semaphore /*swapchainSemaphore,*/ renderSemaphore;
     vk::Fence renderFence;
 };
 
@@ -98,7 +98,8 @@ struct MeshBuffer
 // push constants for our mesh object draws
 struct MeshPush
 {
-    glm::mat4 worldMatrix;
+    // glm::mat4 worldMatrix;
+    uint32_t objId;
     vk::DeviceAddress vertexBufferAddress;
 };
 

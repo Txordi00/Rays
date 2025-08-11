@@ -43,10 +43,10 @@ void Init::clean()
 
         ImGui_ImplVulkan_Shutdown();
         for (auto &m : models) {
-            m->destroyBuffers(allocator);
+            m->destroyBuffers();
         }
-        for (auto &b : uniformBuffers)
-            utils::destroy_buffer(allocator, b);
+        // for (auto &b : uniformBuffers)
+        //     utils::destroy_buffer(allocator, b);
         device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
         device.destroyDescriptorPool(imguiPool);
@@ -65,8 +65,10 @@ void Init::clean()
             device.destroyCommandPool(frames[i].commandPool);
             device.destroyFence(frames[i].renderFence);
             device.destroySemaphore(frames[i].renderSemaphore);
-            device.destroySemaphore(frames[i].swapchainSemaphore);
+            // device.destroySemaphore(frames[i].swapchainSemaphore);
         }
+        for (const auto &sem : swapchainSemaphores)
+            device.destroySemaphore(sem);
         destroy_swapchain();
         instance.destroySurfaceKHR(surface);
         device.destroyImageView(imageDraw.imageView);
@@ -209,9 +211,11 @@ void Init::create_swapchain(uint32_t width, uint32_t height)
     swapchainImageViews.resize(swapchainImageViewsC.size());
     for (size_t i = 0; i < swapchainImageViewsC.size(); i++)
         swapchainImageViews[i] = static_cast<vk::ImageView>(swapchainImageViewsC[i]);
+    swapchainSemaphores.resize(swapchainImagesC.size());
 
     // Select the number of frames that we are going to process per thread
-    frameOverlap = std::max(vkbSwapchain.image_count, MINIMUM_FRAME_OVERLAP);
+    // frameOverlap = std::max(vkbSwapchain.image_count, MINIMUM_FRAME_OVERLAP);
+    frameOverlap = MINIMUM_FRAME_OVERLAP;
     frames.resize(frameOverlap);
 }
 
@@ -321,7 +325,11 @@ void Init::init_sync_structures()
         // gpu->gpu. will control presenting the image to the OS once the drawing finishes
         frames[i].renderSemaphore = device.createSemaphore(semaphoreCreateInfo);
         // gpu->gpu. will make the render commands wait until the swapchain requests the next image
-        frames[i].swapchainSemaphore = device.createSemaphore(semaphoreCreateInfo);
+        // frames[i].swapchainSemaphore = device.createSemaphore(semaphoreCreateInfo);
+    }
+
+    for (int i = 0; i < swapchainSemaphores.size(); i++) {
+        swapchainSemaphores[i] = device.createSemaphore(semaphoreCreateInfo);
     }
 
     transferFence = device.createFence(fenceCreateInfo);
@@ -382,19 +390,19 @@ void Init::init_ub_descriptors()
     // ubo->create_pipeline_layout(pushRange, uboDescriptorSetLayout);
     uboDescriptorSets = ubo->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
 
-    uniformBuffers.reserve(frameOverlap);
-    for (int i = 0; i < frameOverlap; i++) {
-        Buffer b = utils::create_buffer(allocator,
-                                        vk::DeviceSize(sizeof(UniformData)),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        VMA_MEMORY_USAGE_AUTO,
-                                        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                                            | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-        b.bufferId = i;
-        uniformBuffers.emplace_back(b);
-    }
+    // uniformBuffers.reserve(frameOverlap);
+    // for (int i = 0; i < frameOverlap; i++) {
+    //     Buffer b = utils::create_buffer(allocator,
+    //                                     vk::DeviceSize(sizeof(UniformData)),
+    //                                     vk::BufferUsageFlagBits::eUniformBuffer,
+    //                                     VMA_MEMORY_USAGE_AUTO,
+    //                                     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    //                                         | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    //     b.bufferId = i;
+    //     uniformBuffers.emplace_back(b);
+    // }
 
-    ubo->update_descriptor_sets(uniformBuffers, uboDescriptorSets);
+    // ubo->update_descriptor_sets(uniformBuffers, uboDescriptorSets);
 }
 
 void Init::init_pipelines()
@@ -476,8 +484,8 @@ void Init::load_meshes()
         "../../assets/basicmesh.glb");
     models.resize(cpuMeshes.size());
     for (int i = 0; i < cpuMeshes.size(); i++) {
-        models[i] = std::make_shared<Model>(*cpuMeshes[i]);
-        models[i]->createGpuMesh(device, allocator, cmdTransfer, transferFence, transferQueue);
+        models[i] = std::make_shared<Model>(*cpuMeshes[i], allocator);
+        models[i]->createGpuMesh(device, cmdTransfer, transferFence, transferQueue);
     }
 }
 

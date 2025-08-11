@@ -130,23 +130,24 @@ void Engine::run()
 
 void Engine::draw()
 {
+    vk::Semaphore acquireSemaphore = get_current_frame().renderSemaphore;
+    vk::Fence frameFence = get_current_frame().renderFence;
+
     // Wait max 1s until the gpu finished rendering the last frame
-    auto resWaitFences = I->device.waitForFences(get_current_frame().renderFence,
-                                                 vk::True,
-                                                 FENCE_TIMEOUT);
-    VK_CHECK_RES(resWaitFences);
-    I->device.resetFences(get_current_frame().renderFence);
+    VK_CHECK_RES(I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT));
+    I->device.resetFences(frameFence);
 
     // Request image from the swapchain
     vk::AcquireNextImageInfoKHR acquireImageInfo{};
     acquireImageInfo.setSwapchain(I->swapchain);
-    acquireImageInfo.setSemaphore(get_current_frame().swapchainSemaphore);
+    acquireImageInfo.setSemaphore(acquireSemaphore);
     acquireImageInfo.setFence(nullptr);
     acquireImageInfo.setTimeout(FENCE_TIMEOUT);
     acquireImageInfo.setDeviceMask(1); // First and only device in the group
 
-    auto [resNextImage, swapchainImageIndex] = I->device.acquireNextImage2KHR(acquireImageInfo);
-    VK_CHECK_RES(resNextImage);
+    VK_CHECK_RES(I->device.acquireNextImage2KHR(&acquireImageInfo, &swapchainImageIndex));
+
+    vk::Semaphore submitSemaphore = I->swapchainSemaphores[swapchainImageIndex];
 
     // We can safely copy command buffers
     vk::CommandBuffer cmd = get_current_frame().mainCommandBuffer;
@@ -216,12 +217,12 @@ void Engine::draw()
     cmdInfo.setDeviceMask(1);
     cmdInfo.setCommandBuffer(cmd);
     vk::SemaphoreSubmitInfo semaphoreWaitInfo{};
-    semaphoreWaitInfo.setSemaphore(get_current_frame().swapchainSemaphore);
+    semaphoreWaitInfo.setSemaphore(acquireSemaphore);
     semaphoreWaitInfo.setStageMask(vk::PipelineStageFlagBits2::eAllGraphics);
     semaphoreWaitInfo.setDeviceIndex(0);
     semaphoreWaitInfo.setValue(1);
     vk::SemaphoreSubmitInfo semaphoreSignalInfo{};
-    semaphoreSignalInfo.setSemaphore(get_current_frame().renderSemaphore);
+    semaphoreSignalInfo.setSemaphore(submitSemaphore);
     semaphoreSignalInfo.setStageMask(vk::PipelineStageFlagBits2::eAllGraphics);
     semaphoreSignalInfo.setDeviceIndex(0);
     semaphoreSignalInfo.setValue(1);
@@ -230,9 +231,9 @@ void Engine::draw()
     submitInfo.setWaitSemaphoreInfos(semaphoreWaitInfo);
     submitInfo.setSignalSemaphoreInfos(semaphoreSignalInfo);
 
-    //submit command buffer to the queue and execute it.
-    // _renderFence will now block until the graphic commands finish execution
-    I->graphicsQueue.submit2(submitInfo, get_current_frame().renderFence);
+    // submit command buffer to the queue and execute it.
+    // renderFence will now block until the graphic commands finish execution
+    I->graphicsQueue.submit2(submitInfo, frameFence);
 
     //prepare present
     // this will put the image we just rendered to into the visible window.
@@ -240,13 +241,12 @@ void Engine::draw()
     // as its necessary that drawing commands have finished before the image is displayed to the user
     vk::PresentInfoKHR presentInfo{};
     presentInfo.setSwapchains(I->swapchain);
-    presentInfo.setWaitSemaphores(get_current_frame().renderSemaphore);
+    presentInfo.setWaitSemaphores(submitSemaphore);
     presentInfo.setImageIndices(swapchainImageIndex);
 
-    auto resQueuePresent = I->graphicsQueue.presentKHR(&presentInfo);
-    VK_CHECK_RES(resQueuePresent);
+    VK_CHECK_RES(I->graphicsQueue.presentKHR(presentInfo));
 
-    frameNumber++;
+    frameNumber = (frameNumber + 1) % I->frameOverlap;
 }
 
 void Engine::change_background(const vk::CommandBuffer &cmd)
@@ -302,6 +302,7 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
     scissor.setExtent(vk::Extent2D{I->swapchainExtent.width, I->swapchainExtent.height});
     scissor.setOffset(vk::Offset2D{0, 0});
 
+    // std::vector<vk::WriteDescriptorSet> descriptorWrites(I->models.size());
     try {
         cmd.beginRendering(renderInfo);
         cmd.setViewport(0, viewport);
@@ -309,13 +310,20 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, I->simpleMeshGraphicsPipeline.pipeline);
 
+        vk::BindDescriptorSetsInfo descSetsInfo{};
+        descSetsInfo.setDescriptorSets(I->uboDescriptorSets[frameNumber]);
+        descSetsInfo.setStageFlags(vk::ShaderStageFlagBits::eVertex);
+        descSetsInfo.setLayout(I->simpleMeshGraphicsPipeline.pipelineLayout);
+        cmd.bindDescriptorSets2(descSetsInfo);
+
         camera.update();
         for (int objId = 0; objId < I->models.size(); objId++) {
             glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix
                                   * I->models[objId]->modelMatrix;
 
             MeshPush pushConstants;
-            pushConstants.worldMatrix = mvpMatrix;
+            // pushConstants.worldMatrix = mvpMatrix;
+            pushConstants.objId = objId;
             pushConstants.vertexBufferAddress = I->models[objId]
                                                     ->gpuMesh.meshBuffer.vertexBufferAddress;
             cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
@@ -323,6 +331,34 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
                               0,
                               sizeof(MeshPush),
                               &pushConstants);
+
+            UniformData uboData;
+            uboData.worldMatrix = mvpMatrix;
+
+            vk::DescriptorBufferInfo bufferInfo{};
+            bufferInfo.setBuffer(I->models[objId]->uniformBuffer.buffer);
+            bufferInfo.setOffset(0);
+            bufferInfo.setRange(vk::WholeSize);
+
+            vk::WriteDescriptorSet descriptorWrite{};
+            descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+            descriptorWrite.setDstSet(I->uboDescriptorSets[frameNumber]);
+            descriptorWrite.setDstBinding(0);
+            descriptorWrite.setDstArrayElement(objId);
+            descriptorWrite.setDescriptorCount(I->models.size());
+            descriptorWrite.setBufferInfo(
+                bufferInfo); // Weird that I can input multiple buffer infos here
+
+            // descriptorWrites[objId] = descriptorWrite;
+
+            assert(I->models[objId]->uniformBuffer.allocationInfo.pMappedData
+                   && "Cannot copy to unmapped buffer");
+            memcpy(I->models[objId]->uniformBuffer.allocationInfo.pMappedData,
+                   &uboData,
+                   I->models[objId]->uniformBuffer.allocationInfo.size);
+
+            I->device.updateDescriptorSets(descriptorWrite, nullptr);
+
             cmd.bindIndexBuffer(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
                                 0,
                                 vk::IndexType::eUint32);
@@ -331,10 +367,12 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
                             I->models[objId]->gpuMesh.surfaces[0].startIndex,
                             0,
                             0);
+            // bufferInfos.emplace_back(bufferInfo);
         }
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
+    // I->device.updateDescriptorSets(descriptorWrites, nullptr);
     cmd.endRendering();
 }
 
