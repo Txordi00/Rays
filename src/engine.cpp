@@ -8,6 +8,7 @@ import vulkan_hpp;
 #include "ray_tracing.hpp"
 #include "types.hpp"
 #include "utils.hpp"
+#include <algorithm>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
 #include <thread>
@@ -309,15 +310,16 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, I->simpleMeshGraphicsPipeline.pipeline);
 
+        vk::DescriptorSet descriptorSet = get_current_frame().descriptorSet;
+
         vk::BindDescriptorSetsInfo descSetsInfo{};
-        descSetsInfo.setDescriptorSets(I->uboDescriptorSets[frameNumber]);
+        descSetsInfo.setDescriptorSets(descriptorSet);
         descSetsInfo.setStageFlags(vk::ShaderStageFlagBits::eVertex);
         descSetsInfo.setLayout(I->simpleMeshGraphicsPipeline.pipelineLayout);
         cmd.bindDescriptorSets2(descSetsInfo);
 
         camera.update();
 
-        std::vector<vk::DescriptorBufferInfo> bufferInfos(I->models.size());
         for (int objId = 0; objId < I->models.size(); objId++) {
             glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix
                                   * I->models[objId]->modelMatrix;
@@ -325,41 +327,17 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
             UniformData uboData;
             uboData.worldMatrix = mvpMatrix;
 
-            memcpy(I->models[objId]->uniformBuffer.allocationInfo.pMappedData,
-                   &uboData,
-                   I->models[objId]->uniformBuffer.allocationInfo.size);
-
-            vk::DescriptorBufferInfo bufferInfo{};
-            bufferInfo.setBuffer(I->models[objId]->uniformBuffer.buffer);
-            bufferInfo.setOffset(0);
-            bufferInfo.setRange(I->models[objId]->uniformBuffer.allocationInfo.size);
-            bufferInfos[objId] = bufferInfo;
-
-            // vk::WriteDescriptorSet descriptorWrite{};
-            // descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
-            // descriptorWrite.setDstSet(I->uboDescriptorSets[frameNumber]);
-            // descriptorWrite.setDstBinding(0);
-            // descriptorWrite.setDstArrayElement(objId);
-            // descriptorWrite.setDescriptorCount(1);
-            // descriptorWrite.setBufferInfo(
-            //     bufferInfo); // Weird that I can input multiple buffer infos here
-            // descriptorWrites[objId] = descriptorWrite;
-
-            // I->device.updateDescriptorSets(descriptorWrite, nullptr);
+            utils::map_to_buffer(I->models[objId]->uniformBuffer, &uboData);
         }
 
-        // Adding all the buffers to a single vk::WriteDescriptorSet allows to update the
-        // descriptor sets in batch
-        vk::WriteDescriptorSet descriptorWrite{};
-        descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
-        descriptorWrite.setDstSet(I->uboDescriptorSets[frameNumber]);
-        descriptorWrite.setDstBinding(0);
-        // Why is dstArrayElement not an array? I guess that it's only the first element
-        descriptorWrite.setDstArrayElement(0);
-        // descriptorWritess.setDescriptorCount(1); // I am not sure what this means
-        descriptorWrite.setBufferInfo(bufferInfos);
-
-        I->device.updateDescriptorSets(descriptorWrite, nullptr);
+        // Efficiently create a vector of all the uniform buffers
+        std::vector<Buffer> uniformBuffers;
+        uniformBuffers.reserve(I->models.size());
+        std::ranges::transform(I->models,
+                               std::back_inserter(uniformBuffers),
+                               [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
+        // Update all the descriptors in a batch, one per uniform buffer.
+        I->ubo->update_descriptor_sets(uniformBuffers, descriptorSet);
 
         for (int objId = 0; objId < I->models.size(); objId++) {
             MeshPush pushConstants;

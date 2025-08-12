@@ -56,8 +56,9 @@ struct FrameData
 {
     vk::CommandPool commandPool;
     vk::CommandBuffer mainCommandBuffer;
-    vk::Semaphore /*swapchainSemaphore,*/ renderSemaphore;
+    vk::Semaphore renderSemaphore;
     vk::Fence renderFence;
+    vk::DescriptorSet descriptorSet;
 };
 
 struct ImageData

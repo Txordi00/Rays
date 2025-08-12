@@ -324,10 +324,8 @@ void Init::init_sync_structures()
         frames[i].renderFence = device.createFence(fenceCreateInfo);
         // gpu->gpu. will control presenting the image to the OS once the drawing finishes
         frames[i].renderSemaphore = device.createSemaphore(semaphoreCreateInfo);
-        // gpu->gpu. will make the render commands wait until the swapchain requests the next image
-        // frames[i].swapchainSemaphore = device.createSemaphore(semaphoreCreateInfo);
     }
-
+    // gpu->gpu. will make the render commands wait until the swapchain requests the next image
     for (int i = 0; i < swapchainSemaphores.size(); i++) {
         swapchainSemaphores[i] = device.createSemaphore(semaphoreCreateInfo);
     }
@@ -383,26 +381,11 @@ void Init::init_ub_descriptors()
     ubo->create_descriptor_pool(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffers,
                                 frameOverlap);
     uboDescriptorSetLayout = ubo->create_descriptor_set_layout(vk::ShaderStageFlagBits::eVertex);
-    // vk::PushConstantRange pushRange{};
-    // pushRange.setStageFlags(vk::ShaderStageFlagBits::eVertex);
-    // pushRange.setOffset(0);
-    // pushRange.setSize(sizeof(MeshPush));
-    // ubo->create_pipeline_layout(pushRange, uboDescriptorSetLayout);
-    uboDescriptorSets = ubo->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
 
-    // uniformBuffers.reserve(frameOverlap);
-    // for (int i = 0; i < frameOverlap; i++) {
-    //     Buffer b = utils::create_buffer(allocator,
-    //                                     vk::DeviceSize(sizeof(UniformData)),
-    //                                     vk::BufferUsageFlagBits::eUniformBuffer,
-    //                                     VMA_MEMORY_USAGE_AUTO,
-    //                                     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-    //                                         | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-    //     b.bufferId = i;
-    //     uniformBuffers.emplace_back(b);
-    // }
-
-    // ubo->update_descriptor_sets(uniformBuffers, uboDescriptorSets);
+    std::vector<vk::DescriptorSet> descriptorSets
+        = ubo->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
+    for (int i = 0; i < descriptorSets.size(); i++)
+        frames[i].descriptorSet = descriptorSets[i];
 }
 
 void Init::init_pipelines()

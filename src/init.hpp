@@ -60,10 +60,10 @@ public:
     vk::DescriptorSet drawImageDescriptors;
     DescriptorSetData drawImageDescriptorsData;
 
-    // Uniform buffers
+    // Uniform buffer descriptors
     std::unique_ptr<Ubo> ubo;
     vk::DescriptorSetLayout uboDescriptorSetLayout;
-    std::vector<vk::DescriptorSet> uboDescriptorSets;
+    // std::vector<vk::DescriptorSet> uboDescriptorSets;
     // std::vector<Buffer> uniformBuffers;
 
     // Pipelines

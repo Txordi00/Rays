@@ -31,6 +31,8 @@ Buffer create_buffer(const VmaAllocator &allocator,
 
 void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
 
+void map_to_buffer(const Buffer &buffer, const void *data);
+
 vk::ShaderModule load_shader(const vk::Device &device, const std::string filePath);
 
 glm::mat4 get_perspective_projection(const float fovy,

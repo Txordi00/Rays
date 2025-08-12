@@ -1,9 +1,5 @@
 #include "uniform_buffers.hpp"
 
-Ubo::Ubo(const vk::Device &device)
-    : device{device}
-{}
-
 void Ubo::destroy()
 {
     device.destroyDescriptorPool(pool);
@@ -59,46 +55,27 @@ std::vector<vk::DescriptorSet> Ubo::allocate_descriptor_sets(
     return device.allocateDescriptorSets(allocInfo);
 }
 
-// vk::PipelineLayout Ubo::create_pipeline_layout(const vk::PushConstantRange &pushRange,
-//                                                const vk::DescriptorSetLayout &descriptorSetLayout)
-// {
-//     vk::PipelineLayoutCreateInfo createInfo{};
-//     createInfo.setSetLayouts(descriptorSetLayout);
-//     createInfo.setPushConstantRanges(pushRange);
-
-//     return device.createPipelineLayout(createInfo);
-// }
-
-void Ubo::update_buffer(const Buffer &buffer, const void *data)
-{
-    assert(buffer.allocationInfo.pMappedData && "Cannot copy to unmapped buffer");
-    memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
-}
-
 void Ubo::update_descriptor_sets(const std::vector<Buffer> &buffers,
-                                 const std::vector<vk::DescriptorSet> &descriptorSets)
+                                 const vk::DescriptorSet &descriptorSet)
 {
-    assert(buffers.size() == descriptorSets.size()
-           && "Number of buffers != number of descriptor sets");
-    // std::vector<vk::DescriptorBufferInfo> bufferInfos(buffers.size());
-    std::vector<vk::WriteDescriptorSet> descriptorWrites(buffers.size());
-    for (int i = 0; i < buffers.size(); i++) {
+    // Add all the buffers to a single descriptor write
+    std::vector<vk::DescriptorBufferInfo> bufferInfos;
+    bufferInfos.reserve(buffers.size());
+    for (const Buffer &b : buffers) {
         vk::DescriptorBufferInfo bufferInfo{};
-        bufferInfo.setBuffer(buffers[i].buffer);
+        bufferInfo.setBuffer(b.buffer);
         bufferInfo.setOffset(0);
-        bufferInfo.setRange(vk::WholeSize);
-        // bufferInfos.emplace_back(bufferInfo);
-
-        vk::WriteDescriptorSet descriptorWrite{};
-        descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
-        descriptorWrite.setDstSet(descriptorSets[i]);
-        descriptorWrite.setDstBinding(0);
-        descriptorWrite.setDstArrayElement(buffers[i].bufferId);
-        descriptorWrite.setDescriptorCount(1);
-        descriptorWrite.setBufferInfo(
-            bufferInfo); // Weird that I can input multiple buffer infos here
-        descriptorWrites[i] = descriptorWrite;
+        bufferInfo.setRange(b.allocationInfo.size);
+        bufferInfos.emplace_back(bufferInfo);
     }
+    // A single descriptor write.
+    // In principle, we can have multiple and still update everything in a batch
+    vk::WriteDescriptorSet descriptorWrite{};
+    descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+    descriptorWrite.setDstSet(descriptorSet);
+    descriptorWrite.setDstBinding(0);
+    descriptorWrite.setDstArrayElement(0);
+    descriptorWrite.setBufferInfo(bufferInfos); // Weird that I can input multiple buffer infos here
 
-    device.updateDescriptorSets(descriptorWrites, nullptr);
+    device.updateDescriptorSets(descriptorWrite, nullptr);
 }

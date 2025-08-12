@@ -204,4 +204,12 @@ vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
 
 } // namespace init
 
+void map_to_buffer(const Buffer &buffer, const void *data)
+{
+    assert(buffer.allocationInfo.pMappedData && "Buffer must be mapped!");
+    memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
+}
+
+// namespace init
+
 } // namespace utils
