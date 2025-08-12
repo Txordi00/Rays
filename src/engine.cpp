@@ -302,7 +302,6 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
     scissor.setExtent(vk::Extent2D{I->swapchainExtent.width, I->swapchainExtent.height});
     scissor.setOffset(vk::Offset2D{0, 0});
 
-    // std::vector<vk::WriteDescriptorSet> descriptorWrites(I->models.size());
     try {
         cmd.beginRendering(renderInfo);
         cmd.setViewport(0, viewport);
@@ -317,12 +316,53 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         cmd.bindDescriptorSets2(descSetsInfo);
 
         camera.update();
+
+        std::vector<vk::DescriptorBufferInfo> bufferInfos(I->models.size());
         for (int objId = 0; objId < I->models.size(); objId++) {
             glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix
                                   * I->models[objId]->modelMatrix;
 
+            UniformData uboData;
+            uboData.worldMatrix = mvpMatrix;
+
+            memcpy(I->models[objId]->uniformBuffer.allocationInfo.pMappedData,
+                   &uboData,
+                   I->models[objId]->uniformBuffer.allocationInfo.size);
+
+            vk::DescriptorBufferInfo bufferInfo{};
+            bufferInfo.setBuffer(I->models[objId]->uniformBuffer.buffer);
+            bufferInfo.setOffset(0);
+            bufferInfo.setRange(I->models[objId]->uniformBuffer.allocationInfo.size);
+            bufferInfos[objId] = bufferInfo;
+
+            // vk::WriteDescriptorSet descriptorWrite{};
+            // descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+            // descriptorWrite.setDstSet(I->uboDescriptorSets[frameNumber]);
+            // descriptorWrite.setDstBinding(0);
+            // descriptorWrite.setDstArrayElement(objId);
+            // descriptorWrite.setDescriptorCount(1);
+            // descriptorWrite.setBufferInfo(
+            //     bufferInfo); // Weird that I can input multiple buffer infos here
+            // descriptorWrites[objId] = descriptorWrite;
+
+            // I->device.updateDescriptorSets(descriptorWrite, nullptr);
+        }
+
+        // Adding all the buffers to a single vk::WriteDescriptorSet allows to update the
+        // descriptor sets in batch
+        vk::WriteDescriptorSet descriptorWrite{};
+        descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+        descriptorWrite.setDstSet(I->uboDescriptorSets[frameNumber]);
+        descriptorWrite.setDstBinding(0);
+        // Why is dstArrayElement not an array? I guess that it's only the first element
+        descriptorWrite.setDstArrayElement(0);
+        // descriptorWritess.setDescriptorCount(1); // I am not sure what this means
+        descriptorWrite.setBufferInfo(bufferInfos);
+
+        I->device.updateDescriptorSets(descriptorWrite, nullptr);
+
+        for (int objId = 0; objId < I->models.size(); objId++) {
             MeshPush pushConstants;
-            // pushConstants.worldMatrix = mvpMatrix;
             pushConstants.objId = objId;
             pushConstants.vertexBufferAddress = I->models[objId]
                                                     ->gpuMesh.meshBuffer.vertexBufferAddress;
@@ -332,48 +372,21 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
                               sizeof(MeshPush),
                               &pushConstants);
 
-            UniformData uboData;
-            uboData.worldMatrix = mvpMatrix;
+            cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
+                                 0,
+                                 I->models[objId]->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
+                                 vk::IndexType::eUint32);
 
-            vk::DescriptorBufferInfo bufferInfo{};
-            bufferInfo.setBuffer(I->models[objId]->uniformBuffer.buffer);
-            bufferInfo.setOffset(0);
-            bufferInfo.setRange(vk::WholeSize);
-
-            vk::WriteDescriptorSet descriptorWrite{};
-            descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
-            descriptorWrite.setDstSet(I->uboDescriptorSets[frameNumber]);
-            descriptorWrite.setDstBinding(0);
-            descriptorWrite.setDstArrayElement(objId);
-            descriptorWrite.setDescriptorCount(I->models.size());
-            descriptorWrite.setBufferInfo(
-                bufferInfo); // Weird that I can input multiple buffer infos here
-
-            // descriptorWrites[objId] = descriptorWrite;
-
-            assert(I->models[objId]->uniformBuffer.allocationInfo.pMappedData
-                   && "Cannot copy to unmapped buffer");
-            memcpy(I->models[objId]->uniformBuffer.allocationInfo.pMappedData,
-                   &uboData,
-                   I->models[objId]->uniformBuffer.allocationInfo.size);
-
-            I->device.updateDescriptorSets(descriptorWrite, nullptr);
-
-            cmd.bindIndexBuffer(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
-                                0,
-                                vk::IndexType::eUint32);
             cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
                             1,
                             I->models[objId]->gpuMesh.surfaces[0].startIndex,
                             0,
                             0);
-            // bufferInfos.emplace_back(bufferInfo);
         }
+        cmd.endRendering();
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
-    // I->device.updateDescriptorSets(descriptorWrites, nullptr);
-    cmd.endRendering();
 }
 
 void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView)

@@ -145,6 +145,23 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
 
 void Model::allocate_uniform_buffer()
 {
+    // vk::BufferCreateInfo bufferInfo{};
+    // bufferInfo.setUsage(vk::BufferUsageFlagBits::eUniformBuffer);
+    // bufferInfo.setSize(vk::DeviceSize(sizeof(UniformData)));
+
+    // VmaAllocationCreateInfo vmaallocInfo{};
+    // vmaallocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    // vmaallocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    //                      | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    // vmaallocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+    // VK_CHECK_RES(vmaCreateBuffer(allocator,
+    //                              (VkBufferCreateInfo *) &bufferInfo,
+    //                              &vmaallocInfo,
+    //                              (VkBuffer *) &uniformBuffer,
+    //                              &uniformBuffer.allocation,
+    //                              &uniformBuffer.allocationInfo));
+
     uniformBuffer = utils::create_buffer(allocator,
                                          vk::DeviceSize(sizeof(UniformData)),
                                          vk::BufferUsageFlagBits::eUniformBuffer,
