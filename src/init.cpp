@@ -112,6 +112,9 @@ void Init::init_vulkan()
     features13.dynamicRendering = vk::True;
     features13.synchronization2 = vk::True;
 
+    vk::PhysicalDeviceVulkan14Features features14{};
+    features14.setMaintenance6(vk::True);
+
     vk::PhysicalDeviceVulkan12Features features12{};
     features12.descriptorIndexing = vk::True;
     features12.descriptorBindingUniformBufferUpdateAfterBind = vk::True;
@@ -136,6 +139,7 @@ void Init::init_vulkan()
     vkb::PhysicalDeviceSelector physDevSelector{vkbInstance};
     vkb::PhysicalDevice vkbPhysDev
         = physDevSelector.set_minimum_version(API_VERSION[0], API_VERSION[1])
+              .set_required_features_14(features14)
               .set_required_features_13(features13)
               .set_required_features_12(features12)
               // .add_required_extension(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) // NOT SUPPORTED YET
@@ -170,7 +174,6 @@ void Init::init_vulkan()
     VmaVulkanFunctions vulkanFunctions{};
     vulkanFunctions.vkGetInstanceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr;
     vulkanFunctions.vkGetDeviceProcAddr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr;
-    // vulkanFunctions.vkCreateImage = VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateImage;
 
     VmaAllocatorCreateInfo allocatorInfo{};
     allocatorInfo.instance = instance;

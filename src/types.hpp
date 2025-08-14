@@ -102,6 +102,7 @@ struct MeshPush
     // glm::mat4 worldMatrix;
     uint32_t objId;
     vk::DeviceAddress vertexBufferAddress;
+    vk::DeviceAddress indexBufferAddress;
 };
 
 // push constants for our mesh object draws

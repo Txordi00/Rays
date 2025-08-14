@@ -75,8 +75,8 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     mesh.indexBuffer = utils::create_buffer(
         allocator,
         indicesSize,
-        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress
-            | vk::BufferUsageFlagBits::eTransferDst
+        /*vk::BufferUsageFlagBits::eIndexBuffer*/ vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst
             | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         0);
@@ -98,22 +98,22 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     memcpy((char *) stagingData + verticesSize, indicesData, indicesSize);
 
     // Set info structures to copy from staging to vertex & index buffers
-    vk::CopyBufferInfo2 vertexCopyInfo{};
-    vertexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-    vertexCopyInfo.setDstBuffer(mesh.vertexBuffer.buffer);
     vk::BufferCopy2 vertexCopy{};
     vertexCopy.setSrcOffset(0);
     vertexCopy.setDstOffset(0);
     vertexCopy.setSize(verticesSize);
+    vk::CopyBufferInfo2 vertexCopyInfo{};
+    vertexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
+    vertexCopyInfo.setDstBuffer(mesh.vertexBuffer.buffer);
     vertexCopyInfo.setRegions(vertexCopy);
 
-    vk::CopyBufferInfo2 indexCopyInfo{};
-    indexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-    indexCopyInfo.setDstBuffer(mesh.indexBuffer.buffer);
     vk::BufferCopy2 indexCopy{};
     indexCopy.setSrcOffset(verticesSize);
     indexCopy.setDstOffset(0);
     indexCopy.setSize(indicesSize);
+    vk::CopyBufferInfo2 indexCopyInfo{};
+    indexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
+    indexCopyInfo.setDstBuffer(mesh.indexBuffer.buffer);
     indexCopyInfo.setRegions(indexCopy);
 
     // New command buffer to copy in GPU from staging buffer to vertex & index buffers

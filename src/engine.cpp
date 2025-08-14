@@ -344,22 +344,31 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
             pushConstants.objId = objId;
             pushConstants.vertexBufferAddress = I->models[objId]
                                                     ->gpuMesh.meshBuffer.vertexBufferAddress;
+            pushConstants.indexBufferAddress = I->models[objId]
+                                                   ->gpuMesh.meshBuffer.indexBufferAddress;
             cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
                               vk::ShaderStageFlagBits::eVertex,
                               0,
                               sizeof(MeshPush),
                               &pushConstants);
 
-            cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
-                                 0,
-                                 I->models[objId]->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
-                                 vk::IndexType::eUint32);
+            // cmd.bindIndexBuffer2(nullptr, 0, vk::WholeSize, vk::IndexType::eUint32);
 
-            cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
-                            1,
-                            I->models[objId]->gpuMesh.surfaces[0].startIndex,
-                            0,
-                            0);
+            cmd.draw(I->models[objId]->gpuMesh.surfaces[0].count,
+                     1,
+                     I->models[objId]->gpuMesh.surfaces[0].startIndex,
+                     0);
+
+            // cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
+            //                      0,
+            //                      I->models[objId]->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
+            //                      vk::IndexType::eUint32);
+
+            // cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
+            //                 1,
+            //                 I->models[objId]->gpuMesh.surfaces[0].startIndex,
+            //                 0,
+            //                 0);
         }
         cmd.endRendering();
     } catch (const std::exception &e) {
