@@ -26,7 +26,7 @@ private:
     const vk::Device &device;
     const VmaAllocator &allocator;
     const uint32_t queueFamilyIndex;
-    const vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties;
+    const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties;
 
     vk::CommandPool asPool;
     vk::Queue queue;

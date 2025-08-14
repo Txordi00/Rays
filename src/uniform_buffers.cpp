@@ -1,5 +1,10 @@
 #include "uniform_buffers.hpp"
 
+Ubo::Ubo(const vk::Device &device, const vk::PhysicalDeviceProperties &physDevProp)
+    : device{device}
+    , physDevProp{physDevProp}
+{}
+
 void Ubo::destroy()
 {
     device.destroyDescriptorPool(pool);
@@ -7,6 +12,7 @@ void Ubo::destroy()
 
 void Ubo::create_descriptor_pool(const uint32_t maxDescriptorCount, const uint32_t maxSets)
 {
+    assert(maxDescriptorCount <= physDevProp.limits.maxDescriptorSetUniformBuffers);
     maxDescriptors = maxDescriptorCount;
     vk::DescriptorPoolSize poolSize{};
     poolSize.setType(vk::DescriptorType::eUniformBuffer);

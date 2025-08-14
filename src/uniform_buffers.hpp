@@ -4,8 +4,7 @@
 class Ubo
 {
 public:
-    Ubo(const vk::Device &device)
-        : device{device} {};
+    Ubo(const vk::Device &device, const vk::PhysicalDeviceProperties &physDevProp);
     ~Ubo() = default;
     void destroy();
     void create_descriptor_pool(const uint32_t maxDescriptorCount, const uint32_t maxSets);
@@ -17,6 +16,7 @@ public:
 
 private:
     const vk::Device &device;
+    const vk::PhysicalDeviceProperties &physDevProp;
     vk::DescriptorPool pool;
     uint32_t maxDescriptors;
 };

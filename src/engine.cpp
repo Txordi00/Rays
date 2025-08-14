@@ -352,13 +352,12 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
                               sizeof(MeshPush),
                               &pushConstants);
 
-            // cmd.bindIndexBuffer2(nullptr, 0, vk::WholeSize, vk::IndexType::eUint32);
-
             cmd.draw(I->models[objId]->gpuMesh.surfaces[0].count,
                      1,
                      I->models[objId]->gpuMesh.surfaces[0].startIndex,
                      0);
 
+            // USING THE INDEX BUFFER PROPERLY REQUIRES THE FOLLOWING DRAW CALL:
             // cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
             //                      0,
             //                      I->models[objId]->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
