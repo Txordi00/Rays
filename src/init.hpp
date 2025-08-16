@@ -1,9 +1,9 @@
 #pragma once
 #include "descriptors.hpp"
+#include "descriptors2.hpp"
 #include "model.hpp"
 #include "raster_pipelines.hpp"
 #include "types.hpp"
-#include "uniform_buffers.hpp"
 #include <SDL3/SDL.h>
 #include <memory>
 #include <vk_mem_alloc.h>

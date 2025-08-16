@@ -376,12 +376,33 @@ void Init::init_compute_descriptors()
 
 void Init::init_ub_descriptors()
 {
-    ubo = std::make_unique<Ubo>(device, physicalDeviceProperties);
-    ubo->create_descriptor_pool(models.size(), frameOverlap);
-    uboDescriptorSetLayout = ubo->create_descriptor_set_layout(vk::ShaderStageFlagBits::eVertex);
+    ubo = std::make_unique<Ubo>(device, physicalDeviceProperties, asProperties);
+    // Uniform descriptor sizes
+    std::vector<vk::DescriptorPoolSize>
+        uniformSizes(frameOverlap,
+                     vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
+                                            static_cast<uint32_t>(models.size())});
+    // RT-specific descriptor sizes
+    std::vector<vk::DescriptorPoolSize>
+        asSizes(frameOverlap,
+                vk::DescriptorPoolSize{vk::DescriptorType::eAccelerationStructureKHR, 1});
+
+    std::vector<vk::DescriptorPoolSize>
+        storageImageSizes(frameOverlap,
+                          vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1});
+
+    std::vector<vk::DescriptorPoolSize> poolSizes;
+    poolSizes.reserve(uniformSizes.size() + asSizes.size() + storageImageSizes.size());
+    poolSizes.insert(poolSizes.end(), uniformSizes.begin(), uniformSizes.end());
+    poolSizes.insert(poolSizes.end(), asSizes.begin(), asSizes.end());
+    poolSizes.insert(poolSizes.end(), storageImageSizes.begin(), storageImageSizes.end());
+
+    ubo->create_descriptor_pools(poolSizes);
+    auto descriptorSetLayouts = ubo->create_descriptor_set_layouts();
+    uboDescriptorSetLayout = descriptorSetLayouts.first;
 
     std::vector<vk::DescriptorSet> descriptorSets
-        = ubo->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
+        = ubo->allocate_descriptor_sets(descriptorSetLayouts, frameOverlap);
     for (int i = 0; i < descriptorSets.size(); i++)
         frames[i].descriptorSet = descriptorSets[i];
 }
