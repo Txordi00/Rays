@@ -75,7 +75,7 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     mesh.indexBuffer = utils::create_buffer(
         allocator,
         indicesSize,
-        /*vk::BufferUsageFlagBits::eIndexBuffer*/ vk::BufferUsageFlagBits::eStorageBuffer
+        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer
             | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst
             | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,

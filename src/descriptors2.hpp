@@ -29,8 +29,12 @@ public:
     std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>> allocate_descriptor_sets(
         const std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> &descriptorSetLayouts,
         const uint32_t frameOverlap);
-    void update_descriptor_sets(const std::vector<Buffer> &buffers,
-                                const vk::DescriptorSet &descriptorSet);
+    void update_descriptor_sets(const std::vector<Buffer> &uniformBuffers,
+                                const vk::DescriptorSet &uniformSet,
+                                const vk::AccelerationStructureKHR &tlas,
+                                const vk::DescriptorSet &tlasSet,
+                                const vk::ImageView &imageView,
+                                const vk::DescriptorSet &imageSet);
 
 private:
     const vk::Device &device;

@@ -71,7 +71,8 @@ std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> Ubo::create_descript
     uniformBinding.setBinding(BINDING_UNIFORM);
     uniformBinding.setDescriptorType(vk::DescriptorType::eUniformBuffer);
     uniformBinding.setDescriptorCount(maxUniformDescriptors);
-    uniformBinding.setStageFlags(vk::ShaderStageFlagBits::eVertex);
+    uniformBinding.setStageFlags(vk::ShaderStageFlagBits::eVertex
+                                 | vk::ShaderStageFlagBits::eRaygenKHR);
     bindlessBindings.push_back(uniformBinding);
 
     std::vector<vk::DescriptorSetLayoutBinding> rtBindings;
@@ -140,13 +141,18 @@ Ubo::allocate_descriptor_sets(
         device.allocateDescriptorSets(allocInfoRt));
 }
 
-void Ubo::update_descriptor_sets(const std::vector<Buffer> &buffers,
-                                 const vk::DescriptorSet &descriptorSet)
+void Ubo::update_descriptor_sets(const std::vector<Buffer> &uniformBuffers,
+                                 const vk::DescriptorSet &uniformSet,
+                                 const vk::AccelerationStructureKHR &tlas,
+                                 const vk::DescriptorSet &tlasSet,
+                                 const vk::ImageView &imageView,
+                                 const vk::DescriptorSet &imageSet)
 {
+    std::vector<vk::WriteDescriptorSet> descriptorWrites{};
     // Add all the buffers to a single descriptor write
     std::vector<vk::DescriptorBufferInfo> bufferInfos;
-    bufferInfos.reserve(buffers.size());
-    for (const Buffer &b : buffers) {
+    bufferInfos.reserve(uniformBuffers.size());
+    for (const Buffer &b : uniformBuffers) {
         vk::DescriptorBufferInfo bufferInfo{};
         bufferInfo.setBuffer(b.buffer);
         bufferInfo.setOffset(0);
@@ -155,12 +161,37 @@ void Ubo::update_descriptor_sets(const std::vector<Buffer> &buffers,
     }
     // A single descriptor write.
     // In principle, we can have multiple and still update everything in a batch
-    vk::WriteDescriptorSet descriptorWrite{};
-    descriptorWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
-    descriptorWrite.setDstSet(descriptorSet);
-    descriptorWrite.setDstBinding(0);
-    descriptorWrite.setDstArrayElement(0);
-    descriptorWrite.setBufferInfo(bufferInfos);
+    vk::WriteDescriptorSet unifomWrite{};
+    unifomWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+    unifomWrite.setDstSet(uniformSet);
+    unifomWrite.setDstBinding(BINDING_UNIFORM);
+    unifomWrite.setDstArrayElement(0);
+    unifomWrite.setBufferInfo(bufferInfos);
+    if (uniformSet)
+        descriptorWrites.push_back(unifomWrite);
 
-    device.updateDescriptorSets(descriptorWrite, nullptr);
+    // Update TLAS
+    vk::WriteDescriptorSetAccelerationStructureKHR tlasWriteKHR{};
+    tlasWriteKHR.setAccelerationStructures(tlas);
+    vk::WriteDescriptorSet tlasWrite{};
+    tlasWrite.setPNext(&tlasWriteKHR);
+    tlasWrite.setDescriptorType(vk::DescriptorType::eAccelerationStructureKHR);
+    tlasWrite.setDstSet(tlasSet);
+    tlasWrite.setDstBinding(BINDING_TLAS);
+    if (tlasSet)
+        descriptorWrites.push_back(tlasWrite);
+
+    // Update output image
+    vk::DescriptorImageInfo imageInfo{};
+    imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
+    imageInfo.setImageView(imageView);
+    vk::WriteDescriptorSet imageWrite{};
+    imageWrite.setPImageInfo(&imageInfo);
+    imageWrite.setDstSet(imageSet);
+    imageWrite.setDescriptorType(vk::DescriptorType::eStorageImage);
+    imageWrite.setDstBinding(BINDING_OUT_IMG);
+    if (imageSet)
+        descriptorWrites.push_back(imageWrite);
+
+    device.updateDescriptorSets(descriptorWrites, nullptr);
 }
