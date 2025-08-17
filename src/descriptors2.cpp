@@ -10,52 +10,56 @@ Ubo::Ubo(const vk::Device &device,
 
 void Ubo::destroy()
 {
-    device.destroyDescriptorPool(poolBindless);
-    device.destroyDescriptorPool(poolRt);
+    device.destroyDescriptorPool(poolUAB);
+    device.destroyDescriptorPool(poolNonUAB);
 }
 
-void Ubo::create_descriptor_pools(const std::vector<vk::DescriptorPoolSize> &poolSizes)
+void Ubo::add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
+                             const uint32_t numSets,
+                             const bool updateAfterBind)
 {
     uint32_t numUniformDescriptors = 0, numStorageImageDescriptors = 0, numASDescriptors = 0;
-    this->poolSizes = poolSizes;
-    std::vector<vk::DescriptorPoolSize> poolSizesBindless;
-    std::vector<vk::DescriptorPoolSize> poolSizesRt;
+    for (int i = 0; i < numSets; i++) {
+        if (updateAfterBind)
+            poolSizesUAB.push_back(poolSize);
+        else
+            poolSizesNonUAB.push_back(poolSize);
 
-    for (const auto &ps : poolSizes) {
-        if (ps.type == vk::DescriptorType::eUniformBuffer) {
+        if (poolSize.type == vk::DescriptorType::eUniformBuffer) {
             numUniformDescriptors++;
-            maxUniformDescriptors = (maxUniformDescriptors < ps.descriptorCount)
-                                        ? ps.descriptorCount
+            maxUniformDescriptors = (maxUniformDescriptors < poolSize.descriptorCount)
+                                        ? poolSize.descriptorCount
                                         : maxUniformDescriptors;
-            poolSizesBindless.push_back(ps);
-        } else if (ps.type == vk::DescriptorType::eStorageImage) {
+        } else if (poolSize.type == vk::DescriptorType::eStorageImage) {
             numStorageImageDescriptors++;
-            maxStorageImageDescriptors = (maxStorageImageDescriptors < ps.descriptorCount)
-                                             ? ps.descriptorCount
+            maxStorageImageDescriptors = (maxStorageImageDescriptors < poolSize.descriptorCount)
+                                             ? poolSize.descriptorCount
                                              : maxStorageImageDescriptors;
-            poolSizesRt.push_back(ps);
-        } else if (ps.type == vk::DescriptorType::eAccelerationStructureKHR) {
+        } else if (poolSize.type == vk::DescriptorType::eAccelerationStructureKHR) {
             numASDescriptors++;
-            maxASDescriptors = (maxASDescriptors < ps.descriptorCount) ? ps.descriptorCount
-                                                                       : maxASDescriptors;
-            poolSizesRt.push_back(ps);
+            maxASDescriptors = (maxASDescriptors < poolSize.descriptorCount)
+                                   ? poolSize.descriptorCount
+                                   : maxASDescriptors;
         }
     }
     assert(numUniformDescriptors <= physDevProp.limits.maxDescriptorSetUniformBuffers);
     assert(numStorageImageDescriptors <= physDevProp.limits.maxDescriptorSetStorageImages);
     assert(numASDescriptors <= asProperties.maxDescriptorSetAccelerationStructures);
+}
 
+void Ubo::create_descriptor_pools()
+{
     vk::DescriptorPoolCreateInfo poolBindlessCreateInfo{};
     poolBindlessCreateInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind);
-    poolBindlessCreateInfo.setMaxSets(poolSizesBindless.size());
-    poolBindlessCreateInfo.setPoolSizes(poolSizesBindless);
+    poolBindlessCreateInfo.setMaxSets(poolSizesUAB.size());
+    poolBindlessCreateInfo.setPoolSizes(poolSizesUAB);
 
     vk::DescriptorPoolCreateInfo poolRtCreateInfo{};
-    poolRtCreateInfo.setMaxSets(poolSizesRt.size());
-    poolRtCreateInfo.setPoolSizes(poolSizesRt);
+    poolRtCreateInfo.setMaxSets(poolSizesNonUAB.size());
+    poolRtCreateInfo.setPoolSizes(poolSizesNonUAB);
 
-    poolBindless = device.createDescriptorPool(poolBindlessCreateInfo);
-    poolRt = device.createDescriptorPool(poolRtCreateInfo);
+    poolUAB = device.createDescriptorPool(poolBindlessCreateInfo);
+    poolNonUAB = device.createDescriptorPool(poolRtCreateInfo);
 }
 
 // Returns a pair (bindless ds layout, rt ds layout)
@@ -113,7 +117,8 @@ std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> Ubo::create_descript
                                                                        rtDescriptorSetLayout);
 }
 
-std::vector<vk::DescriptorSet> Ubo::allocate_descriptor_sets(
+std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>>
+Ubo::allocate_descriptor_sets(
     const std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> &descriptorSetLayouts,
     const uint32_t frameOverlap)
 {
@@ -122,26 +127,17 @@ std::vector<vk::DescriptorSet> Ubo::allocate_descriptor_sets(
     std::vector<vk::DescriptorSetLayout> rtDescriptorSetLayouts(frameOverlap,
                                                                 descriptorSetLayouts.second);
 
-    // std::vector<vk::DescriptorSetLayout> allDescriptorSetLayouts;
-    // allDescriptorSetLayouts.resize(bindlessDescriptorSetLayouts.size()
-    //                                + rtDescriptorSetLayouts.size());
-    // allDescriptorSetLayouts.insert(allDescriptorSetLayouts.end(),
-    //                                bindlessDescriptorSetLayouts.begin(),
-    //                                bindlessDescriptorSetLayouts.end());
-    // allDescriptorSetLayouts.insert(allDescriptorSetLayouts.end(),
-    //                                rtDescriptorSetLayouts.begin(),
-    //                                rtDescriptorSetLayouts.end());
-
     vk::DescriptorSetAllocateInfo allocInfoBindless{};
-    allocInfoBindless.setDescriptorPool(poolBindless);
+    allocInfoBindless.setDescriptorPool(poolUAB);
     allocInfoBindless.setSetLayouts(bindlessDescriptorSetLayouts);
 
     vk::DescriptorSetAllocateInfo allocInfoRt{};
-    allocInfoRt.setDescriptorPool(poolRt);
+    allocInfoRt.setDescriptorPool(poolNonUAB);
     allocInfoRt.setSetLayouts(rtDescriptorSetLayouts);
-    device.allocateDescriptorSets(allocInfoRt);
 
-    return device.allocateDescriptorSets(allocInfoBindless);
+    return std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>>(
+        device.allocateDescriptorSets(allocInfoBindless),
+        device.allocateDescriptorSets(allocInfoRt));
 }
 
 void Ubo::update_descriptor_sets(const std::vector<Buffer> &buffers,
