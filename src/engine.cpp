@@ -4,8 +4,8 @@ import vulkan_hpp;
 #include <vulkan/vulkan_hpp_macros.hpp>
 #endif
 
+#include "acceleration_structures.hpp"
 #include "engine.hpp"
-#include "ray_tracing.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 #include <algorithm>
@@ -102,25 +102,25 @@ void Engine::run()
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
-        if (ImGui::Begin("background")) {
-            ComputePipelineData &currentPipeline
-                = I->computePipelines[currentBackgroundPipelineIndex];
-            const std::string text = "Selected background compute shader: " + currentPipeline.name;
-            ImGui::Text("%s", text.c_str());
-            ImGui::SliderInt("Shader Index: ",
-                             &currentBackgroundPipelineIndex,
-                             0,
-                             I->computePipelines.size() - 1);
-            glm::vec4 *colorUp = (glm::vec4 *) I->computePipelines[0].pushData;
-            glm::vec4 *colorDown = (glm::vec4 *) ((char *) I->computePipelines[0].pushData
-                                                  + sizeof(glm::vec4));
-            ImGui::InputFloat4("[ColorGradient] colorUp", (float *) colorUp);
-            ImGui::InputFloat4("[ColorGradient] colorDown", (float *) colorDown);
-            ImGui::InputFloat4("[Sky] colorW", (float *) I->computePipelines[1].pushData);
-        }
-        ImGui::End();
+        // if (ImGui::Begin("background")) {
+        //     ComputePipelineData &currentPipeline
+        //         = I->computePipelines[currentBackgroundPipelineIndex];
+        //     const std::string text = "Selected background compute shader: " + currentPipeline.name;
+        //     ImGui::Text("%s", text.c_str());
+        //     ImGui::SliderInt("Shader Index: ",
+        //                      &currentBackgroundPipelineIndex,
+        //                      0,
+        //                      I->computePipelines.size() - 1);
+        //     glm::vec4 *colorUp = (glm::vec4 *) I->computePipelines[0].pushData;
+        //     glm::vec4 *colorDown = (glm::vec4 *) ((char *) I->computePipelines[0].pushData
+        //                                           + sizeof(glm::vec4));
+        //     ImGui::InputFloat4("[ColorGradient] colorUp", (float *) colorUp);
+        //     ImGui::InputFloat4("[ColorGradient] colorDown", (float *) colorDown);
+        //     ImGui::InputFloat4("[Sky] colorW", (float *) I->computePipelines[1].pushData);
+        // }
         // Imgui UI to test
-        // ImGui::ShowDemoWindow();
+        // ImGui::End();
+        ImGui::ShowDemoWindow();
 
         //make imgui calculate internal draw structures
         ImGui::Render();
@@ -161,16 +161,16 @@ void Engine::draw()
     cmd.begin(commandBufferBeginInfo);
 
     // Make the draw image into writeable mode before rendering
-    utils::transition_image(cmd,
-                            I->imageDraw.image,
-                            vk::ImageLayout::eUndefined,
-                            vk::ImageLayout::eGeneral);
+    // utils::transition_image(cmd,
+    //                         I->imageDraw.image,
+    //                         vk::ImageLayout::eUndefined,
+    //                         vk::ImageLayout::eGeneral);
     // Draw into the draw image
-    change_background(cmd);
+    // change_background(cmd);
 
     utils::transition_image(cmd,
                             I->imageDraw.image,
-                            vk::ImageLayout::eGeneral,
+                            vk::ImageLayout::eUndefined,
                             vk::ImageLayout::eColorAttachmentOptimal);
 
     utils::transition_image(cmd,
@@ -248,25 +248,6 @@ void Engine::draw()
     VK_CHECK_RES(I->graphicsQueue.presentKHR(presentInfo));
 
     frameNumber = (frameNumber + 1) % I->frameOverlap;
-}
-
-void Engine::change_background(const vk::CommandBuffer &cmd)
-{
-    cmd.bindPipeline(vk::PipelineBindPoint::eCompute,
-                     I->computePipelines[currentBackgroundPipelineIndex].pipeline);
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                           I->computePipelines[currentBackgroundPipelineIndex].pipelineLayout,
-                           0,
-                           I->drawImageDescriptors,
-                           nullptr);
-    cmd.pushConstants(I->computePipelines[currentBackgroundPipelineIndex].pipelineLayout,
-                      vk::ShaderStageFlagBits::eCompute,
-                      0,
-                      I->computePipelines[currentBackgroundPipelineIndex].pushDataSize,
-                      I->computePipelines[currentBackgroundPipelineIndex].pushData);
-    cmd.dispatch(std::ceil((float) I->imageDraw.extent.width / 16.f),
-                 std::ceil((float) I->imageDraw.extent.height / 16.f),
-                 1);
 }
 
 void Engine::draw_meshes(const vk::CommandBuffer &cmd)

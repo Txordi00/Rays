@@ -1,6 +1,5 @@
 #pragma once
 #include "descriptors.hpp"
-#include "descriptors2.hpp"
 #include "model.hpp"
 #include "raster_pipelines.hpp"
 #include "types.hpp"
@@ -55,19 +54,11 @@ public:
     ImageData imageDepth;
     // vk::Extent2D imageDrawExtent;
 
-    // Descriptors data and functions
-    std::unique_ptr<DescriptorPool> descriptorPool;
-    vk::DescriptorSet drawImageDescriptors;
-    DescriptorSetData drawImageDescriptorsData;
-
     // Uniform buffer descriptors
     std::unique_ptr<Ubo> ubo;
     vk::DescriptorSetLayout uboDescriptorSetLayout;
-    // std::vector<vk::DescriptorSet> uboDescriptorSets;
-    // std::vector<Buffer> uniformBuffers;
 
     // Pipelines
-    std::vector<ComputePipelineData> computePipelines;
     SimplePipelineData simpleMeshGraphicsPipeline;
 
     // Imgui
@@ -88,7 +79,6 @@ private:
     void create_draw_data();
     void init_commands();
     void init_sync_structures();
-    void init_compute_descriptors();
     void init_ub_descriptors();
     void init_pipelines();
     void init_imgui();

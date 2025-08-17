@@ -1,6 +1,5 @@
 #include "init.hpp"
 #include "loader.hpp"
-#include "pipelines_compute.hpp"
 #include "utils.hpp"
 
 #include <SDL3/SDL_vulkan.h>
@@ -28,7 +27,7 @@ Init::Init()
     init_commands();
     init_sync_structures();
     load_meshes();
-    init_compute_descriptors();
+    // init_compute_descriptors();
     init_ub_descriptors();
     init_pipelines();
     init_imgui();
@@ -45,18 +44,10 @@ void Init::clean()
         for (auto &m : models) {
             m->destroyBuffers();
         }
-        // for (auto &b : uniformBuffers)
-        //     utils::destroy_buffer(allocator, b);
         device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
         device.destroyDescriptorPool(imguiPool);
-        for (int i = 0; i < computePipelines.size(); i++) {
-            device.destroyPipelineLayout(computePipelines[i].pipelineLayout);
-            device.destroyPipeline(computePipelines[i].pipeline);
-        }
-        descriptorPool->destroyPool();
         ubo->destroy();
-        device.destroyDescriptorSetLayout(drawImageDescriptorsData.layout);
         device.destroyDescriptorSetLayout(uboDescriptorSetLayout);
 
         device.destroyCommandPool(transferCmdPool);
@@ -65,7 +56,6 @@ void Init::clean()
             device.destroyCommandPool(frames[i].commandPool);
             device.destroyFence(frames[i].renderFence);
             device.destroySemaphore(frames[i].renderSemaphore);
-            // device.destroySemaphore(frames[i].swapchainSemaphore);
         }
         for (const auto &sem : swapchainSemaphores)
             device.destroySemaphore(sem);
@@ -140,10 +130,6 @@ void Init::init_vulkan()
               .set_required_features_12(features12)
               // .add_required_extension(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) // NOT SUPPORTED YET
               // .add_required_extension_features(unifiedImageLayoutsFeatures)
-              // .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
-              // .add_required_extension_features(
-              //     static_cast<VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT>(
-              //         swapchainMaintenance1Features))
               .add_required_extensions(rtExtensions)
               .add_required_extension_features(asFeatures)
               .add_required_extension_features(rtPipelineFeatures)
@@ -332,48 +318,6 @@ void Init::init_sync_structures()
     transferFence = device.createFence(fenceCreateInfo);
 }
 
-void Init::init_compute_descriptors()
-{
-    // Set the descriptor set properties for the gradient compute shader layout
-    vk::DescriptorType drawImageDescriptorSetType = vk::DescriptorType::eStorageImage;
-    DescriptorSetLayout drawImageDescSetLayout{device};
-    vk::DescriptorSetLayoutBinding binding{};
-    binding.setBinding(0);
-    binding.setDescriptorType(drawImageDescriptorSetType);
-    binding.setStageFlags(vk::ShaderStageFlagBits::eCompute);
-    binding.setDescriptorCount(1);
-    drawImageDescSetLayout.add_binding(binding);
-
-    vk::DescriptorSetLayoutCreateFlags descSetLayoutCreateFlags{};
-    drawImageDescriptorsData.layout = drawImageDescSetLayout.get_descriptor_set_layout(
-        descSetLayoutCreateFlags);
-    drawImageDescriptorsData.type = drawImageDescriptorSetType;
-    drawImageDescriptorsData.descriptorCount = 10;
-
-    // I need to play with the maxSets parameter!
-    descriptorPool = std::make_unique<DescriptorPool>(device,
-                                                      std::vector<DescriptorSetData>{
-                                                          drawImageDescriptorsData},
-                                                      9);
-    vk::DescriptorPoolCreateFlags descriptorPoolCreateFlags{};
-    descriptorPool->create(descriptorPoolCreateFlags);
-
-    drawImageDescriptors = descriptorPool->allocate_descriptors({0})[0];
-
-    vk::DescriptorImageInfo imageInfo{};
-    imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
-    imageInfo.setImageView(imageDraw.imageView);
-
-    vk::WriteDescriptorSet descriptorImageDrawWrite{};
-    descriptorImageDrawWrite.setDstBinding(0);
-    descriptorImageDrawWrite.setImageInfo(imageInfo);
-    descriptorImageDrawWrite.setDescriptorType(drawImageDescriptorsData.type);
-    descriptorImageDrawWrite.setDescriptorCount(1);
-    descriptorImageDrawWrite.setDstSet(drawImageDescriptors);
-
-    device.updateDescriptorSets(descriptorImageDrawWrite, nullptr);
-}
-
 void Init::init_ub_descriptors()
 {
     ubo = std::make_unique<Ubo>(device, physicalDeviceProperties, asProperties);
@@ -399,8 +343,6 @@ void Init::init_ub_descriptors()
 
 void Init::init_pipelines()
 {
-    computePipelines = init_background_compute_pipelines(device, drawImageDescriptorsData.layout);
-
     simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
                                                           imageDraw.format,
                                                           imageDepth.format,

@@ -1,4 +1,4 @@
-#include "ray_tracing.hpp"
+#include "acceleration_structures.hpp"
 #include "utils.hpp"
 #include <glm/gtc/type_ptr.hpp>
 

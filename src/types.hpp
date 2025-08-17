@@ -38,12 +38,8 @@ const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
 const unsigned int MINIMUM_FRAME_OVERLAP = 2;
 const uint64_t FENCE_TIMEOUT = 1000000000;
 
-#define GRADIENT_COMP_SHADER_FP "shaders/gradient.comp.spv"
-#define GRADIENT_COLOR_COMP_SHADER_FP "shaders/gradient_color.comp.spv"
-#define SKY_SHADER_FP "shaders/sky.comp.spv"
-#define TRIANGLE_VERT_SHADER "shaders/triangle.vert.spv"
-#define TRIANGLE_FRAG_SHADER "shaders/triangle.frag.spv"
-#define SIMPLE_MESH_VERT_SHADER "shaders/triangle_mesh.vert.spv"
+#define SIMPLE_MESH_FRAG_SHADER "shaders/simple_mesh.frag.spv"
+#define SIMPLE_MESH_VERT_SHADER "shaders/simple_mesh.vert.spv"
 
 struct DescriptorSetData
 {

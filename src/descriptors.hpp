@@ -1,44 +1,51 @@
 #pragma once
+#include "types.hpp"
+
+#pragma once
 #ifndef USE_CXX20_MODULES
 #include <vulkan/vulkan.hpp>
 #else
 import vulkan_hpp;
 #endif
-#include "types.hpp"
 
-class DescriptorSetLayout
+// CHECK THESE VALUES
+const uint32_t BINDING_UNIFORM = 0;
+const uint32_t BINDING_TLAS = 0;
+const uint32_t BINDING_OUT_IMG = 1;
+
+class Ubo
 {
 public:
-    DescriptorSetLayout(const vk::Device &device);
-    ~DescriptorSetLayout() = default;
-    void add_binding(vk::DescriptorSetLayoutBinding binding);
-    vk::DescriptorSetLayout get_descriptor_set_layout(
-        vk::DescriptorSetLayoutCreateFlags descriptorSetLayoutCreateFlags);
-    void reset();
+    Ubo(const vk::Device &device,
+        const vk::PhysicalDeviceProperties &physDevProp,
+        const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
+    ~Ubo() = default;
+    void destroy();
+    void add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
+                            const uint32_t numSets,
+                            const bool updateAfterBind);
+    void create_descriptor_pools();
+    std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> create_descriptor_set_layouts();
+    std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>> allocate_descriptor_sets(
+        const std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> &descriptorSetLayouts,
+        const uint32_t frameOverlap);
+    void update_descriptor_sets(const std::vector<Buffer> &uniformBuffers,
+                                const vk::DescriptorSet &uniformSet,
+                                const vk::AccelerationStructureKHR &tlas,
+                                const vk::DescriptorSet &tlasSet,
+                                const vk::ImageView &imageView,
+                                const vk::DescriptorSet &imageSet);
 
 private:
-    vk::Device device;
-    std::vector<vk::DescriptorSetLayoutBinding> bindings;
-    vk::DescriptorSetLayout layout;
-};
+    const vk::Device &device;
+    const vk::PhysicalDeviceProperties &physDevProp;
+    const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties;
 
-class DescriptorPool
-{
-public:
-    DescriptorPool(const vk::Device &device,
-                   const std::vector<DescriptorSetData> &descriptorSets,
-                   const uint32_t maxSets);
-    ~DescriptorPool() = default;
-    vk::DescriptorPool create(const vk::DescriptorPoolCreateFlags &descriptorPoolCreateFlags);
-    std::vector<vk::DescriptorSet> allocate_descriptors(const std::vector<unsigned int> &indexes);
-    void reset();
-    void destroyPool();
-
-    vk::DescriptorPool getPool() const { return pool; }
-
-private:
-    vk::Device device;
-    std::vector<DescriptorSetData> descriptorSets;
-    uint32_t maxSets;
-    vk::DescriptorPool pool;
+    std::vector<vk::DescriptorPoolSize> poolSizesUAB;
+    std::vector<vk::DescriptorPoolSize> poolSizesNonUAB;
+    vk::DescriptorPool poolUAB;
+    vk::DescriptorPool poolNonUAB;
+    uint32_t maxUniformDescriptors{0};
+    uint32_t maxStorageImageDescriptors{0};
+    uint32_t maxASDescriptors{0};
 };

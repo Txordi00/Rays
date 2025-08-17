@@ -165,58 +165,6 @@ vk::Pipeline GraphicsPipelineBuilder::buildPipeline(const vk::Device &device)
     return pipeline;
 }
 
-SimplePipelineData get_triangle_pipeline(const vk::Device &device,
-                                         const vk::Format &colorImageFormat)
-{
-    SimplePipelineData trianglePipelineData;
-
-    vk::ShaderModule vertexShader = utils::load_shader(device, TRIANGLE_VERT_SHADER);
-    vk::ShaderModule fragmentShader = utils::load_shader(device, TRIANGLE_FRAG_SHADER);
-
-    //build the pipeline layout that controls the inputs/outputs of the shader
-    //we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
-    vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.setSetLayouts(nullptr);
-
-    try {
-        trianglePipelineData.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
-    } catch (const std::exception &e) {
-        VK_CHECK_EXC(e);
-    }
-
-    GraphicsPipelineBuilder pipelineBuilder{};
-    //use the triangle layout we created
-    pipelineBuilder.pipelineLayout = trianglePipelineData.pipelineLayout;
-    //connecting the vertex and pixel shaders to the pipeline
-    pipelineBuilder.set_shaders(vertexShader, fragmentShader);
-    //it will draw triangles
-    pipelineBuilder.set_input_topology(vk::PrimitiveTopology::eTriangleList);
-    //filled triangles
-    pipelineBuilder.set_polygon_mode(vk::PolygonMode::eFill);
-    //no backface culling
-    pipelineBuilder.set_cull_mode(vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
-    //no multisampling
-    pipelineBuilder.set_multisampling_none();
-    //no blending
-    pipelineBuilder.disable_blending();
-    //no depth testing
-    pipelineBuilder.disable_depthtest();
-
-    //connect the image format we will draw into, from draw image
-    pipelineBuilder.set_color_attachment_format(colorImageFormat);
-    pipelineBuilder.set_depth_format(vk::Format::eUndefined);
-
-    try {
-        trianglePipelineData.pipeline = pipelineBuilder.buildPipeline(device);
-    } catch (const std::exception &e) {
-        VK_CHECK_EXC(e);
-    }
-    device.destroyShaderModule(vertexShader);
-    device.destroyShaderModule(fragmentShader);
-
-    return trianglePipelineData;
-}
-
 SimplePipelineData get_simple_mesh_pipeline(
     const vk::Device &device,
     const vk::Format &colorImageFormat,
@@ -226,7 +174,7 @@ SimplePipelineData get_simple_mesh_pipeline(
     SimplePipelineData trianglePipelineData;
 
     vk::ShaderModule vertexShader = utils::load_shader(device, SIMPLE_MESH_VERT_SHADER);
-    vk::ShaderModule fragmentShader = utils::load_shader(device, TRIANGLE_FRAG_SHADER);
+    vk::ShaderModule fragmentShader = utils::load_shader(device, SIMPLE_MESH_FRAG_SHADER);
 
     //build the pipeline layout that controls the inputs/outputs of the shader
     //we are not using descriptor sets or other systems yet, so no need to use anything other than empty default

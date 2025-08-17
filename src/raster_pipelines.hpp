@@ -13,9 +13,6 @@ struct SimplePipelineData
     vk::Pipeline pipeline;
 };
 
-SimplePipelineData get_triangle_pipeline(const vk::Device &device,
-                                         const vk::Format &colorImageFormat);
-
 SimplePipelineData get_simple_mesh_pipeline(
     const vk::Device &device,
     const vk::Format &colorImageFormat,

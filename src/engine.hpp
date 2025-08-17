@@ -31,7 +31,7 @@ private:
     Camera camera{};
 
     // Draw commands
-    void change_background(const vk::CommandBuffer &cmd);
+    // void change_background(const vk::CommandBuffer &cmd);
     void draw_meshes(const vk::CommandBuffer &cmd);
 
     // Imgui
@@ -45,5 +45,5 @@ private:
     uint64_t frameNumber{0};
     uint32_t swapchainImageIndex{0};
     bool stopRendering{false};
-    int currentBackgroundPipelineIndex{1};
+    // int currentBackgroundPipelineIndex{1};
 };
