@@ -37,15 +37,25 @@ const unsigned int API_VERSION[3] = {1, 4, 0};
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
 const unsigned int MINIMUM_FRAME_OVERLAP = 2;
 const uint64_t FENCE_TIMEOUT = 1000000000;
+const uint32_t MAX_RT_RECURSION = 1;
 
 #define SIMPLE_MESH_FRAG_SHADER "shaders/simple_mesh.frag.spv"
 #define SIMPLE_MESH_VERT_SHADER "shaders/simple_mesh.vert.spv"
+#define SIMPLE_RCHIT_SHADER "shaders/raytrace.rchit.spv"
+#define SIMPLE_RGEN_SHADER "shaders/raytrace.rgen.spv"
+#define SIMPLE_RMISS_SHADER "shaders/raytrace.rmiss.spv"
 
 struct DescriptorSetData
 {
     vk::DescriptorSetLayout layout;
     vk::DescriptorType type;
     uint32_t descriptorCount;
+};
+
+struct SimplePipelineData
+{
+    vk::PipelineLayout pipelineLayout;
+    vk::Pipeline pipeline;
 };
 
 struct FrameData
@@ -99,6 +109,14 @@ struct MeshPush
     uint32_t objId;
     vk::DeviceAddress vertexBufferAddress;
     vk::DeviceAddress indexBufferAddress;
+};
+
+struct RayPush
+{
+    glm::vec4 clearColor;
+    glm::vec3 lightPosition;
+    float lightIntensity;
+    uint32_t lightType;
 };
 
 // push constants for our mesh object draws

@@ -1,5 +1,6 @@
 #include "init.hpp"
 #include "loader.hpp"
+#include "rt_pipelines.hpp"
 #include "utils.hpp"
 
 #include <SDL3/SDL_vulkan.h>
@@ -27,8 +28,7 @@ Init::Init()
     init_commands();
     init_sync_structures();
     load_meshes();
-    // init_compute_descriptors();
-    init_ub_descriptors();
+    init_descriptors();
     init_pipelines();
     init_imgui();
 
@@ -46,9 +46,13 @@ void Init::clean()
         }
         device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
+        device.destroyPipelineLayout(simpleRtPipeline.pipelineLayout);
+        device.destroyPipeline(simpleRtPipeline.pipeline);
+
         device.destroyDescriptorPool(imguiPool);
-        ubo->destroy();
+        descHelper->destroy();
         device.destroyDescriptorSetLayout(uboDescriptorSetLayout);
+        device.destroyDescriptorSetLayout(rtDescriptorSetLayout);
 
         device.destroyCommandPool(transferCmdPool);
         device.destroyFence(transferFence);
@@ -122,6 +126,7 @@ void Init::init_vulkan()
     asFeatures.setAccelerationStructure(vk::True);
     // asFeatures.setDescriptorBindingAccelerationStructureUpdateAfterBind(vk::True);
     vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
+    rtPipelineFeatures.setRayTracingPipeline(vk::True);
     // Select a GPU
     vkb::PhysicalDeviceSelector physDevSelector{vkbInstance};
     vkb::PhysicalDevice vkbPhysDev
@@ -318,25 +323,28 @@ void Init::init_sync_structures()
     transferFence = device.createFence(fenceCreateInfo);
 }
 
-void Init::init_ub_descriptors()
+void Init::init_descriptors()
 {
-    ubo = std::make_unique<Ubo>(device, physicalDeviceProperties, asProperties);
-    ubo->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
-                                                   static_cast<uint32_t>(models.size())},
-                            frameOverlap,
-                            true);
-    ubo->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eAccelerationStructureKHR, 1},
-                            frameOverlap,
-                            false);
-    ubo->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
-                            frameOverlap,
-                            false);
+    descHelper = std::make_unique<DescHelper>(device, physicalDeviceProperties, asProperties);
+    descHelper->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
+                                                          static_cast<uint32_t>(models.size())},
+                                   frameOverlap,
+                                   true);
+    descHelper
+        ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eAccelerationStructureKHR,
+                                                    1},
+                             frameOverlap,
+                             false);
+    descHelper->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
+                                   frameOverlap,
+                                   false);
 
-    ubo->create_descriptor_pools();
-    auto descriptorSetLayouts = ubo->create_descriptor_set_layouts();
+    descHelper->create_descriptor_pools();
+    auto descriptorSetLayouts = descHelper->create_descriptor_set_layouts();
     uboDescriptorSetLayout = descriptorSetLayouts.first;
+    rtDescriptorSetLayout = descriptorSetLayouts.second;
 
-    auto descriptorSets = ubo->allocate_descriptor_sets(descriptorSetLayouts, frameOverlap);
+    auto descriptorSets = descHelper->allocate_descriptor_sets(descriptorSetLayouts, frameOverlap);
     for (int i = 0; i < descriptorSets.first.size(); i++)
         frames[i].descriptorSet = descriptorSets.first[i];
 }
@@ -347,6 +355,13 @@ void Init::init_pipelines()
                                                           imageDraw.format,
                                                           imageDepth.format,
                                                           {uboDescriptorSetLayout});
+
+    RtPipelineBuilder rtPipelineBuilder{device};
+    rtPipelineBuilder.create_shader_stages();
+    rtPipelineBuilder.create_shader_groups();
+    simpleRtPipeline.pipelineLayout = rtPipelineBuilder.buildPipelineLayout(
+        {rtDescriptorSetLayout, uboDescriptorSetLayout});
+    simpleRtPipeline.pipeline = rtPipelineBuilder.buildPipeline(simpleRtPipeline.pipelineLayout);
 }
 
 void Init::init_imgui()

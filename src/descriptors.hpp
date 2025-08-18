@@ -13,13 +13,13 @@ const uint32_t BINDING_UNIFORM = 0;
 const uint32_t BINDING_TLAS = 0;
 const uint32_t BINDING_OUT_IMG = 1;
 
-class Ubo
+class DescHelper
 {
 public:
-    Ubo(const vk::Device &device,
-        const vk::PhysicalDeviceProperties &physDevProp,
-        const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
-    ~Ubo() = default;
+    DescHelper(const vk::Device &device,
+               const vk::PhysicalDeviceProperties &physDevProp,
+               const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
+    ~DescHelper() = default;
     void destroy();
     void add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
                             const uint32_t numSets,

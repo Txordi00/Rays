@@ -1,29 +1,31 @@
 #include "descriptors.hpp"
 
-Ubo::Ubo(const vk::Device &device,
-         const vk::PhysicalDeviceProperties &physDevProp,
-         const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties)
+DescHelper::DescHelper(const vk::Device &device,
+                       const vk::PhysicalDeviceProperties &physDevProp,
+                       const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties)
     : device{device}
     , physDevProp{physDevProp}
     , asProperties{asProperties}
 {}
 
-void Ubo::destroy()
+void DescHelper::destroy()
 {
     device.destroyDescriptorPool(poolUAB);
     device.destroyDescriptorPool(poolNonUAB);
 }
 
-void Ubo::add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
-                             const uint32_t numSets,
-                             const bool updateAfterBind)
+void DescHelper::add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
+                                    const uint32_t numSets,
+                                    const bool updateAfterBind)
 {
     uint32_t numUniformDescriptors = 0, numStorageImageDescriptors = 0, numASDescriptors = 0;
+    poolSizesUAB.reserve(numSets);
+    poolSizesNonUAB.reserve(numSets);
     for (int i = 0; i < numSets; i++) {
         if (updateAfterBind)
-            poolSizesUAB.push_back(poolSize);
+            poolSizesUAB.emplace_back(poolSize);
         else
-            poolSizesNonUAB.push_back(poolSize);
+            poolSizesNonUAB.emplace_back(poolSize);
 
         if (poolSize.type == vk::DescriptorType::eUniformBuffer) {
             numUniformDescriptors++;
@@ -47,7 +49,7 @@ void Ubo::add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
     assert(numASDescriptors <= asProperties.maxDescriptorSetAccelerationStructures);
 }
 
-void Ubo::create_descriptor_pools()
+void DescHelper::create_descriptor_pools()
 {
     vk::DescriptorPoolCreateInfo poolBindlessCreateInfo{};
     poolBindlessCreateInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind);
@@ -63,7 +65,7 @@ void Ubo::create_descriptor_pools()
 }
 
 // Returns a pair (bindless ds layout, rt ds layout)
-std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> Ubo::create_descriptor_set_layouts()
+std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> DescHelper::create_descriptor_set_layouts()
 {
     std::vector<vk::DescriptorSetLayoutBinding> bindlessBindings;
 
@@ -119,7 +121,7 @@ std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> Ubo::create_descript
 }
 
 std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>>
-Ubo::allocate_descriptor_sets(
+DescHelper::allocate_descriptor_sets(
     const std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> &descriptorSetLayouts,
     const uint32_t frameOverlap)
 {
@@ -141,12 +143,12 @@ Ubo::allocate_descriptor_sets(
         device.allocateDescriptorSets(allocInfoRt));
 }
 
-void Ubo::update_descriptor_sets(const std::vector<Buffer> &uniformBuffers,
-                                 const vk::DescriptorSet &uniformSet,
-                                 const vk::AccelerationStructureKHR &tlas,
-                                 const vk::DescriptorSet &tlasSet,
-                                 const vk::ImageView &imageView,
-                                 const vk::DescriptorSet &imageSet)
+void DescHelper::update_descriptor_sets(const std::vector<Buffer> &uniformBuffers,
+                                        const vk::DescriptorSet &uniformSet,
+                                        const vk::AccelerationStructureKHR &tlas,
+                                        const vk::DescriptorSet &tlasSet,
+                                        const vk::ImageView &imageView,
+                                        const vk::DescriptorSet &imageSet)
 {
     std::vector<vk::WriteDescriptorSet> descriptorWrites{};
     // Add all the buffers to a single descriptor write

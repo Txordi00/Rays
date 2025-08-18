@@ -54,12 +54,14 @@ public:
     ImageData imageDepth;
     // vk::Extent2D imageDrawExtent;
 
-    // Uniform buffer descriptors
-    std::unique_ptr<Ubo> ubo;
+    // Вescriptors
+    std::unique_ptr<DescHelper> descHelper;
     vk::DescriptorSetLayout uboDescriptorSetLayout;
+    vk::DescriptorSetLayout rtDescriptorSetLayout;
 
     // Pipelines
     SimplePipelineData simpleMeshGraphicsPipeline;
+    SimplePipelineData simpleRtPipeline;
 
     // Imgui
     vk::DescriptorPool imguiPool;
@@ -79,7 +81,7 @@ private:
     void create_draw_data();
     void init_commands();
     void init_sync_structures();
-    void init_ub_descriptors();
+    void init_descriptors();
     void init_pipelines();
     void init_imgui();
     void load_meshes();

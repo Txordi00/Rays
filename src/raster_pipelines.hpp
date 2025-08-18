@@ -4,14 +4,8 @@
 #else
 import vulkan_hpp;
 #endif
-
+#include "types.hpp"
 #include <glm/glm.hpp>
-
-struct SimplePipelineData
-{
-    vk::PipelineLayout pipelineLayout;
-    vk::Pipeline pipeline;
-};
 
 SimplePipelineData get_simple_mesh_pipeline(
     const vk::Device &device,

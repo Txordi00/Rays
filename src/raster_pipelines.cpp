@@ -19,7 +19,7 @@ void GraphicsPipelineBuilder::set_shaders(const vk::ShaderModule &vertexShader,
                                           const vk::ShaderModule &fragmentShader)
 {
     shaderStages.clear();
-    shaderStages.resize(2);
+    shaderStages.reserve(2);
 
     vk::PipelineShaderStageCreateInfo vertexInfo{};
     vertexInfo.setModule(vertexShader);
@@ -31,8 +31,8 @@ void GraphicsPipelineBuilder::set_shaders(const vk::ShaderModule &vertexShader,
     fragmentInfo.setPName("main");
     fragmentInfo.setStage(vk::ShaderStageFlagBits::eFragment);
 
-    shaderStages[0] = vertexInfo;
-    shaderStages[1] = fragmentInfo;
+    shaderStages.emplace_back(vertexInfo);
+    shaderStages.emplace_back(fragmentInfo);
 }
 void GraphicsPipelineBuilder::set_input_topology(const vk::PrimitiveTopology &topology)
 {

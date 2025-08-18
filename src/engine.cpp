@@ -318,12 +318,12 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
                                std::back_inserter(uniformBuffers),
                                [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
         // Update all the descriptors in a batch, one per uniform buffer.
-        I->ubo->update_descriptor_sets(uniformBuffers,
-                                       descriptorSet,
-                                       nullptr,
-                                       nullptr,
-                                       nullptr,
-                                       nullptr);
+        I->descHelper->update_descriptor_sets(uniformBuffers,
+                                              descriptorSet,
+                                              nullptr,
+                                              nullptr,
+                                              nullptr,
+                                              nullptr);
 
         for (int objId = 0; objId < I->models.size(); objId++) {
             MeshPush pushConstants;
