@@ -1,5 +1,6 @@
 #pragma once
 #include "types.hpp"
+#include <unordered_map>
 
 #pragma once
 #ifndef USE_CXX20_MODULES
@@ -9,43 +10,42 @@ import vulkan_hpp;
 #endif
 
 // CHECK THESE VALUES
-const uint32_t BINDING_UNIFORM = 0;
-const uint32_t BINDING_TLAS = 0;
-const uint32_t BINDING_OUT_IMG = 1;
+const std::unordered_map<vk::DescriptorType, uint32_t> BINDING_DICT
+    = {{vk::DescriptorType::eUniformBuffer, 0},
+       {vk::DescriptorType::eAccelerationStructureKHR, 0},
+       {vk::DescriptorType::eStorageImage, 1}};
 
 class DescHelper
 {
 public:
     DescHelper(const vk::Device &device,
                const vk::PhysicalDeviceProperties &physDevProp,
-               const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
+               const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties,
+               const bool updateAfterBind);
     ~DescHelper() = default;
     void destroy();
-    void add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
-                            const uint32_t numSets,
-                            const bool updateAfterBind);
-    void create_descriptor_pools();
-    std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> create_descriptor_set_layouts();
-    std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>> allocate_descriptor_sets(
-        const std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> &descriptorSetLayouts,
-        const uint32_t frameOverlap);
-    void update_descriptor_sets(const std::vector<Buffer> &uniformBuffers,
-                                const vk::DescriptorSet &uniformSet,
-                                const vk::AccelerationStructureKHR &tlas,
-                                const vk::DescriptorSet &tlasSet,
-                                const vk::ImageView &imageView,
-                                const vk::DescriptorSet &imageSet);
+    void add_descriptor_set(const vk::DescriptorPoolSize &poolSize, const uint32_t numSets);
+    void create_descriptor_pool();
+    void add_binding(const vk::DescriptorType &type, const vk::ShaderStageFlags &shaderStageFlags);
+    vk::DescriptorSetLayout create_descriptor_set_layout();
+    std::vector<vk::DescriptorSet> allocate_descriptor_sets(
+        const vk::DescriptorSetLayout &descriptorSetLayout, const uint32_t frameOverlap);
 
 private:
     const vk::Device &device;
     const vk::PhysicalDeviceProperties &physDevProp;
     const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties;
+    const bool updateAfterBind;
 
-    std::vector<vk::DescriptorPoolSize> poolSizesUAB;
-    std::vector<vk::DescriptorPoolSize> poolSizesNonUAB;
-    vk::DescriptorPool poolUAB;
-    vk::DescriptorPool poolNonUAB;
-    uint32_t maxUniformDescriptors{0};
-    uint32_t maxStorageImageDescriptors{0};
-    uint32_t maxASDescriptors{0};
+    vk::DescriptorPool pool;
+    std::vector<vk::DescriptorPoolSize> poolSizes;
+    std::vector<vk::DescriptorSetLayoutBinding> bindings;
 };
+
+void update_descriptor_sets(const vk::Device &device,
+                            const std::optional<std::vector<Buffer> > &uniformBuffers = std::nullopt,
+                            const std::optional<vk::DescriptorSet> &uniformSet = std::nullopt,
+                            const std::optional<vk::AccelerationStructureKHR> &tlas = std::nullopt,
+                            const std::optional<vk::DescriptorSet> &tlasSet = std::nullopt,
+                            const std::optional<vk::ImageView> &imageView = std::nullopt,
+                            const std::optional<vk::DescriptorSet> &imageSet = std::nullopt);

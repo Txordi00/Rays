@@ -55,7 +55,7 @@ public:
     // vk::Extent2D imageDrawExtent;
 
     // Вescriptors
-    std::unique_ptr<DescHelper> descHelper;
+    std::unique_ptr<DescHelper> descHelperUAB, descHelperRt;
     vk::DescriptorSetLayout uboDescriptorSetLayout;
     vk::DescriptorSetLayout rtDescriptorSetLayout;
 

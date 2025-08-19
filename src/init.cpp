@@ -50,7 +50,8 @@ void Init::clean()
         device.destroyPipeline(simpleRtPipeline.pipeline);
 
         device.destroyDescriptorPool(imguiPool);
-        descHelper->destroy();
+        descHelperUAB->destroy();
+        descHelperRt->destroy();
         device.destroyDescriptorSetLayout(uboDescriptorSetLayout);
         device.destroyDescriptorSetLayout(rtDescriptorSetLayout);
 
@@ -325,28 +326,42 @@ void Init::init_sync_structures()
 
 void Init::init_descriptors()
 {
-    descHelper = std::make_unique<DescHelper>(device, physicalDeviceProperties, asProperties);
-    descHelper->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
-                                                          static_cast<uint32_t>(models.size())},
-                                   frameOverlap,
-                                   true);
-    descHelper
+    descHelperUAB = std::make_unique<DescHelper>(device,
+                                                 physicalDeviceProperties,
+                                                 asProperties,
+                                                 true);
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
+                                                             static_cast<uint32_t>(models.size())},
+                                      frameOverlap);
+    descHelperUAB->create_descriptor_pool();
+    descHelperUAB->add_binding(vk::DescriptorType::eUniformBuffer,
+                               vk::ShaderStageFlagBits::eVertex
+                                   | vk::ShaderStageFlagBits::eRaygenKHR);
+    uboDescriptorSetLayout = descHelperUAB->create_descriptor_set_layout();
+    std::vector<vk::DescriptorSet> setsUAB
+        = descHelperUAB->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
+    for (int i = 0; i < setsUAB.size(); i++)
+        frames[i].descriptorSet = setsUAB[i];
+
+    descHelperRt = std::make_unique<DescHelper>(device,
+                                                physicalDeviceProperties,
+                                                asProperties,
+                                                false);
+    descHelperRt
         ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eAccelerationStructureKHR,
                                                     1},
-                             frameOverlap,
-                             false);
-    descHelper->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
-                                   frameOverlap,
-                                   false);
-
-    descHelper->create_descriptor_pools();
-    auto descriptorSetLayouts = descHelper->create_descriptor_set_layouts();
-    uboDescriptorSetLayout = descriptorSetLayouts.first;
-    rtDescriptorSetLayout = descriptorSetLayouts.second;
-
-    auto descriptorSets = descHelper->allocate_descriptor_sets(descriptorSetLayouts, frameOverlap);
-    for (int i = 0; i < descriptorSets.first.size(); i++)
-        frames[i].descriptorSet = descriptorSets.first[i];
+                             frameOverlap);
+    descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
+                                     frameOverlap);
+    descHelperRt->create_descriptor_pool();
+    descHelperRt->add_binding(vk::DescriptorType::eAccelerationStructureKHR,
+                              vk::ShaderStageFlagBits::eRaygenKHR
+                                  | vk::ShaderStageFlagBits::eClosestHitKHR);
+    descHelperRt->add_binding(vk::DescriptorType::eStorageImage,
+                              vk::ShaderStageFlagBits::eRaygenKHR);
+    rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
+    std::vector<vk::DescriptorSet> setsRt
+        = descHelperRt->allocate_descriptor_sets(rtDescriptorSetLayout, frameOverlap);
 }
 
 void Init::init_pipelines()

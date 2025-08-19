@@ -2,198 +2,145 @@
 
 DescHelper::DescHelper(const vk::Device &device,
                        const vk::PhysicalDeviceProperties &physDevProp,
-                       const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties)
+                       const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties,
+                       const bool updateAfterBind)
     : device{device}
     , physDevProp{physDevProp}
     , asProperties{asProperties}
-{}
+    , updateAfterBind{updateAfterBind}
+{
+}
 
 void DescHelper::destroy()
 {
-    device.destroyDescriptorPool(poolUAB);
-    device.destroyDescriptorPool(poolNonUAB);
+    device.destroyDescriptorPool(pool);
 }
 
-void DescHelper::add_descriptor_set(const vk::DescriptorPoolSize &poolSize,
-                                    const uint32_t numSets,
-                                    const bool updateAfterBind)
+void DescHelper::add_descriptor_set(const vk::DescriptorPoolSize &poolSize, const uint32_t numSets)
 {
     uint32_t numUniformDescriptors = 0, numStorageImageDescriptors = 0, numASDescriptors = 0;
-    poolSizesUAB.reserve(numSets);
-    poolSizesNonUAB.reserve(numSets);
+    poolSizes.reserve(numSets);
     for (int i = 0; i < numSets; i++) {
-        if (updateAfterBind)
-            poolSizesUAB.emplace_back(poolSize);
-        else
-            poolSizesNonUAB.emplace_back(poolSize);
-
-        if (poolSize.type == vk::DescriptorType::eUniformBuffer) {
-            numUniformDescriptors++;
-            maxUniformDescriptors = (maxUniformDescriptors < poolSize.descriptorCount)
-                                        ? poolSize.descriptorCount
-                                        : maxUniformDescriptors;
-        } else if (poolSize.type == vk::DescriptorType::eStorageImage) {
-            numStorageImageDescriptors++;
-            maxStorageImageDescriptors = (maxStorageImageDescriptors < poolSize.descriptorCount)
-                                             ? poolSize.descriptorCount
-                                             : maxStorageImageDescriptors;
-        } else if (poolSize.type == vk::DescriptorType::eAccelerationStructureKHR) {
-            numASDescriptors++;
-            maxASDescriptors = (maxASDescriptors < poolSize.descriptorCount)
-                                   ? poolSize.descriptorCount
-                                   : maxASDescriptors;
-        }
+        poolSizes.emplace_back(poolSize);
     }
-    assert(numUniformDescriptors <= physDevProp.limits.maxDescriptorSetUniformBuffers);
-    assert(numStorageImageDescriptors <= physDevProp.limits.maxDescriptorSetStorageImages);
-    assert(numASDescriptors <= asProperties.maxDescriptorSetAccelerationStructures);
 }
 
-void DescHelper::create_descriptor_pools()
+void DescHelper::create_descriptor_pool()
 {
-    vk::DescriptorPoolCreateInfo poolBindlessCreateInfo{};
-    poolBindlessCreateInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind);
-    poolBindlessCreateInfo.setMaxSets(poolSizesUAB.size());
-    poolBindlessCreateInfo.setPoolSizes(poolSizesUAB);
+    vk::DescriptorPoolCreateInfo poolCreateInfo{};
+    poolCreateInfo.setMaxSets(poolSizes.size());
+    poolCreateInfo.setPoolSizes(poolSizes);
+    if (updateAfterBind)
+        poolCreateInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind);
 
-    vk::DescriptorPoolCreateInfo poolRtCreateInfo{};
-    poolRtCreateInfo.setMaxSets(poolSizesNonUAB.size());
-    poolRtCreateInfo.setPoolSizes(poolSizesNonUAB);
+    pool = device.createDescriptorPool(poolCreateInfo);
+}
 
-    poolUAB = device.createDescriptorPool(poolBindlessCreateInfo);
-    poolNonUAB = device.createDescriptorPool(poolRtCreateInfo);
+void DescHelper::add_binding(const vk::DescriptorType &type,
+                             const vk::ShaderStageFlags &shaderStageFlags)
+{
+    uint32_t maxDescriptors = 0;
+    for (const auto &ps : poolSizes)
+        if (type == ps.type)
+            maxDescriptors = std::max(maxDescriptors, ps.descriptorCount);
+
+    vk::DescriptorSetLayoutBinding binding{};
+    binding.setBinding(BINDING_DICT.at(type));
+    binding.setDescriptorType(type);
+    binding.setDescriptorCount(maxDescriptors);
+    binding.setStageFlags(shaderStageFlags);
+
+    bindings.push_back(binding);
 }
 
 // Returns a pair (bindless ds layout, rt ds layout)
-std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> DescHelper::create_descriptor_set_layouts()
+vk::DescriptorSetLayout DescHelper::create_descriptor_set_layout()
 {
-    std::vector<vk::DescriptorSetLayoutBinding> bindlessBindings;
-
-    vk::DescriptorSetLayoutBinding uniformBinding{};
-    uniformBinding.setBinding(BINDING_UNIFORM);
-    uniformBinding.setDescriptorType(vk::DescriptorType::eUniformBuffer);
-    uniformBinding.setDescriptorCount(maxUniformDescriptors);
-    uniformBinding.setStageFlags(vk::ShaderStageFlagBits::eVertex
-                                 | vk::ShaderStageFlagBits::eRaygenKHR);
-    bindlessBindings.push_back(uniformBinding);
-
-    std::vector<vk::DescriptorSetLayoutBinding> rtBindings;
-    // TLAS binding - accessible from raygen and closest hit
-    vk::DescriptorSetLayoutBinding tlasBinding{};
-    tlasBinding.setBinding(BINDING_TLAS);
-    tlasBinding.setDescriptorCount(maxASDescriptors);
-    tlasBinding.setDescriptorType(vk::DescriptorType::eAccelerationStructureKHR);
-    tlasBinding.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR
-                              | vk::ShaderStageFlagBits::eClosestHitKHR);
-    rtBindings.push_back(tlasBinding);
-
-    // Output image binding - only accessible from raygen
-    vk::DescriptorSetLayoutBinding outImageBinding{};
-    outImageBinding.setBinding(BINDING_OUT_IMG);
-    outImageBinding.setDescriptorCount(maxStorageImageDescriptors);
-    outImageBinding.setDescriptorType(vk::DescriptorType::eStorageImage);
-    outImageBinding.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR);
-    rtBindings.push_back(outImageBinding);
+    vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo{};
+    descriptorSetLayoutInfo.setBindings(bindings);
 
     vk::DescriptorBindingFlags bindlessBindingFlags{
         vk::DescriptorBindingFlagBits::ePartiallyBound
         | vk::DescriptorBindingFlagBits::eUpdateAfterBind};
     vk::DescriptorSetLayoutBindingFlagsCreateInfo bindlessBindingFlagsInfo{};
     bindlessBindingFlagsInfo.setBindingFlags(bindlessBindingFlags);
+    if (updateAfterBind) {
+        descriptorSetLayoutInfo.setFlags(
+            vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
+        descriptorSetLayoutInfo.setPNext(&bindlessBindingFlagsInfo);
+    }
 
-    vk::DescriptorSetLayoutCreateInfo bindlesssDescriptorSetLayoutInfo{};
-    bindlesssDescriptorSetLayoutInfo.setBindings(bindlessBindings);
-    bindlesssDescriptorSetLayoutInfo.setFlags(
-        vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
-    bindlesssDescriptorSetLayoutInfo.setPNext(bindlessBindingFlagsInfo);
-
-    vk::DescriptorSetLayoutCreateInfo rtDescriptorSetLayoutInfo{};
-    rtDescriptorSetLayoutInfo.setBindings(rtBindings);
-
-    vk::DescriptorSetLayout bindlessDescriptorSetLayout = device.createDescriptorSetLayout(
-        bindlesssDescriptorSetLayoutInfo);
-
-    vk::DescriptorSetLayout rtDescriptorSetLayout = device.createDescriptorSetLayout(
-        rtDescriptorSetLayoutInfo);
-
-    return std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout>(bindlessDescriptorSetLayout,
-                                                                       rtDescriptorSetLayout);
+    return device.createDescriptorSetLayout(descriptorSetLayoutInfo);
 }
 
-std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>>
-DescHelper::allocate_descriptor_sets(
-    const std::pair<vk::DescriptorSetLayout, vk::DescriptorSetLayout> &descriptorSetLayouts,
-    const uint32_t frameOverlap)
+std::vector<vk::DescriptorSet> DescHelper::allocate_descriptor_sets(
+    const vk::DescriptorSetLayout &descriptorSetLayout, const uint32_t frameOverlap)
 {
-    std::vector<vk::DescriptorSetLayout> bindlessDescriptorSetLayouts(frameOverlap,
-                                                                      descriptorSetLayouts.first);
-    std::vector<vk::DescriptorSetLayout> rtDescriptorSetLayouts(frameOverlap,
-                                                                descriptorSetLayouts.second);
+    std::vector<vk::DescriptorSetLayout> descriptorSetLayoutPerFrame(frameOverlap,
+                                                                     descriptorSetLayout);
 
-    vk::DescriptorSetAllocateInfo allocInfoBindless{};
-    allocInfoBindless.setDescriptorPool(poolUAB);
-    allocInfoBindless.setSetLayouts(bindlessDescriptorSetLayouts);
+    vk::DescriptorSetAllocateInfo allocInfo{};
+    allocInfo.setDescriptorPool(pool);
+    allocInfo.setSetLayouts(descriptorSetLayoutPerFrame);
 
-    vk::DescriptorSetAllocateInfo allocInfoRt{};
-    allocInfoRt.setDescriptorPool(poolNonUAB);
-    allocInfoRt.setSetLayouts(rtDescriptorSetLayouts);
-
-    return std::pair<std::vector<vk::DescriptorSet>, std::vector<vk::DescriptorSet>>(
-        device.allocateDescriptorSets(allocInfoBindless),
-        device.allocateDescriptorSets(allocInfoRt));
+    return device.allocateDescriptorSets(allocInfo);
 }
 
-void DescHelper::update_descriptor_sets(const std::vector<Buffer> &uniformBuffers,
-                                        const vk::DescriptorSet &uniformSet,
-                                        const vk::AccelerationStructureKHR &tlas,
-                                        const vk::DescriptorSet &tlasSet,
-                                        const vk::ImageView &imageView,
-                                        const vk::DescriptorSet &imageSet)
+void update_descriptor_sets(const vk::Device &device,
+                            const std::optional<std::vector<Buffer> > &uniformBuffers,
+                            const std::optional<vk::DescriptorSet> &uniformSet,
+                            const std::optional<vk::AccelerationStructureKHR> &tlas,
+                            const std::optional<vk::DescriptorSet> &tlasSet,
+                            const std::optional<vk::ImageView> &imageView,
+                            const std::optional<vk::DescriptorSet> &imageSet)
 {
     std::vector<vk::WriteDescriptorSet> descriptorWrites{};
     // Add all the buffers to a single descriptor write
     std::vector<vk::DescriptorBufferInfo> bufferInfos;
-    bufferInfos.reserve(uniformBuffers.size());
-    for (const Buffer &b : uniformBuffers) {
-        vk::DescriptorBufferInfo bufferInfo{};
-        bufferInfo.setBuffer(b.buffer);
-        bufferInfo.setOffset(0);
-        bufferInfo.setRange(b.allocationInfo.size);
-        bufferInfos.emplace_back(bufferInfo);
-    }
-    // A single descriptor write.
-    // In principle, we can have multiple and still update everything in a batch
-    vk::WriteDescriptorSet unifomWrite{};
-    unifomWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
-    unifomWrite.setDstSet(uniformSet);
-    unifomWrite.setDstBinding(BINDING_UNIFORM);
-    unifomWrite.setDstArrayElement(0);
-    unifomWrite.setBufferInfo(bufferInfos);
-    if (uniformSet)
+    bufferInfos.reserve(uniformBuffers.value().size());
+    if (uniformBuffers.has_value() && uniformSet.has_value()) {
+        for (const Buffer &b : uniformBuffers.value()) {
+            vk::DescriptorBufferInfo bufferInfo{};
+            bufferInfo.setBuffer(b.buffer);
+            bufferInfo.setOffset(0);
+            bufferInfo.setRange(b.allocationInfo.size);
+            bufferInfos.emplace_back(bufferInfo);
+        }
+        // A single descriptor write.
+        // In principle, we can have multiple and still update everything in a batch
+        vk::WriteDescriptorSet unifomWrite{};
+        unifomWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+        unifomWrite.setDstSet(uniformSet.value());
+        unifomWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eUniformBuffer));
+        unifomWrite.setDstArrayElement(0);
+        unifomWrite.setBufferInfo(bufferInfos);
         descriptorWrites.push_back(unifomWrite);
+    }
 
     // Update TLAS
     vk::WriteDescriptorSetAccelerationStructureKHR tlasWriteKHR{};
-    tlasWriteKHR.setAccelerationStructures(tlas);
     vk::WriteDescriptorSet tlasWrite{};
-    tlasWrite.setPNext(&tlasWriteKHR);
-    tlasWrite.setDescriptorType(vk::DescriptorType::eAccelerationStructureKHR);
-    tlasWrite.setDstSet(tlasSet);
-    tlasWrite.setDstBinding(BINDING_TLAS);
-    if (tlasSet)
+    if (tlas.has_value() && tlasSet.has_value()) {
+        tlasWriteKHR.setAccelerationStructures(tlas.value());
+        tlasWrite.setPNext(&tlasWriteKHR);
+        tlasWrite.setDescriptorType(vk::DescriptorType::eAccelerationStructureKHR);
+        tlasWrite.setDstSet(tlasSet.value());
+        tlasWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eAccelerationStructureKHR));
         descriptorWrites.push_back(tlasWrite);
+    }
 
     // Update output image
     vk::DescriptorImageInfo imageInfo{};
-    imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
-    imageInfo.setImageView(imageView);
     vk::WriteDescriptorSet imageWrite{};
-    imageWrite.setPImageInfo(&imageInfo);
-    imageWrite.setDstSet(imageSet);
-    imageWrite.setDescriptorType(vk::DescriptorType::eStorageImage);
-    imageWrite.setDstBinding(BINDING_OUT_IMG);
-    if (imageSet)
+    if (imageView.has_value() && imageSet.has_value()) {
+        imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
+        imageInfo.setImageView(imageView.value());
+        imageWrite.setPImageInfo(&imageInfo);
+        imageWrite.setDstSet(imageSet.value());
+        imageWrite.setDescriptorType(vk::DescriptorType::eStorageImage);
+        imageWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eStorageImage));
         descriptorWrites.push_back(imageWrite);
+    }
 
     device.updateDescriptorSets(descriptorWrites, nullptr);
 }
