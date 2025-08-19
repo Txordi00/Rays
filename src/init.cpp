@@ -1,6 +1,7 @@
 #include "init.hpp"
 #include "loader.hpp"
 #include "rt_pipelines.hpp"
+#include "shader_binding_tables.hpp"
 #include "utils.hpp"
 
 #include <SDL3/SDL_vulkan.h>
@@ -30,6 +31,7 @@ Init::Init()
     load_meshes();
     init_descriptors();
     init_pipelines();
+    create_sbt();
     init_imgui();
 
     isInitialized = true;
@@ -377,6 +379,12 @@ void Init::init_pipelines()
     simpleRtPipeline.pipelineLayout = rtPipelineBuilder.buildPipelineLayout(
         {rtDescriptorSetLayout, uboDescriptorSetLayout});
     simpleRtPipeline.pipeline = rtPipelineBuilder.buildPipeline(simpleRtPipeline.pipelineLayout);
+}
+
+void Init::create_sbt()
+{
+    std::unique_ptr<SbtHelper> sbtHelper = std::make_unique<SbtHelper>(device, rtProperties);
+    sbtHelper->create_shader_binding_table();
 }
 
 void Init::init_imgui()

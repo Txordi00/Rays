@@ -1,15 +1,13 @@
 #pragma once
-#include "types.hpp"
-#include <unordered_map>
-
-#pragma once
 #ifndef USE_CXX20_MODULES
 #include <vulkan/vulkan.hpp>
 #else
 import vulkan_hpp;
 #endif
+#include "types.hpp"
+#include <unordered_map>
 
-// CHECK THESE VALUES
+// CAREFUL WITH THESE VALUES!
 const std::unordered_map<vk::DescriptorType, uint32_t> BINDING_DICT
     = {{vk::DescriptorType::eUniformBuffer, 0},
        {vk::DescriptorType::eAccelerationStructureKHR, 0},

@@ -164,6 +164,11 @@ void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer)
     vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
 }
 
+uint32_t align_up(uint32_t x, uint32_t a)
+{
+    return uint32_t((x + (uint32_t(a) - 1)) & ~uint32_t(a - 1));
+}
+
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,

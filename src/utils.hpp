@@ -40,8 +40,9 @@ glm::mat4 get_perspective_projection(const float fovy,
                                      const float near,
                                      const float far);
 
-namespace init {
+uint32_t align_up(uint32_t x, uint32_t a);
 
+namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
                                       const vk::Extent3D &extent);

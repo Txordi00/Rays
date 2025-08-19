@@ -83,6 +83,7 @@ private:
     void init_sync_structures();
     void init_descriptors();
     void init_pipelines();
+    void create_sbt();
     void init_imgui();
     void load_meshes();
     void init_rt();
