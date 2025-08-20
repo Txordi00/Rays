@@ -10,15 +10,18 @@ class SbtHelper
 {
 public:
     SbtHelper(const vk::Device &device,
+              const VmaAllocator &allocator,
               const vk::PhysicalDeviceRayTracingPipelinePropertiesKHR &rtProperties)
         : device{device}
+        , allocator{allocator}
         , rtProperties{rtProperties}
     {}
     ~SbtHelper() = default;
 
-    Buffer create_shader_binding_table();
+    Buffer create_shader_binding_table(const vk::Pipeline &rtPipeline);
 
 private:
     const vk::Device &device;
+    const VmaAllocator &allocator;
     const vk::PhysicalDeviceRayTracingPipelinePropertiesKHR &rtProperties;
 };

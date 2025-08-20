@@ -383,8 +383,11 @@ void Init::init_pipelines()
 
 void Init::create_sbt()
 {
-    std::unique_ptr<SbtHelper> sbtHelper = std::make_unique<SbtHelper>(device, rtProperties);
-    sbtHelper->create_shader_binding_table();
+    std::unique_ptr<SbtHelper> sbtHelper = std::make_unique<SbtHelper>(device,
+                                                                       allocator,
+                                                                       rtProperties);
+    Buffer sbtBuffer = sbtHelper->create_shader_binding_table(simpleRtPipeline.pipeline);
+    utils::destroy_buffer(allocator, sbtBuffer);
 }
 
 void Init::init_imgui()
