@@ -9,7 +9,7 @@ import vulkan_hpp;
 
 // CAREFUL WITH THESE VALUES!
 const std::unordered_map<vk::DescriptorType, uint32_t> BINDING_DICT
-    = {{vk::DescriptorType::eUniformBuffer, 0},
+    = {{vk::DescriptorType::eUniformBuffer, 2},
        {vk::DescriptorType::eAccelerationStructureKHR, 0},
        {vk::DescriptorType::eStorageImage, 1}};
 

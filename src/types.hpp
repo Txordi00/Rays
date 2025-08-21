@@ -115,9 +115,10 @@ struct MeshPush
 struct RayPush
 {
     glm::vec4 clearColor;
-    glm::vec3 lightPosition;
-    float lightIntensity;
-    uint32_t lightType;
+    uint32_t numObjects;
+    // glm::vec3 lightPosition;
+    // float lightIntensity;
+    // uint32_t lightType;
 };
 
 // push constants for our mesh object draws

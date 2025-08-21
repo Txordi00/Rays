@@ -157,10 +157,10 @@ vk::Pipeline GraphicsPipelineBuilder::buildPipeline(const vk::Device &device)
     vk::Pipeline pipeline;
     try {
         std::tie(res, pipeline) = device.createGraphicsPipeline(nullptr, pipelineInfo);
+        VK_CHECK_RES(res);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
-    VK_CHECK_RES(res);
 
     return pipeline;
 }
@@ -171,7 +171,7 @@ SimplePipelineData get_simple_mesh_pipeline(
     const vk::Format &depthImageFormat,
     const std::vector<vk::DescriptorSetLayout> &descriptorLayouts)
 {
-    SimplePipelineData trianglePipelineData;
+    SimplePipelineData simplePipelineData;
 
     vk::ShaderModule vertexShader = utils::load_shader(device, SIMPLE_MESH_VERT_SHADER);
     vk::ShaderModule fragmentShader = utils::load_shader(device, SIMPLE_MESH_FRAG_SHADER);
@@ -187,14 +187,14 @@ SimplePipelineData get_simple_mesh_pipeline(
     pipelineLayoutInfo.setPushConstantRanges(pushInfo);
 
     try {
-        trianglePipelineData.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
+        simplePipelineData.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
 
     GraphicsPipelineBuilder pipelineBuilder{};
     //use the triangle layout we created
-    pipelineBuilder.pipelineLayout = trianglePipelineData.pipelineLayout;
+    pipelineBuilder.pipelineLayout = simplePipelineData.pipelineLayout;
     //connecting the vertex and pixel shaders to the pipeline
     pipelineBuilder.set_shaders(vertexShader, fragmentShader);
     //it will draw triangles
@@ -217,12 +217,12 @@ SimplePipelineData get_simple_mesh_pipeline(
     pipelineBuilder.set_depth_format(depthImageFormat);
 
     try {
-        trianglePipelineData.pipeline = pipelineBuilder.buildPipeline(device);
+        simplePipelineData.pipeline = pipelineBuilder.buildPipeline(device);
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
     device.destroyShaderModule(vertexShader);
     device.destroyShaderModule(fragmentShader);
 
-    return trianglePipelineData;
+    return simplePipelineData;
 }

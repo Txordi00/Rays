@@ -369,10 +369,11 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     cmd.bindDescriptorSets2(bindSetsInfo);
 
     RayPush push{};
-    push.clearColor = glm::vec4(0.f);
-    push.lightIntensity = 1.f;
-    push.lightPosition = glm::vec3(0.f, -2.f, 2.f);
-    push.lightType = 0;
+    push.clearColor = glm::vec4(0.f, 0.5f, 1.f, 1.f);
+    push.numObjects = I->models.size();
+    // push.lightIntensity = 1.f;
+    // push.lightPosition = glm::vec3(0.f, -2.f, 2.f);
+    // push.lightType = 0;
     vk::PushConstantsInfo pushInfo{};
     pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR
@@ -381,6 +382,16 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     pushInfo.setValues<RayPush>(push);
     pushInfo.setOffset(0);
     cmd.pushConstants2(pushInfo);
+
+    camera.update();
+    for (int objId = 0; objId < I->models.size(); objId++) {
+        glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix * I->models[objId]->modelMatrix;
+
+        UniformData uboData;
+        uboData.worldMatrix = mvpMatrix;
+
+        utils::map_to_buffer(uniformBuffers[objId], &uboData);
+    }
 
     update_descriptor_sets(I->device,
                            uniformBuffers,

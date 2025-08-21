@@ -342,8 +342,7 @@ void Init::init_descriptors()
                                       frameOverlap);
     descHelperUAB->create_descriptor_pool();
     descHelperUAB->add_binding(vk::DescriptorType::eUniformBuffer,
-                               vk::ShaderStageFlagBits::eVertex
-                                   | vk::ShaderStageFlagBits::eRaygenKHR);
+                               vk::ShaderStageFlagBits::eRaygenKHR);
     uboDescriptorSetLayout = descHelperUAB->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
@@ -375,16 +374,17 @@ void Init::init_descriptors()
 
 void Init::init_pipelines()
 {
-    simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
-                                                          imageDraw.format,
-                                                          imageDepth.format,
-                                                          {uboDescriptorSetLayout});
+    // simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
+    //                                                       imageDraw.format,
+    //                                                       imageDepth.format,
+    //                                                       {uboDescriptorSetLayout});
 
     RtPipelineBuilder rtPipelineBuilder{device};
     rtPipelineBuilder.create_shader_stages();
     rtPipelineBuilder.create_shader_groups();
-    simpleRtPipeline.pipelineLayout = rtPipelineBuilder.buildPipelineLayout(
-        {rtDescriptorSetLayout, uboDescriptorSetLayout});
+    std::vector<vk::DescriptorSetLayout> descLayouts = {rtDescriptorSetLayout,
+                                                        uboDescriptorSetLayout};
+    simpleRtPipeline.pipelineLayout = rtPipelineBuilder.buildPipelineLayout(descLayouts);
     simpleRtPipeline.pipeline = rtPipelineBuilder.buildPipeline(simpleRtPipeline.pipelineLayout);
 }
 
