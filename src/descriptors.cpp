@@ -123,6 +123,7 @@ void update_descriptor_sets(const vk::Device &device,
     if (tlas.has_value() && tlasSet.has_value()) {
         tlasWriteKHR.setAccelerationStructures(tlas.value());
         tlasWrite.setPNext(&tlasWriteKHR);
+        tlasWrite.setDescriptorCount(1);
         tlasWrite.setDescriptorType(vk::DescriptorType::eAccelerationStructureKHR);
         tlasWrite.setDstSet(tlasSet.value());
         tlasWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eAccelerationStructureKHR));
@@ -135,7 +136,7 @@ void update_descriptor_sets(const vk::Device &device,
     if (imageView.has_value() && imageSet.has_value()) {
         imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
         imageInfo.setImageView(imageView.value());
-        imageWrite.setPImageInfo(&imageInfo);
+        imageWrite.setImageInfo(imageInfo);
         imageWrite.setDstSet(imageSet.value());
         imageWrite.setDescriptorType(vk::DescriptorType::eStorageImage);
         imageWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eStorageImage));

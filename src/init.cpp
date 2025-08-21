@@ -1,7 +1,7 @@
 #include "init.hpp"
+#include "acceleration_structures.hpp"
 #include "loader.hpp"
 #include "rt_pipelines.hpp"
-#include "shader_binding_tables.hpp"
 #include "utils.hpp"
 
 #include <SDL3/SDL_vulkan.h>
@@ -29,6 +29,7 @@ Init::Init()
     init_commands();
     init_sync_structures();
     load_meshes();
+    create_as();
     init_descriptors();
     init_pipelines();
     create_sbt();
@@ -46,6 +47,10 @@ void Init::clean()
         for (auto &m : models) {
             m->destroyBuffers();
         }
+        utils::destroy_buffer(allocator, rtSBTBuffer);
+        utils::destroy_buffer(allocator, tlas.buffer);
+        device.destroyAccelerationStructureKHR(tlas.AS);
+
         device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
         device.destroyPipelineLayout(simpleRtPipeline.pipelineLayout);
@@ -218,7 +223,7 @@ void Init::create_draw_data()
     vk::Extent3D drawExtent{swapchainExtent, 1};
 
     // Overkill format
-    imageDraw.format = vk::Format::eR16G16B16A16Sfloat;
+    imageDraw.format = vk::Format::eR32G32B32A32Sfloat;
     imageDraw.extent = drawExtent;
 
     // We should be able to erase Storage if we get rid of the background compute pipeline
@@ -343,7 +348,7 @@ void Init::init_descriptors()
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
     for (int i = 0; i < setsUAB.size(); i++)
-        frames[i].descriptorSet = setsUAB[i];
+        frames[i].descriptorSetUAB = setsUAB[i];
 
     descHelperRt = std::make_unique<DescHelper>(device,
                                                 physicalDeviceProperties,
@@ -364,6 +369,8 @@ void Init::init_descriptors()
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt
         = descHelperRt->allocate_descriptor_sets(rtDescriptorSetLayout, frameOverlap);
+    for (int i = 0; i < setsRt.size(); i++)
+        frames[i].descriptorSetRt = setsRt[i];
 }
 
 void Init::init_pipelines()
@@ -383,11 +390,8 @@ void Init::init_pipelines()
 
 void Init::create_sbt()
 {
-    std::unique_ptr<SbtHelper> sbtHelper = std::make_unique<SbtHelper>(device,
-                                                                       allocator,
-                                                                       rtProperties);
-    Buffer sbtBuffer = sbtHelper->create_shader_binding_table(simpleRtPipeline.pipeline);
-    utils::destroy_buffer(allocator, sbtBuffer);
+    sbtHelper = std::make_unique<SbtHelper>(device, allocator, rtProperties);
+    rtSBTBuffer = sbtHelper->create_shader_binding_table(simpleRtPipeline.pipeline);
 }
 
 void Init::init_imgui()
@@ -461,6 +465,16 @@ void Init::load_meshes()
         models[i] = std::make_shared<Model>(*cpuMeshes[i], allocator);
         models[i]->createGpuMesh(device, cmdTransfer, transferFence, transferQueue);
     }
+}
+
+void Init::create_as()
+{
+    std::unique_ptr<ASBuilder> asBuilder = std::make_unique<ASBuilder>(device,
+                                                                       allocator,
+                                                                       graphicsQueueFamilyIndex,
+                                                                       asProperties);
+
+    tlas = asBuilder->buildTLAS(models);
 }
 
 void Init::destroy_swapchain()

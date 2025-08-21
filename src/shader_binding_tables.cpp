@@ -18,10 +18,6 @@ Buffer SbtHelper::create_shader_binding_table(const vk::Pipeline &rtPipeline)
     uint32_t handleSizeAligned = utils::align_up(handleSize,
                                                  rtProperties.shaderGroupHandleAlignment);
 
-    vk::StridedDeviceAddressRegionKHR rgenRegion{};
-    vk::StridedDeviceAddressRegionKHR missRegion{};
-    vk::StridedDeviceAddressRegionKHR hitRegion{};
-
     rgenRegion.setStride(utils::align_up(handleSizeAligned, rtProperties.shaderGroupBaseAlignment));
     // The size member of pRayGenShaderBindingTable must be equal to its stride member
     rgenRegion.setSize(rgenRegion.stride);

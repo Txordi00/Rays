@@ -20,6 +20,10 @@ public:
 
     Buffer create_shader_binding_table(const vk::Pipeline &rtPipeline);
 
+    vk::StridedDeviceAddressRegionKHR rgenRegion;
+    vk::StridedDeviceAddressRegionKHR missRegion;
+    vk::StridedDeviceAddressRegionKHR hitRegion;
+
 private:
     const vk::Device &device;
     const VmaAllocator &allocator;

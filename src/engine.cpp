@@ -16,6 +16,10 @@ import vulkan_hpp;
 Engine::Engine()
 {
     I = std::make_unique<Init>();
+    uniformBuffers.reserve(I->models.size());
+    std::ranges::transform(I->models,
+                           std::back_inserter(uniformBuffers),
+                           [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
 }
 
 Engine::~Engine()
@@ -160,30 +164,25 @@ void Engine::draw()
     commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     cmd.begin(commandBufferBeginInfo);
 
-    // Make the draw image into writeable mode before rendering
-    // utils::transition_image(cmd,
-    //                         I->imageDraw.image,
-    //                         vk::ImageLayout::eUndefined,
-    //                         vk::ImageLayout::eGeneral);
-    // Draw into the draw image
-    // change_background(cmd);
-
     utils::transition_image(cmd,
                             I->imageDraw.image,
                             vk::ImageLayout::eUndefined,
-                            vk::ImageLayout::eColorAttachmentOptimal);
+                            vk::ImageLayout::eGeneral);
+    // vk::ImageLayout::eColorAttachmentOptimal);
 
     utils::transition_image(cmd,
                             I->imageDepth.image,
                             vk::ImageLayout::eUndefined,
                             vk::ImageLayout::eDepthAttachmentOptimal);
 
-    draw_meshes(cmd);
+    // draw_meshes(cmd);
+    raytrace(cmd);
 
     // Transition the draw image to be sent and the swapchain image to receive it
     utils::transition_image(cmd,
                             I->imageDraw.image,
-                            vk::ImageLayout::eColorAttachmentOptimal,
+                            // vk::ImageLayout::eColorAttachmentOptimal,
+                            vk::ImageLayout::eGeneral,
                             vk::ImageLayout::eTransferSrcOptimal);
     utils::transition_image(cmd,
                             I->swapchainImages[swapchainImageIndex],
@@ -291,7 +290,7 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, I->simpleMeshGraphicsPipeline.pipeline);
 
-        vk::DescriptorSet descriptorSet = get_current_frame().descriptorSet;
+        vk::DescriptorSet descriptorSet = get_current_frame().descriptorSetUAB;
 
         vk::BindDescriptorSetsInfo descSetsInfo{};
         descSetsInfo.setDescriptorSets(descriptorSet);
@@ -311,12 +310,6 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
             utils::map_to_buffer(I->models[objId]->uniformBuffer, &uboData);
         }
 
-        // Efficiently create a vector of all the uniform buffers
-        std::vector<Buffer> uniformBuffers;
-        uniformBuffers.reserve(I->models.size());
-        std::ranges::transform(I->models,
-                               std::back_inserter(uniformBuffers),
-                               [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
         // Update all the descriptors in a batch, one per uniform buffer.
         update_descriptor_sets(I->device, uniformBuffers, descriptorSet);
 
@@ -354,6 +347,56 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
+}
+
+void Engine::raytrace(const vk::CommandBuffer &cmd)
+{
+    cmd.bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, I->simpleRtPipeline.pipeline);
+
+    vk::DescriptorSet descriptorSetUniform = get_current_frame().descriptorSetUAB;
+    vk::DescriptorSet descriptorSetRt = get_current_frame().descriptorSetRt;
+    vk::ImageView imageView = I->imageDraw.imageView;
+
+    std::vector<vk::DescriptorSet> descriptorSets = {descriptorSetRt, descriptorSetUniform};
+    vk::BindDescriptorSetsInfo bindSetsInfo{};
+    bindSetsInfo.setDescriptorSets(descriptorSets);
+    bindSetsInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR
+                               | vk::ShaderStageFlagBits::eClosestHitKHR
+                               | vk::ShaderStageFlagBits::eMissKHR);
+    bindSetsInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
+    bindSetsInfo.setFirstSet(0);
+
+    cmd.bindDescriptorSets2(bindSetsInfo);
+
+    RayPush push{};
+    push.clearColor = glm::vec4(0.f);
+    push.lightIntensity = 1.f;
+    push.lightPosition = glm::vec3(0.f, -2.f, 2.f);
+    push.lightType = 0;
+    vk::PushConstantsInfo pushInfo{};
+    pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
+    pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR
+                           | vk::ShaderStageFlagBits::eClosestHitKHR
+                           | vk::ShaderStageFlagBits::eMissKHR);
+    pushInfo.setValues<RayPush>(push);
+    pushInfo.setOffset(0);
+    cmd.pushConstants2(pushInfo);
+
+    update_descriptor_sets(I->device,
+                           uniformBuffers,
+                           descriptorSetUniform,
+                           I->tlas.AS,
+                           descriptorSetRt,
+                           imageView,
+                           descriptorSetRt);
+
+    cmd.traceRaysKHR(I->sbtHelper->rgenRegion,
+                     I->sbtHelper->missRegion,
+                     I->sbtHelper->hitRegion,
+                     vk::StridedDeviceAddressRegionKHR{},
+                     I->swapchainExtent.width,
+                     I->swapchainExtent.height,
+                     1);
 }
 
 void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView)

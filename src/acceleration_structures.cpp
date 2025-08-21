@@ -270,9 +270,9 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Mod
 {
     blases.clear();
     blases.reserve(models.size());
-    for (const auto &m : models) {
+    for (const auto &m : models)
         blases.emplace_back(buildBLAS(m));
-    }
+
     return buildTLAS(blases);
 }
 

@@ -34,6 +34,9 @@ private:
     // void change_background(const vk::CommandBuffer &cmd);
     void draw_meshes(const vk::CommandBuffer &cmd);
 
+    // Ray tracing commands
+    void raytrace(const vk::CommandBuffer &cmd);
+
     // Imgui
     void draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &imageView);
 
@@ -46,4 +49,8 @@ private:
     uint32_t swapchainImageIndex{0};
     bool stopRendering{false};
     // int currentBackgroundPipelineIndex{1};
+
+    // Frame data
+    // Efficiently create a vector of all the uniform buffers
+    std::vector<Buffer> uniformBuffers;
 };

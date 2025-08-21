@@ -64,7 +64,8 @@ struct FrameData
     vk::CommandBuffer mainCommandBuffer;
     vk::Semaphore renderSemaphore;
     vk::Fence renderFence;
-    vk::DescriptorSet descriptorSet;
+    vk::DescriptorSet descriptorSetUAB;
+    vk::DescriptorSet descriptorSetRt;
 };
 
 struct ImageData

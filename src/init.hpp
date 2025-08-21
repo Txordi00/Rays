@@ -1,7 +1,9 @@
 #pragma once
+#include "acceleration_structures.hpp"
 #include "descriptors.hpp"
 #include "model.hpp"
 #include "raster_pipelines.hpp"
+#include "shader_binding_tables.hpp"
 #include "types.hpp"
 #include <SDL3/SDL.h>
 #include <memory>
@@ -69,6 +71,9 @@ public:
     // Ray tracing
     vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtProperties{};
     vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties{};
+    AccelerationStructure tlas;
+    Buffer rtSBTBuffer;
+    std::unique_ptr<SbtHelper> sbtHelper;
 
     // Meshes
     std::vector<std::shared_ptr<Model>> models;
@@ -78,6 +83,7 @@ public:
 private:
     // Initialization calls
     void init_vulkan();
+    void init_rt();
     void create_draw_data();
     void init_commands();
     void init_sync_structures();
@@ -86,7 +92,7 @@ private:
     void create_sbt();
     void init_imgui();
     void load_meshes();
-    void init_rt();
+    void create_as();
 
     void destroy_swapchain();
 };
