@@ -4,6 +4,7 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_LEFT_HANDED
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include "types.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
@@ -31,8 +32,14 @@ public:
 
     void update();
 
+    void create_camera_storage_buffer(const VmaAllocator &allocator);
+    void destroy_camera_storage_buffer(const VmaAllocator &allocator);
+
     glm::mat4 viewMatrix{1.f};
     glm::vec3 orientation{0, 0, 1};
     glm::vec3 translation{0.f};
     glm::mat4 projMatrix{1.f};
+
+    Buffer cameraBuffer;
+    CameraData cameraData{};
 };

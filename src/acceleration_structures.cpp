@@ -131,7 +131,6 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
     submitInfo.setCommandBufferInfos(cmdInfo);
     queue.submit2(submitInfo, asFence);
-    // queue.waitIdle();
 
     // 9. scratch buffer can be destroyed after queue finishes
     utils::destroy_buffer(allocator, scratchBuffer);
@@ -140,21 +139,24 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 }
 
 // NEED TO OPTIMIZE: Do instances of a single model.
-AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructure> &blases)
+AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructure> &blases,
+                                           const std::vector<glm::mat3x4> &transforms)
 {
+    assert(blases.size() == transforms.size());
     VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
     device.resetFences(asFence);
 
     std::vector<vk::AccelerationStructureInstanceKHR> instances;
     instances.reserve(blases.size());
-    for (const AccelerationStructure &b : blases) {
+    for (int i = 0; i < blases.size(); i++) {
+        glm::mat3x4 transformGlm = transforms[i];
+        AccelerationStructure blas = blases[i];
         vk::AccelerationStructureInstanceKHR tlas{};
-        glm::mat3x4 idGlm(1.f);
-        vk::TransformMatrixKHR idVk;
-        memcpy(&idVk, glm::value_ptr(idGlm), sizeof(vk::TransformMatrixKHR));
-        tlas.setTransform(idVk);
+        vk::TransformMatrixKHR transformVk;
+        memcpy(&transformVk, glm::value_ptr(transformGlm), sizeof(vk::TransformMatrixKHR));
+        tlas.setTransform(transformVk);
         tlas.setInstanceCustomIndex(0); // gl_InstanceCustomIndexEXT
-        tlas.setAccelerationStructureReference(b.addr);
+        tlas.setAccelerationStructureReference(blas.addr);
         tlas.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
         tlas.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
         tlas.setInstanceShaderBindingTableRecordOffset(
@@ -266,14 +268,15 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
     return AccelerationStructure{.AS = tlas, .buffer = tlasBuffer};
 }
 
-AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Model> > &models)
+AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Model> > &models,
+                                           const std::vector<glm::mat3x4> &transforms)
 {
     blases.clear();
     blases.reserve(models.size());
     for (const auto &m : models)
         blases.emplace_back(buildBLAS(m));
 
-    return buildTLAS(blases);
+    return buildTLAS(blases, transforms);
 }
 
 void ASBuilder::init()

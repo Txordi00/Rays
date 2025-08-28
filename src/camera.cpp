@@ -1,6 +1,6 @@
 #include "camera.hpp"
+#include "utils.hpp"
 #include <glm/ext.hpp>
-
 
 void Camera::setProjMatrix(
     const float &fov, const float &w, const float &h, const float &near, const float &far)
@@ -67,4 +67,29 @@ void Camera::lookLeft(const float &dx)
 void Camera::update()
 {
     viewMatrix = glm::lookAt(translation, translation + orientation, glm::vec3(0, 1, 0));
+    if (cameraBuffer.buffer) {
+        cameraData.origin = translation;
+        cameraData.orientation = orientation;
+        utils::map_to_buffer(cameraBuffer, &cameraData);
+    }
+}
+
+void Camera::create_camera_storage_buffer(const VmaAllocator &allocator)
+{
+    cameraBuffer = utils::create_buffer(allocator,
+                                        sizeof(CameraData),
+                                        vk::BufferUsageFlagBits::eUniformBuffer,
+                                        VMA_MEMORY_USAGE_AUTO,
+                                        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                            | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    cameraData.origin = translation;
+    cameraData.orientation = orientation;
+
+    utils::map_to_buffer(cameraBuffer, &cameraData);
+}
+
+void Camera::destroy_camera_storage_buffer(const VmaAllocator &allocator)
+{
+    utils::destroy_buffer(allocator, cameraBuffer);
 }

@@ -4,13 +4,25 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 
-layout(scalar, binding = 2) uniform Ubo{
+layout(scalar, binding = 0, set = 1) uniform Ubo{
   mat4 worldMatrix;
 } ubo[];
+
+layout(scalar, binding = 2, set = 0) uniform CameraData{
+  vec3 origin;
+  vec3 orientation;
+} camera;
+
+
+struct hitPayload
+{
+  vec3 hitValue;
+};
+
+layout(location = 0) rayPayloadEXT hitPayload rayPayload;
 
 //push constants block
 layout(scalar, push_constant) uniform constants
@@ -19,11 +31,43 @@ layout(scalar, push_constant) uniform constants
     uint numObjects;
 } push;
 
+// const vec3 origin = vec3(0., 0., -10.);
+const float Ft = 0.700207531;
 
+const uint rayFlags = gl_RayFlagsOpaqueEXT;
+const float tMin = 0.001;
+const float tMax = 10000.;
 
 void main() 
 {
-    mat4 worldMatrix = ubo[0].worldMatrix;
-    vec4 color = worldMatrix * push.clearColor;
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(color.xyz, 1.));
+    const float h = gl_LaunchSizeEXT.y;
+    const float w = gl_LaunchSizeEXT.x;
+    const float i = gl_LaunchIDEXT.y;
+    const float j = gl_LaunchIDEXT.x;
+    const float hm1 = h - 1.;
+    const float wm1 = w - 1.;
+    const float arFt = (w / h) * Ft;
+
+    float y = (-1. + 2. * (i + 0.5f) / hm1) * Ft;
+    float x = (-1. + 2. * (j + 0.5f) / wm1) * arFt;
+
+    vec3 direction = normalize(vec3(x, y, 0.) + camera.orientation);
+
+    vec3 origin = camera.origin;
+    // vec3 direction = camera.orientation;
+
+    traceRayEXT(topLevelAS, // acceleration structure
+      rayFlags, // rayFlags
+      0xFF, // cullMask
+      0, // sbtRecordOffset
+      0, // sbtRecordStride
+      0, // missIndex
+      origin, // ray origin
+      tMin, // ray min range
+      direction, // ray direction
+      tMax, // ray max range
+      0 // payload (location = 0)
+    );
+
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(rayPayload.hitValue, 1.));
 }

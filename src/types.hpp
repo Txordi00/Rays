@@ -31,6 +31,8 @@ import vulkan_hpp;
 
 const unsigned int W = 1000;
 const unsigned int H = 1000;
+const float F = 1.f; // focal length
+const float FOV = glm::radians(70.f);
 #define PROJNAME "LRT"
 const unsigned int API_VERSION[3] = {1, 4, 0};
 
@@ -125,6 +127,13 @@ struct RayPush
 struct UniformData
 {
     glm::mat4 worldMatrix;
+};
+
+// camera data for the storage buffer
+struct CameraData
+{
+    glm::vec3 origin = glm::vec3(0.f);     // origin
+    glm::vec3 orientation = glm::vec3(0.f, 0.f, 1.f);
 };
 
 struct ComputePipelineData

@@ -6,6 +6,7 @@
 
 #include <SDL3/SDL_vulkan.h>
 #include <VkBootstrap.h>
+#include <glm/ext/matrix_transform.hpp>
 #define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
@@ -341,8 +342,10 @@ void Init::init_descriptors()
                                                              static_cast<uint32_t>(models.size())},
                                       frameOverlap);
     descHelperUAB->create_descriptor_pool();
-    descHelperUAB->add_binding(vk::DescriptorType::eUniformBuffer,
-                               vk::ShaderStageFlagBits::eRaygenKHR);
+    descHelperUAB->add_binding(
+        Binding{vk::DescriptorType::eUniformBuffer,
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eRaygenKHR,
+                0});
     uboDescriptorSetLayout = descHelperUAB->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
@@ -359,12 +362,19 @@ void Init::init_descriptors()
                              frameOverlap);
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
                                      frameOverlap);
+    descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1},
+                                     frameOverlap);
+    descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
+                                     frameOverlap);
     descHelperRt->create_descriptor_pool();
-    descHelperRt->add_binding(vk::DescriptorType::eAccelerationStructureKHR,
-                              vk::ShaderStageFlagBits::eRaygenKHR
-                                  | vk::ShaderStageFlagBits::eClosestHitKHR);
-    descHelperRt->add_binding(vk::DescriptorType::eStorageImage,
-                              vk::ShaderStageFlagBits::eRaygenKHR);
+    descHelperRt->add_binding(
+        Binding{vk::DescriptorType::eAccelerationStructureKHR,
+                vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
+                0});
+    descHelperRt->add_binding(
+        Binding{vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eRaygenKHR, 1});
+    descHelperRt->add_binding(
+        Binding{vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eRaygenKHR, 2});
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt
         = descHelperRt->allocate_descriptor_sets(rtDescriptorSetLayout, frameOverlap);
@@ -374,10 +384,10 @@ void Init::init_descriptors()
 
 void Init::init_pipelines()
 {
-    // simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
-    //                                                       imageDraw.format,
-    //                                                       imageDepth.format,
-    //                                                       {uboDescriptorSetLayout});
+    simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
+                                                          imageDraw.format,
+                                                          imageDepth.format,
+                                                          {uboDescriptorSetLayout});
 
     RtPipelineBuilder rtPipelineBuilder{device};
     rtPipelineBuilder.create_shader_stages();
@@ -463,8 +473,12 @@ void Init::load_meshes()
     models.resize(cpuMeshes.size());
     for (int i = 0; i < cpuMeshes.size(); i++) {
         models[i] = std::make_shared<Model>(*cpuMeshes[i], allocator);
-        models[i]->createGpuMesh(device, cmdTransfer, transferFence, transferQueue);
+        models[i]->createGpuMesh(device, cmdTransfer, transferFence, transferQueue);        
     }
+
+    models[0]->position = glm::vec3(-5.f, 0.f, 7.f);
+    models[1]->position = glm::vec3(5.f, 0.f, 7.f);
+    models[2]->position = glm::vec3(0.f, 0.f, 7.f);
 }
 
 void Init::create_as()
@@ -473,8 +487,12 @@ void Init::create_as()
                                                                        allocator,
                                                                        graphicsQueueFamilyIndex,
                                                                        asProperties);
+    std::vector<glm::mat3x4> transforms(models.size());
+    for (int i = 0; i < models.size(); i++)
+        transforms[i] = glm::mat3x4(
+            glm::transpose(glm::translate(glm::mat4(1.f), models[i]->position)));
 
-    tlas = asBuilder->buildTLAS(models);
+    tlas = asBuilder->buildTLAS(models, transforms);
 }
 
 void Init::destroy_swapchain()

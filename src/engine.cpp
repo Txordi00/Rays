@@ -9,6 +9,7 @@ import vulkan_hpp;
 #include "types.hpp"
 #include "utils.hpp"
 #include <algorithm>
+#include <glm/ext.hpp>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
 #include <thread>
@@ -24,6 +25,7 @@ Engine::Engine()
 
 Engine::~Engine()
 {
+    camera.destroy_camera_storage_buffer(I->allocator);
     I->clean();
 }
 
@@ -32,24 +34,16 @@ void Engine::run()
     SDL_Event e;
     bool quit = false;
 
-    camera.setProjMatrix(glm::radians(70.f),
+    camera.setProjMatrix(FOV,
                          static_cast<float>(I->swapchainExtent.width),
                          static_cast<float>(I->swapchainExtent.height),
                          0.01f,
                          100.f);
+    camera.create_camera_storage_buffer(I->allocator);
     const float dx = 0.5f;
     const float dt = glm::radians(2.f);
-    I->models[0]->position = glm::vec3(-5.f, 0.f, 7.f);
-    I->models[1]->position = glm::vec3(5.f, 0.f, 7.f);
-    I->models[2]->position = glm::vec3(0.f, 0.f, 7.f);
     for (const auto &m : I->models)
         m->updateModelMatrix();
-
-    ASBuilder asBuilder{I->device, I->allocator, I->graphicsQueueFamilyIndex, I->asProperties};
-    auto tlas = asBuilder.buildTLAS(I->models);
-
-    I->device.destroyAccelerationStructureKHR(tlas.AS);
-    utils::destroy_buffer(I->allocator, tlas.buffer);
 
     int numKeys;
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);
@@ -311,7 +305,7 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         }
 
         // Update all the descriptors in a batch, one per uniform buffer.
-        update_descriptor_sets(I->device, uniformBuffers, descriptorSet);
+        update_descriptor_sets(I->device, uniformBuffers, descriptorSet, 0);
 
         for (int objId = 0; objId < I->models.size(); objId++) {
             MeshPush pushConstants;
@@ -356,6 +350,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     vk::DescriptorSet descriptorSetUniform = get_current_frame().descriptorSetUAB;
     vk::DescriptorSet descriptorSetRt = get_current_frame().descriptorSetRt;
     vk::ImageView imageView = I->imageDraw.imageView;
+    vk::AccelerationStructureKHR tlas = I->tlas.AS;
 
     std::vector<vk::DescriptorSet> descriptorSets = {descriptorSetRt, descriptorSetUniform};
     vk::BindDescriptorSetsInfo bindSetsInfo{};
@@ -393,13 +388,29 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
         utils::map_to_buffer(uniformBuffers[objId], &uboData);
     }
 
-    update_descriptor_sets(I->device,
-                           uniformBuffers,
-                           descriptorSetUniform,
-                           I->tlas.AS,
-                           descriptorSetRt,
-                           imageView,
-                           descriptorSetRt);
+    DescriptorUpdater descUpdater{I->device};
+    descUpdater.add_uniform(descriptorSetUniform, 0, uniformBuffers);
+    descUpdater.add_as(descriptorSetRt, 0, tlas);
+    descUpdater.add_image(descriptorSetRt, 1, imageView);
+    std::vector<Buffer> cameraBuffer = {camera.cameraBuffer};
+    descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
+    descUpdater.update();
+
+    // update_descriptor_sets(I->device,
+    //                        uniformBuffers,
+    //                        descriptorSetUniform,
+    //                        0,
+    //                        I->tlas.AS,
+    //                        descriptorSetRt,
+    //                        0,
+    //                        imageView,
+    //                        descriptorSetRt,
+    //                        1);
+
+    // std::vector<Buffer> cameraBuffer = {camera.cameraBuffer};
+    // update_descriptor_sets(I->device, cameraBuffer, descriptorSetRt, 2);
+
+    // std::cout << glm::to_string(camera.cameraData.orientation) << std::endl;
 
     cmd.traceRaysKHR(I->sbtHelper->rgenRegion,
                      I->sbtHelper->missRegion,

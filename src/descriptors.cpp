@@ -36,21 +36,20 @@ void DescHelper::create_descriptor_pool()
     pool = device.createDescriptorPool(poolCreateInfo);
 }
 
-void DescHelper::add_binding(const vk::DescriptorType &type,
-                             const vk::ShaderStageFlags &shaderStageFlags)
+void DescHelper::add_binding(const Binding &bind)
 {
     uint32_t maxDescriptors = 0;
     for (const auto &ps : poolSizes)
-        if (type == ps.type)
+        if (bind.type == ps.type)
             maxDescriptors = std::max(maxDescriptors, ps.descriptorCount);
 
-    vk::DescriptorSetLayoutBinding binding{};
-    binding.setBinding(BINDING_DICT.at(type));
-    binding.setDescriptorType(type);
-    binding.setDescriptorCount(maxDescriptors);
-    binding.setStageFlags(shaderStageFlags);
+    vk::DescriptorSetLayoutBinding vkBinding{};
+    vkBinding.setBinding(bind.binding);
+    vkBinding.setDescriptorType(bind.type);
+    vkBinding.setDescriptorCount(maxDescriptors);
+    vkBinding.setStageFlags(bind.shaderStageFlags);
 
-    bindings.push_back(binding);
+    bindings.push_back(vkBinding);
 }
 
 // Returns a pair (bindless ds layout, rt ds layout)
@@ -86,13 +85,18 @@ std::vector<vk::DescriptorSet> DescHelper::allocate_descriptor_sets(
     return device.allocateDescriptorSets(allocInfo);
 }
 
+// I SHOULD USE TEMPLATES HERE: vector<vk::DescriptorSet> sets, vector<uint32_t> bindings,
+// T_1...T_sets.size() setData
 void update_descriptor_sets(const vk::Device &device,
                             const std::optional<std::vector<Buffer> > &uniformBuffers,
                             const std::optional<vk::DescriptorSet> &uniformSet,
+                            const std::optional<uint32_t> uBinding,
                             const std::optional<vk::AccelerationStructureKHR> &tlas,
                             const std::optional<vk::DescriptorSet> &tlasSet,
+                            const std::optional<uint32_t> asBinding,
                             const std::optional<vk::ImageView> &imageView,
-                            const std::optional<vk::DescriptorSet> &imageSet)
+                            const std::optional<vk::DescriptorSet> &imageSet,
+                            const std::optional<uint32_t> imBinding)
 {
     std::vector<vk::WriteDescriptorSet> descriptorWrites{};
     // Add all the buffers to a single descriptor write
@@ -103,7 +107,7 @@ void update_descriptor_sets(const vk::Device &device,
             vk::DescriptorBufferInfo bufferInfo{};
             bufferInfo.setBuffer(b.buffer);
             bufferInfo.setOffset(0);
-            bufferInfo.setRange(b.allocationInfo.size);
+            bufferInfo.setRange(vk::WholeSize);
             bufferInfos.emplace_back(bufferInfo);
         }
         // A single descriptor write.
@@ -111,7 +115,7 @@ void update_descriptor_sets(const vk::Device &device,
         vk::WriteDescriptorSet unifomWrite{};
         unifomWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
         unifomWrite.setDstSet(uniformSet.value());
-        unifomWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eUniformBuffer));
+        unifomWrite.setDstBinding(uBinding.value());
         unifomWrite.setDstArrayElement(0);
         unifomWrite.setBufferInfo(bufferInfos);
         descriptorWrites.push_back(unifomWrite);
@@ -126,7 +130,7 @@ void update_descriptor_sets(const vk::Device &device,
         tlasWrite.setDescriptorCount(1);
         tlasWrite.setDescriptorType(vk::DescriptorType::eAccelerationStructureKHR);
         tlasWrite.setDstSet(tlasSet.value());
-        tlasWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eAccelerationStructureKHR));
+        tlasWrite.setDstBinding(asBinding.value());
         descriptorWrites.push_back(tlasWrite);
     }
 
@@ -139,9 +143,70 @@ void update_descriptor_sets(const vk::Device &device,
         imageWrite.setImageInfo(imageInfo);
         imageWrite.setDstSet(imageSet.value());
         imageWrite.setDescriptorType(vk::DescriptorType::eStorageImage);
-        imageWrite.setDstBinding(BINDING_DICT.at(vk::DescriptorType::eStorageImage));
+        imageWrite.setDstBinding(imBinding.value());
         descriptorWrites.push_back(imageWrite);
     }
 
     device.updateDescriptorSets(descriptorWrites, nullptr);
+}
+
+void DescriptorUpdater::add_uniform(const vk::DescriptorSet &descSet,
+                                    const uint32_t binding,
+                                    const std::vector<Buffer> &uniformBuffers)
+{ // Add all the buffers to a single descriptor write
+    bufferInfos.reserve(uniformBuffers.size());
+    for (const Buffer &b : uniformBuffers) {
+        vk::DescriptorBufferInfo bufferInfo{};
+        bufferInfo.setBuffer(b.buffer);
+        bufferInfo.setOffset(0);
+        bufferInfo.setRange(vk::WholeSize);
+        bufferInfos.push_back(bufferInfo);
+    }
+    // A single descriptor write.
+    // In principle, we can have multiple and still update everything in a batch
+    vk::WriteDescriptorSet uniformWrite{};
+    uniformWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
+    // uniformWrite.setDescriptorCount(uniformBuffers.size());
+    uniformWrite.setDstSet(descSet);
+    uniformWrite.setDstBinding(binding);
+    uniformWrite.setDstArrayElement(0);
+    uniformWrite.setBufferInfo(bufferInfos);
+    descriptorWrites.push_back(uniformWrite);
+}
+
+void DescriptorUpdater::add_as(const vk::DescriptorSet &descSet,
+                               const uint32_t binding,
+                               const vk::AccelerationStructureKHR &as)
+{ // Update TLAS
+    vk::WriteDescriptorSet tlasWrite{};
+    tlasWriteKHR.setAccelerationStructures(as);
+    tlasWrite.setPNext(&tlasWriteKHR);
+    tlasWrite.setDescriptorCount(1);
+    tlasWrite.setDescriptorType(vk::DescriptorType::eAccelerationStructureKHR);
+    tlasWrite.setDstSet(descSet);
+    tlasWrite.setDstBinding(binding);
+    descriptorWrites.push_back(tlasWrite);
+}
+
+void DescriptorUpdater::add_image(const vk::DescriptorSet &descSet,
+                                  const uint32_t binding,
+                                  const vk::ImageView &imageView)
+{
+    // Update output image
+    vk::WriteDescriptorSet imageWrite{};
+    imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
+    imageInfo.setImageView(imageView);
+    imageWrite.setImageInfo(imageInfo);
+    imageWrite.setDstSet(descSet);
+    imageWrite.setDescriptorType(vk::DescriptorType::eStorageImage);
+    imageWrite.setDstBinding(binding);
+    descriptorWrites.push_back(imageWrite);
+}
+
+void DescriptorUpdater::update()
+{
+    device.updateDescriptorSets(descriptorWrites, nullptr);
+    // bufferInfos = {};
+    // imageInfo = vk::DescriptorImageInfo{};
+    // tlasWriteKHR = vk::WriteDescriptorSetAccelerationStructureKHR{};
 }
