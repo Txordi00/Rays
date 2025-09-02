@@ -60,21 +60,13 @@ public:
 
 private:
     const vk::Device &device;
-    std::vector<vk::WriteDescriptorSet> descriptorWrites{};
 
-    // These are declared here in order to not be lost when they get out of scope
-    std::vector<vk::DescriptorBufferInfo> bufferInfos{};
-    vk::DescriptorImageInfo imageInfo{};
-    vk::WriteDescriptorSetAccelerationStructureKHR tlasWriteKHR{};
+    // We have to save all this Infos because they are accessed as an address in vk::WriteDescriptorSet,
+    // and therefore we must avoid their unallocation. vk::WriteDescriptorSet is the structure passed to device.updateDescriptorSets()
+    std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorBufferInfo>>>
+        bufferInfos{};
+    std::vector<std::tuple<vk::DescriptorSet, uint32_t, vk::DescriptorImageInfo>> imageInfos{};
+    std::vector<
+        std::tuple<vk::DescriptorSet, uint32_t, vk::WriteDescriptorSetAccelerationStructureKHR>>
+        tlasWritesKHR{};
 };
-
-void update_descriptor_sets(const vk::Device &device,
-                            const std::optional<std::vector<Buffer> > &uniformBuffers = std::nullopt,
-                            const std::optional<vk::DescriptorSet> &uniformSet = std::nullopt,
-                            const std::optional<uint32_t> uBinding = std::nullopt,
-                            const std::optional<vk::AccelerationStructureKHR> &tlas = std::nullopt,
-                            const std::optional<vk::DescriptorSet> &tlasSet = std::nullopt,
-                            const std::optional<uint32_t> asBinding = std::nullopt,
-                            const std::optional<vk::ImageView> &imageView = std::nullopt,
-                            const std::optional<vk::DescriptorSet> &imageSet = std::nullopt,
-                            const std::optional<uint32_t> imBinding = std::nullopt);

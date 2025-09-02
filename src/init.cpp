@@ -27,6 +27,7 @@ Init::Init()
     init_rt();
     create_swapchain(W, H);
     create_draw_data();
+    create_camera();
     init_commands();
     init_sync_structures();
     load_meshes();
@@ -62,6 +63,9 @@ void Init::clean()
         descHelperRt->destroy();
         device.destroyDescriptorSetLayout(uboDescriptorSetLayout);
         device.destroyDescriptorSetLayout(rtDescriptorSetLayout);
+
+        // Destroy things created in this class from here:
+        camera.destroy_camera_storage_buffer(allocator);
 
         device.destroyCommandPool(transferCmdPool);
         device.destroyFence(transferFence);
@@ -284,6 +288,17 @@ void Init::create_draw_data()
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
+}
+
+void Init::create_camera()
+{
+    camera = Camera{};
+    camera.setProjMatrix(FOV,
+                         static_cast<float>(swapchainExtent.width),
+                         static_cast<float>(swapchainExtent.height),
+                         0.01f,
+                         100.f);
+    camera.create_camera_storage_buffer(allocator);
 }
 
 void Init::init_commands()

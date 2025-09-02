@@ -25,7 +25,6 @@ Engine::Engine()
 
 Engine::~Engine()
 {
-    camera.destroy_camera_storage_buffer(I->allocator);
     I->clean();
 }
 
@@ -34,12 +33,23 @@ void Engine::run()
     SDL_Event e;
     bool quit = false;
 
-    camera.setProjMatrix(FOV,
-                         static_cast<float>(I->swapchainExtent.width),
-                         static_cast<float>(I->swapchainExtent.height),
-                         0.01f,
-                         100.f);
-    camera.create_camera_storage_buffer(I->allocator);
+    // Set all the resource descriptors at once. We don't need more if we don't change any
+    // resources
+    vk::ImageView imageView = I->imageDraw.imageView;
+    vk::AccelerationStructureKHR tlas = I->tlas.AS;
+    DescriptorUpdater descUpdater{I->device};
+    std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
+    for (const auto &frame : I->frames) {
+        vk::DescriptorSet descriptorSetUniform = frame.descriptorSetUAB;
+        vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
+
+        descUpdater.add_uniform(descriptorSetUniform, 0, uniformBuffers);
+        descUpdater.add_as(descriptorSetRt, 0, tlas);
+        descUpdater.add_image(descriptorSetRt, 1, imageView);
+        descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
+        descUpdater.update();
+    }
+
     const float dx = 0.5f;
     const float dt = glm::radians(2.f);
     for (const auto &m : I->models)
@@ -67,25 +77,25 @@ void Engine::run()
             case SDL_EVENT_KEY_DOWN:
                 // key = e.key.key;
                 if (keyStates[SDL_SCANCODE_W])
-                    camera.forward(dx);
+                    I->camera.forward(dx);
                 if (keyStates[SDL_SCANCODE_S])
-                    camera.backwards(dx);
+                    I->camera.backwards(dx);
                 if (keyStates[SDL_SCANCODE_A])
-                    camera.left(dx);
+                    I->camera.left(dx);
                 if (keyStates[SDL_SCANCODE_D])
-                    camera.right(dx);
+                    I->camera.right(dx);
                 if (keyStates[SDL_SCANCODE_Q])
-                    camera.down(dx);
+                    I->camera.down(dx);
                 if (keyStates[SDL_SCANCODE_E])
-                    camera.up(dx);
+                    I->camera.up(dx);
                 if (keyStates[SDL_SCANCODE_UP])
-                    camera.lookUp(dt);
+                    I->camera.lookUp(dt);
                 if (keyStates[SDL_SCANCODE_DOWN])
-                    camera.lookDown(dt);
+                    I->camera.lookDown(dt);
                 if (keyStates[SDL_SCANCODE_LEFT])
-                    camera.lookLeft(dt);
+                    I->camera.lookLeft(dt);
                 if (keyStates[SDL_SCANCODE_RIGHT])
-                    camera.lookRight(dt);
+                    I->camera.lookRight(dt);
             }
             //send SDL event to imgui for handling
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -292,10 +302,10 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         descSetsInfo.setLayout(I->simpleMeshGraphicsPipeline.pipelineLayout);
         cmd.bindDescriptorSets2(descSetsInfo);
 
-        camera.update();
+        I->camera.update();
 
         for (int objId = 0; objId < I->models.size(); objId++) {
-            glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix
+            glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
                                   * I->models[objId]->modelMatrix;
 
             UniformData uboData;
@@ -303,9 +313,6 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 
             utils::map_to_buffer(I->models[objId]->uniformBuffer, &uboData);
         }
-
-        // Update all the descriptors in a batch, one per uniform buffer.
-        update_descriptor_sets(I->device, uniformBuffers, descriptorSet, 0);
 
         for (int objId = 0; objId < I->models.size(); objId++) {
             MeshPush pushConstants;
@@ -378,39 +385,16 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     pushInfo.setOffset(0);
     cmd.pushConstants2(pushInfo);
 
-    camera.update();
+    I->camera.update();
     for (int objId = 0; objId < I->models.size(); objId++) {
-        glm::mat4 mvpMatrix = camera.projMatrix * camera.viewMatrix * I->models[objId]->modelMatrix;
+        glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
+                              * I->models[objId]->modelMatrix;
 
         UniformData uboData;
         uboData.worldMatrix = mvpMatrix;
 
         utils::map_to_buffer(uniformBuffers[objId], &uboData);
     }
-
-    DescriptorUpdater descUpdater{I->device};
-    descUpdater.add_uniform(descriptorSetUniform, 0, uniformBuffers);
-    descUpdater.add_as(descriptorSetRt, 0, tlas);
-    descUpdater.add_image(descriptorSetRt, 1, imageView);
-    std::vector<Buffer> cameraBuffer = {camera.cameraBuffer};
-    descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
-    descUpdater.update();
-
-    // update_descriptor_sets(I->device,
-    //                        uniformBuffers,
-    //                        descriptorSetUniform,
-    //                        0,
-    //                        I->tlas.AS,
-    //                        descriptorSetRt,
-    //                        0,
-    //                        imageView,
-    //                        descriptorSetRt,
-    //                        1);
-
-    // std::vector<Buffer> cameraBuffer = {camera.cameraBuffer};
-    // update_descriptor_sets(I->device, cameraBuffer, descriptorSetRt, 2);
-
-    // std::cout << glm::to_string(camera.cameraData.orientation) << std::endl;
 
     cmd.traceRaysKHR(I->sbtHelper->rgenRegion,
                      I->sbtHelper->missRegion,

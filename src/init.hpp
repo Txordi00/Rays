@@ -1,5 +1,6 @@
 #pragma once
 #include "acceleration_structures.hpp"
+#include "camera.hpp"
 #include "descriptors.hpp"
 #include "model.hpp"
 #include "raster_pipelines.hpp"
@@ -56,6 +57,9 @@ public:
     ImageData imageDepth;
     // vk::Extent2D imageDrawExtent;
 
+    // Camera
+    Camera camera;
+
     // Вescriptors
     std::unique_ptr<DescHelper> descHelperUAB, descHelperRt;
     vk::DescriptorSetLayout uboDescriptorSetLayout;
@@ -85,6 +89,7 @@ private:
     void init_vulkan();
     void init_rt();
     void create_draw_data();
+    void create_camera();
     void init_commands();
     void init_sync_structures();
     void init_descriptors();

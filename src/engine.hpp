@@ -14,21 +14,25 @@ public:
     Engine();
     ~Engine();
 
-    // draw loop
-    void draw();
-
     // run main loop
     void run();
 
-    // Return frame
-    FrameData &get_current_frame() { return I->frames[frameNumber]; }
 
 private:
     // initializes everything in the engine
     std::unique_ptr<Init> I;
 
+    // Return frame
+    FrameData &get_current_frame() { return I->frames[frameNumber]; }
+
     // Camera
-    Camera camera{};
+    // Camera camera{};
+
+    // draw loop
+    void draw();
+
+    // record main command buffer
+    void record_frame_cmds();
 
     // Draw commands
     // void change_background(const vk::CommandBuffer &cmd);
