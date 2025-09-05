@@ -19,12 +19,12 @@ struct HostMeshAsset
     std::vector<GeoSurface> surfaces;
 };
 
-struct DeviceMeshAsset
-{
-    std::string name;
-    std::vector<GeoSurface> surfaces;
-    MeshBuffer meshBuffer;
-};
+// struct DeviceMeshAsset
+// {
+//     std::string name;
+//     std::vector<GeoSurface> surfaces;
+//     // MeshBuffer meshBuffer;
+// };
 
 class GLTFLoader
 {

@@ -123,7 +123,8 @@ glm::mat4 get_perspective_projection(const float fovy,
     return projectionMatrix;
 }
 
-Buffer create_buffer(const VmaAllocator &allocator,
+Buffer create_buffer(const vk::Device &device,
+                     const VmaAllocator &allocator,
                      const vk::DeviceSize &size,
                      const vk::BufferUsageFlags &usageFlags,
                      const VmaMemoryUsage &memoryUsage,
@@ -154,6 +155,12 @@ Buffer create_buffer(const VmaAllocator &allocator,
                                      (VkBuffer *) &createdBuffer.buffer,
                                      &createdBuffer.allocation,
                                      &createdBuffer.allocationInfo);
+    }
+
+    if (usageFlags & vk::BufferUsageFlagBits::eShaderDeviceAddress) {
+        vk::BufferDeviceAddressInfo addressInfo{};
+        addressInfo.setBuffer(createdBuffer.buffer);
+        createdBuffer.bufferAddress = device.getBufferAddress(addressInfo);
     }
 
     return createdBuffer;

@@ -39,7 +39,8 @@ Buffer SbtHelper::create_shader_binding_table(const vk::Pipeline &rtPipeline)
 
     // Allocate a buffer for storing the SBT.
     vk::DeviceSize sbtSize = rgenRegion.size + missRegion.size + hitRegion.size;
-    Buffer rtSBTBuffer = utils::create_buffer(allocator,
+    Buffer rtSBTBuffer = utils::create_buffer(device,
+                                              allocator,
                                               sbtSize,
                                               vk::BufferUsageFlagBits::eTransferSrc
                                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress

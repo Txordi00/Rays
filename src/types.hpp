@@ -85,6 +85,7 @@ struct Buffer
     VmaAllocation allocation;
     VmaAllocationInfo allocationInfo;
     uint32_t bufferId;
+    vk::DeviceAddress bufferAddress;
 };
 
 struct Vertex
@@ -97,36 +98,40 @@ struct Vertex
 };
 
 // holds the resources needed for a mesh
-struct MeshBuffer
-{
-    Buffer indexBuffer;
-    Buffer vertexBuffer;
-    vk::DeviceAddress vertexBufferAddress;
-    vk::DeviceAddress indexBufferAddress;
-};
+// struct MeshBuffer
+// {
+//     Buffer indexBuffer;
+//     Buffer vertexBuffer;
+//     // vk::DeviceAddress vertexBufferAddress;
+//     // vk::DeviceAddress indexBufferAddress;
+// };
 
 // push constants for our mesh object draws
 struct MeshPush
 {
-    // glm::mat4 worldMatrix;
     uint32_t objId;
-    vk::DeviceAddress vertexBufferAddress;
-    vk::DeviceAddress indexBufferAddress;
 };
 
 struct RayPush
 {
     glm::vec4 clearColor;
     uint32_t numObjects;
-    // glm::vec3 lightPosition;
-    // float lightIntensity;
-    // uint32_t lightType;
+    glm::vec3 lightPosition;
+    float lightIntensity;
+    uint32_t lightType;
 };
 
-// push constants for our mesh object draws
+// Per-object uniform buffer data
 struct UniformData
 {
     glm::mat4 worldMatrix;
+};
+
+// Per-object storage buffer data
+struct ObjectStorageData
+{
+    vk::DeviceAddress vertexBufferAddress;
+    vk::DeviceAddress indexBufferAddress;
 };
 
 // camera data for the storage buffer

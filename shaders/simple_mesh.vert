@@ -24,16 +24,19 @@ layout(buffer_reference, std430) readonly buffer IndexBuffer{
 };
 
 
-layout(scalar, binding = 0) uniform Ubo{
+layout(set = 0, binding = 0, scalar) uniform Ubo{
   mat4 worldMatrix;
 } ubo[];
+
+layout(set = 0, binding = 1, scalar) readonly buffer ObjectStorage {
+    VertexBuffer vertexBuffer;
+    IndexBuffer indexBuffer;
+} objStorage[];
 
 //push constants block
 layout(scalar, push_constant) uniform constants
 {
     uint objId;
-    VertexBuffer vertexBuffer;
-    IndexBuffer indexBuffer;
 } push;
 
 void main()
@@ -43,8 +46,10 @@ void main()
     // uint index = gl_VertexIndex;
 
     // Load index&vertex data from device adress
-    uint index = push.indexBuffer.indices[gl_VertexIndex];
-    Vertex v = push.vertexBuffer.vertices[index];
+    // uint index = push.indexBuffer.indices[gl_VertexIndex];
+    // Vertex v = push.vertexBuffer.vertices[index];
+    uint index = objStorage[push.objId].indexBuffer.indices[gl_VertexIndex];
+    Vertex v = objStorage[push.objId].vertexBuffer.vertices[index];
     
     // output data
     gl_Position = ubo[push.objId].worldMatrix * vec4(v.position, 1.0f);

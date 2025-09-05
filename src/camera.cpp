@@ -74,9 +74,10 @@ void Camera::update()
     }
 }
 
-void Camera::create_camera_storage_buffer(const VmaAllocator &allocator)
+void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAllocator &allocator)
 {
-    cameraBuffer = utils::create_buffer(allocator,
+    cameraBuffer = utils::create_buffer(device,
+                                        allocator,
                                         sizeof(CameraData),
                                         vk::BufferUsageFlagBits::eUniformBuffer,
                                         VMA_MEMORY_USAGE_AUTO,

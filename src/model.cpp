@@ -5,17 +5,18 @@
 #include <glm/gtx/transform.hpp>
 #include <vk_mem_alloc.h>
 
-Model::Model(const HostMeshAsset &cpuMesh, const VmaAllocator &allocator)
-    : allocator{allocator}
+Model::Model(const vk::Device &device, const HostMeshAsset &cpuMesh, const VmaAllocator &allocator)
+    : device{device}
+    , allocator{allocator}
 {
     name = cpuMesh.name;
     numVertices = cpuMesh.vertices.size();
     numIndices = cpuMesh.indices.size();
-    gpuMesh.surfaces = cpuMesh.surfaces;
+    surfaces = cpuMesh.surfaces;
     verticesData = cpuMesh.vertices.data();
     indicesData = cpuMesh.indices.data();
 
-    allocate_uniform_buffer();
+    // create_buffers();
 }
 
 void Model::updateModelMatrix()
@@ -36,30 +37,25 @@ void Model::updateModelMatrix()
     modelMatrix = transMat * rotMat * scaleMat;
 }
 
-void Model::createGpuMesh(const vk::Device &device,
-                          const vk::CommandBuffer &cmdTransfer,
-                          const vk::Fence &transferFence,
-                          const vk::Queue &transferQueue)
-{
-    gpuMesh.meshBuffer = create_mesh(device, allocator, cmdTransfer, transferFence, transferQueue);
-    gpuMesh.name = name;
-}
-
+// void Model::createGpuMesh(const vk::CommandBuffer &cmdTransfer,
+//                           const vk::Fence &transferFence,
+//                           const vk::Queue &transferQueue)
+// {
+//     gpuMesh.meshBuffer = create_mesh(allocator, cmdTransfer, transferFence, transferQueue);
+//     gpuMesh.name = name;
+// }
 
 // OPTIMIZATION: This could be run on a separate thread in order to not force the main thread to wait
 // for fences
-MeshBuffer Model::create_mesh(const vk::Device &device,
-                              const VmaAllocator &allocator,
-                              const vk::CommandBuffer &cmdTransfer,
-                              const vk::Fence &transferFence,
-                              const vk::Queue &transferQueue)
+void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
+                        const vk::Fence &transferFence,
+                        const vk::Queue &transferQueue)
 {
     const vk::DeviceSize verticesSize = numVertices * sizeof(Vertex);
     const vk::DeviceSize indicesSize = numIndices * sizeof(uint32_t);
 
-    MeshBuffer mesh;
-
-    mesh.vertexBuffer = utils::create_buffer(
+    vertexBuffer = utils::create_buffer(
+        device,
         allocator,
         verticesSize,
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress
@@ -68,11 +64,12 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         0);
     // | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-    vk::BufferDeviceAddressInfo vertexAddressInfo{};
-    vertexAddressInfo.setBuffer(mesh.vertexBuffer.buffer);
-    mesh.vertexBufferAddress = device.getBufferAddress(vertexAddressInfo);
+    // vk::BufferDeviceAddressInfo vertexAddressInfo{};
+    // vertexAddressInfo.setBuffer(mesh.vertexBuffer.buffer);
+    // mesh.vertexBufferAddress = device.getBufferAddress(vertexAddressInfo);
 
-    mesh.indexBuffer = utils::create_buffer(
+    indexBuffer = utils::create_buffer(
+        device,
         allocator,
         indicesSize,
         vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer
@@ -80,11 +77,12 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
             | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         0);
-    vk::BufferDeviceAddressInfo indexAddressInfo{};
-    indexAddressInfo.setBuffer(mesh.indexBuffer.buffer);
-    mesh.indexBufferAddress = device.getBufferAddress(indexAddressInfo);
+    // vk::BufferDeviceAddressInfo indexAddressInfo{};
+    // indexAddressInfo.setBuffer(mesh.indexBuffer.buffer);
+    // mesh.indexBufferAddress = device.getBufferAddress(indexAddressInfo);
 
-    Buffer stagingBuffer = utils::create_buffer(allocator,
+    Buffer stagingBuffer = utils::create_buffer(device,
+                                                allocator,
                                                 verticesSize + indicesSize,
                                                 vk::BufferUsageFlagBits::eTransferSrc,
                                                 VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
@@ -104,7 +102,7 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     vertexCopy.setSize(verticesSize);
     vk::CopyBufferInfo2 vertexCopyInfo{};
     vertexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-    vertexCopyInfo.setDstBuffer(mesh.vertexBuffer.buffer);
+    vertexCopyInfo.setDstBuffer(vertexBuffer.buffer);
     vertexCopyInfo.setRegions(vertexCopy);
 
     vk::BufferCopy2 indexCopy{};
@@ -113,7 +111,7 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     indexCopy.setSize(indicesSize);
     vk::CopyBufferInfo2 indexCopyInfo{};
     indexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-    indexCopyInfo.setDstBuffer(mesh.indexBuffer.buffer);
+    indexCopyInfo.setDstBuffer(indexBuffer.buffer);
     indexCopyInfo.setRegions(indexCopy);
 
     // New command buffer to copy in GPU from staging buffer to vertex & index buffers
@@ -141,22 +139,58 @@ MeshBuffer Model::create_mesh(const vk::Device &device,
     }
     vmaDestroyBuffer(allocator, stagingBuffer.buffer, stagingBuffer.allocation);
 
-    return mesh;
-}
-
-void Model::allocate_uniform_buffer()
-{
-    uniformBuffer = utils::create_buffer(allocator,
+    // Create the per-model uniform & storage buffers
+    uniformBuffer = utils::create_buffer(device,
+                                         allocator,
                                          vk::DeviceSize(sizeof(UniformData)),
                                          vk::BufferUsageFlagBits::eUniformBuffer,
                                          VMA_MEMORY_USAGE_AUTO,
                                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                                              | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    storageBuffer = utils::create_buffer(device,
+                                         allocator,
+                                         vk::DeviceSize(sizeof(ObjectStorageData)),
+                                         vk::BufferUsageFlagBits::eStorageBuffer,
+                                         VMA_MEMORY_USAGE_AUTO,
+                                         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                             | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    // Pass the buffer addresses to the storage buffer from the get-go
+    ObjectStorageData objectStorage;
+    objectStorage.vertexBufferAddress = vertexBuffer.bufferAddress;
+    objectStorage.indexBufferAddress = indexBuffer.bufferAddress;
+    utils::map_to_buffer(storageBuffer, &objectStorage);
 }
+
+// void Model::create_buffers()
+// {
+//     uniformBuffer = utils::create_buffer(device,
+//                                          allocator,
+//                                          vk::DeviceSize(sizeof(UniformData)),
+//                                          vk::BufferUsageFlagBits::eUniformBuffer,
+//                                          VMA_MEMORY_USAGE_AUTO,
+//                                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+//                                              | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+//     storageBuffer = utils::create_buffer(device,
+//                                          allocator,
+//                                          vk::DeviceSize(sizeof(ObjectStorageData)),
+//                                          vk::BufferUsageFlagBits::eStorageBuffer,
+//                                          VMA_MEMORY_USAGE_AUTO,
+//                                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+//                                              | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+//     ObjectStorageData objectStorage;
+//     objectStorage.vertexBufferAddress = vertexBuffer.bufferAddress;
+//     objectStorage.indexBufferAddress = indexBuffer.bufferAddress;
+//     utils::map_to_buffer(storageBuffer, &objectStorage);
+// }
 
 void Model::destroyBuffers()
 {
     utils::destroy_buffer(allocator, uniformBuffer);
-    utils::destroy_buffer(allocator, gpuMesh.meshBuffer.vertexBuffer);
-    utils::destroy_buffer(allocator, gpuMesh.meshBuffer.indexBuffer);
+    utils::destroy_buffer(allocator, storageBuffer);
+    utils::destroy_buffer(allocator, vertexBuffer);
+    utils::destroy_buffer(allocator, indexBuffer);
 }

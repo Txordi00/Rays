@@ -32,7 +32,7 @@ public:
 
     void update();
 
-    void create_camera_storage_buffer(const VmaAllocator &allocator);
+    void create_camera_storage_buffer(const vk::Device &device, const VmaAllocator &allocator);
     void destroy_camera_storage_buffer(const VmaAllocator &allocator);
 
     glm::mat4 viewMatrix{1.f};

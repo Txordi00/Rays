@@ -59,9 +59,11 @@ vk::DescriptorSetLayout DescHelper::create_descriptor_set_layout()
     vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo{};
     descriptorSetLayoutInfo.setBindings(bindings);
 
-    vk::DescriptorBindingFlags bindlessBindingFlags{
-        vk::DescriptorBindingFlagBits::ePartiallyBound
-        | vk::DescriptorBindingFlagBits::eUpdateAfterBind};
+    std::vector<vk::DescriptorBindingFlags>
+        bindlessBindingFlags{bindings.size(),
+                             vk::DescriptorBindingFlags{
+                                 vk::DescriptorBindingFlagBits::ePartiallyBound
+                                 | vk::DescriptorBindingFlagBits::eUpdateAfterBind}};
     vk::DescriptorSetLayoutBindingFlagsCreateInfo bindlessBindingFlagsInfo{};
     bindlessBindingFlagsInfo.setBindingFlags(bindlessBindingFlags);
     if (updateAfterBind) {
@@ -89,7 +91,8 @@ std::vector<vk::DescriptorSet> DescHelper::allocate_descriptor_sets(
 void DescriptorUpdater::add_uniform(const vk::DescriptorSet &descSet,
                                     const uint32_t binding,
                                     const std::vector<Buffer> &uniformBuffers)
-{ // Add all the buffers to a single descriptor write
+{
+    // Add all the buffers to a single descriptor write
     std::vector<vk::DescriptorBufferInfo> bufferInfosTmp;
     bufferInfosTmp.reserve(uniformBuffers.size());
     for (const Buffer &b : uniformBuffers) {
@@ -100,7 +103,25 @@ void DescriptorUpdater::add_uniform(const vk::DescriptorSet &descSet,
         bufferInfosTmp.emplace_back(bufferInfo);
     }
     auto bufferInfosTupleTmp = std::make_tuple(descSet, binding, bufferInfosTmp);
-    bufferInfos.push_back(bufferInfosTupleTmp);
+    uniformInfos.push_back(bufferInfosTupleTmp);
+}
+
+void DescriptorUpdater::add_storage(const vk::DescriptorSet &descSet,
+                                    const uint32_t binding,
+                                    const std::vector<Buffer> &storageBuffers)
+{
+    // Add all the buffers to a single descriptor write
+    std::vector<vk::DescriptorBufferInfo> bufferInfosTmp;
+    bufferInfosTmp.reserve(storageBuffers.size());
+    for (const Buffer &b : storageBuffers) {
+        vk::DescriptorBufferInfo bufferInfo{};
+        bufferInfo.setBuffer(b.buffer);
+        bufferInfo.setOffset(0);
+        bufferInfo.setRange(vk::WholeSize);
+        bufferInfosTmp.emplace_back(bufferInfo);
+    }
+    auto bufferInfosTupleTmp = std::make_tuple(descSet, binding, bufferInfosTmp);
+    storageInfos.push_back(bufferInfosTupleTmp);
 }
 
 void DescriptorUpdater::add_as(const vk::DescriptorSet &descSet,
@@ -127,8 +148,9 @@ void DescriptorUpdater::add_image(const vk::DescriptorSet &descSet,
 void DescriptorUpdater::update()
 {
     std::vector<vk::WriteDescriptorSet> descriptorWrites;
-    descriptorWrites.reserve(bufferInfos.size() + imageInfos.size() + tlasWritesKHR.size());
-    for (const auto &bi : bufferInfos) {
+    descriptorWrites.reserve(uniformInfos.size() + storageInfos.size() + imageInfos.size()
+                             + tlasWritesKHR.size());
+    for (const auto &bi : uniformInfos) {
         vk::WriteDescriptorSet uniformWrite{};
         uniformWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
         uniformWrite.setDstSet(std::get<0>(bi));
@@ -136,6 +158,15 @@ void DescriptorUpdater::update()
         uniformWrite.setBufferInfo(std::get<2>(bi));
         uniformWrite.setDstArrayElement(0);
         descriptorWrites.emplace_back(uniformWrite);
+    }
+    for (const auto &bi : storageInfos) {
+        vk::WriteDescriptorSet storageWrite{};
+        storageWrite.setDescriptorType(vk::DescriptorType::eStorageBuffer);
+        storageWrite.setDstSet(std::get<0>(bi));
+        storageWrite.setDstBinding(std::get<1>(bi));
+        storageWrite.setBufferInfo(std::get<2>(bi));
+        storageWrite.setDstArrayElement(0);
+        descriptorWrites.emplace_back(storageWrite);
     }
     for (const auto &ii : imageInfos) {
         vk::WriteDescriptorSet imageWrite{};
@@ -155,7 +186,8 @@ void DescriptorUpdater::update()
         descriptorWrites.emplace_back(tlasWrite);
     }
     device.updateDescriptorSets(descriptorWrites, nullptr);
-    bufferInfos = {};
+    uniformInfos = {};
+    storageInfos = {};
     imageInfos = {};
     tlasWritesKHR = {};
 }

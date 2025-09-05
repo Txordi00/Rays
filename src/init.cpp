@@ -122,6 +122,7 @@ void Init::init_vulkan()
     vk::PhysicalDeviceVulkan12Features features12{};
     features12.descriptorIndexing = vk::True;
     features12.descriptorBindingUniformBufferUpdateAfterBind = vk::True;
+    features12.descriptorBindingStorageBufferUpdateAfterBind = vk::True;
     features12.descriptorBindingPartiallyBound = vk::True;
     features12.runtimeDescriptorArray = vk::True;
     features12.scalarBlockLayout = vk::True;
@@ -298,7 +299,7 @@ void Init::create_camera()
                          static_cast<float>(swapchainExtent.height),
                          0.01f,
                          100.f);
-    camera.create_camera_storage_buffer(allocator);
+    camera.create_camera_storage_buffer(device, allocator);
 }
 
 void Init::init_commands()
@@ -356,11 +357,18 @@ void Init::init_descriptors()
     descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
                                                              static_cast<uint32_t>(models.size())},
                                       frameOverlap);
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer,
+                                                             static_cast<uint32_t>(models.size())},
+                                      frameOverlap);
     descHelperUAB->create_descriptor_pool();
     descHelperUAB->add_binding(
         Binding{vk::DescriptorType::eUniformBuffer,
-                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eRaygenKHR,
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eClosestHitKHR,
                 0});
+    descHelperUAB->add_binding(
+        Binding{vk::DescriptorType::eStorageBuffer,
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eClosestHitKHR,
+                1});
     uboDescriptorSetLayout = descHelperUAB->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
@@ -487,8 +495,8 @@ void Init::load_meshes()
         "../../assets/basicmesh.glb");
     models.resize(cpuMeshes.size());
     for (int i = 0; i < cpuMeshes.size(); i++) {
-        models[i] = std::make_shared<Model>(*cpuMeshes[i], allocator);
-        models[i]->createGpuMesh(device, cmdTransfer, transferFence, transferQueue);        
+        models[i] = std::make_shared<Model>(device, *cpuMeshes[i], allocator);
+        models[i]->create_mesh(cmdTransfer, transferFence, transferQueue);
     }
 
     models[0]->position = glm::vec3(-5.f, 0.f, 7.f);

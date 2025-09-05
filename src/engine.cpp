@@ -17,10 +17,17 @@ import vulkan_hpp;
 Engine::Engine()
 {
     I = std::make_unique<Init>();
+
+    // Create vector of buffers in an efficient way
     uniformBuffers.reserve(I->models.size());
     std::ranges::transform(I->models,
                            std::back_inserter(uniformBuffers),
                            [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
+
+    storageBuffers.reserve(I->models.size());
+    std::ranges::transform(I->models,
+                           std::back_inserter(storageBuffers),
+                           [](const std::shared_ptr<Model> &m) { return m->storageBuffer; });
 }
 
 Engine::~Engine()
@@ -44,6 +51,7 @@ void Engine::run()
         vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
         descUpdater.add_uniform(descriptorSetUniform, 0, uniformBuffers);
+        descUpdater.add_storage(descriptorSetUniform, 1, storageBuffers);
         descUpdater.add_as(descriptorSetRt, 0, tlas);
         descUpdater.add_image(descriptorSetRt, 1, imageView);
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
@@ -317,19 +325,15 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
         for (int objId = 0; objId < I->models.size(); objId++) {
             MeshPush pushConstants;
             pushConstants.objId = objId;
-            pushConstants.vertexBufferAddress = I->models[objId]
-                                                    ->gpuMesh.meshBuffer.vertexBufferAddress;
-            pushConstants.indexBufferAddress = I->models[objId]
-                                                   ->gpuMesh.meshBuffer.indexBufferAddress;
             cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
                               vk::ShaderStageFlagBits::eVertex,
                               0,
                               sizeof(MeshPush),
                               &pushConstants);
 
-            cmd.draw(I->models[objId]->gpuMesh.surfaces[0].count,
+            cmd.draw(I->models[objId]->surfaces[0].count,
                      1,
-                     I->models[objId]->gpuMesh.surfaces[0].startIndex,
+                     I->models[objId]->surfaces[0].startIndex,
                      0);
 
             // USING THE INDEX BUFFER PROPERLY REQUIRES THE FOLLOWING DRAW CALL:
@@ -373,9 +377,9 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     RayPush push{};
     push.clearColor = glm::vec4(0.f, 0.5f, 1.f, 1.f);
     push.numObjects = I->models.size();
-    // push.lightIntensity = 1.f;
-    // push.lightPosition = glm::vec3(0.f, -2.f, 2.f);
-    // push.lightType = 0;
+    push.lightIntensity = 2.f;
+    push.lightType = 0;
+    push.lightPosition = glm::vec3(-2.f, -6.f, 6.f);
     vk::PushConstantsInfo pushInfo{};
     pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR

@@ -36,13 +36,11 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     // 1. Geometry description (single triangle array)
     vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
     triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
-    triData.setVertexData(
-        vk::DeviceOrHostAddressConstKHR{model->gpuMesh.meshBuffer.vertexBufferAddress});
+    triData.setVertexData(vk::DeviceOrHostAddressConstKHR{model->vertexBuffer.bufferAddress});
     triData.setVertexStride(sizeof(Vertex));
     triData.setMaxVertex(model->numVertices - 1); // conservative
     triData.setIndexType(vk::IndexType::eUint32);
-    triData.setIndexData(
-        vk::DeviceOrHostAddressConstKHR{model->gpuMesh.meshBuffer.indexBufferAddress});
+    triData.setIndexData(vk::DeviceOrHostAddressConstKHR{model->indexBuffer.bufferAddress});
 
     vk::AccelerationStructureGeometryKHR geom{};
     geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
@@ -63,7 +61,8 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
                                                        primCount);
 
     // 3. Allocate BLAS buffer
-    Buffer blasBuffer = utils::create_buffer(allocator,
+    Buffer blasBuffer = utils::create_buffer(device,
+                                             allocator,
                                              sizeInfo.accelerationStructureSize,
                                              vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR
                                                  | vk::BufferUsageFlagBits::eShaderDeviceAddress,
@@ -80,7 +79,8 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 
     // 5. Allocate scratch buffer
     Buffer scratchBuffer
-        = utils::create_buffer(allocator,
+        = utils::create_buffer(device,
+                               allocator,
                                sizeInfo.buildScratchSize,
                                vk::BufferUsageFlagBits::eStorageBuffer
                                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
@@ -155,7 +155,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
         vk::TransformMatrixKHR transformVk;
         memcpy(&transformVk, glm::value_ptr(transformGlm), sizeof(vk::TransformMatrixKHR));
         tlas.setTransform(transformVk);
-        tlas.setInstanceCustomIndex(0); // gl_InstanceCustomIndexEXT
+        tlas.setInstanceCustomIndex(i); // gl_InstanceCustomIndexEXT
         tlas.setAccelerationStructureReference(blas.addr);
         tlas.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
         tlas.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
@@ -171,7 +171,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
         sizeof(vk::AccelerationStructureInstanceKHR) * instances.size());
     // Buffer of instances containing the matrices and BLAS ids
     Buffer instancesBuffer
-        = utils::create_buffer(allocator,
+        = utils::create_buffer(device,
+                               allocator,
                                instancesSize,
                                vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR
                                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
@@ -210,7 +211,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
     // Create acceleration structure, not building it yet
     // NOT GETTING THE SHADER ADDRESS AT THE MOMENT
     Buffer tlasBuffer
-        = utils::create_buffer(allocator,
+        = utils::create_buffer(device,
+                               allocator,
                                sizeInfo.accelerationStructureSize,
                                vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR,
                                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
@@ -226,7 +228,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
 
     // 5. Allocate scratch buffer
     Buffer scratchBuffer
-        = utils::create_buffer(allocator,
+        = utils::create_buffer(device,
+                               allocator,
                                sizeInfo.buildScratchSize,
                                vk::BufferUsageFlagBits::eStorageBuffer
                                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,

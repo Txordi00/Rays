@@ -22,7 +22,8 @@ void copy_image(vk::CommandBuffer &cmd,
                 const vk::Extent2D &srcRes,
                 const vk::Extent2D &dstRes);
 
-Buffer create_buffer(const VmaAllocator &allocator,
+Buffer create_buffer(const vk::Device &device,
+                     const VmaAllocator &allocator,
                      const vk::DeviceSize &size,
                      const vk::BufferUsageFlags &usageFlags,
                      const VmaMemoryUsage &memoryUsage,

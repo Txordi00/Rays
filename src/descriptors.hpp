@@ -50,6 +50,9 @@ public:
     void add_uniform(const vk::DescriptorSet &descSet,
                      const uint32_t binding,
                      const std::vector<Buffer> &uniformBuffers);
+    void add_storage(const vk::DescriptorSet &descSet,
+                     const uint32_t binding,
+                     const std::vector<Buffer> &storageBuffers);
     void add_as(const vk::DescriptorSet &descSet,
                 const uint32_t binding,
                 const vk::AccelerationStructureKHR &as);
@@ -64,7 +67,9 @@ private:
     // We have to save all this Infos because they are accessed as an address in vk::WriteDescriptorSet,
     // and therefore we must avoid their unallocation. vk::WriteDescriptorSet is the structure passed to device.updateDescriptorSets()
     std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorBufferInfo>>>
-        bufferInfos{};
+        uniformInfos{};
+    std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorBufferInfo>>>
+        storageInfos{};
     std::vector<std::tuple<vk::DescriptorSet, uint32_t, vk::DescriptorImageInfo>> imageInfos{};
     std::vector<
         std::tuple<vk::DescriptorSet, uint32_t, vk::WriteDescriptorSetAccelerationStructureKHR>>

@@ -7,10 +7,6 @@
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 
-layout(scalar, binding = 0, set = 1) uniform Ubo{
-  mat4 worldMatrix;
-} ubo[];
-
 layout(scalar, binding = 2, set = 0) uniform CameraData{
   vec3 origin;
   vec3 orientation;
@@ -29,6 +25,10 @@ layout(scalar, push_constant) uniform constants
 {
     vec4 clearColor;
     uint numObjects;
+    vec3 lightPosition;
+    float lightIntensity;
+    uint lightType;
+
 } push;
 
 // const vec3 origin = vec3(0., 0., -10.);
