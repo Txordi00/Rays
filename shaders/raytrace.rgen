@@ -51,10 +51,17 @@ void main()
     float y = (-1. + 2. * (i + 0.5f) / hm1) * Ft;
     float x = (-1. + 2. * (j + 0.5f) / wm1) * arFt;
 
-    vec3 direction = normalize(vec3(x, y, 0.) + camera.orientation);
+    vec3 forward = camera.orientation;
+    vec3 up = vec3(0.0, 1.0, 0.0);
+    vec3 right = cross(up, forward);
+    up = normalize(cross(forward, right));   // re-orthonormalize
+
+    vec3 pixelCam = normalize(vec3(x, y, 1.)); // camera-space ray
+    vec3 direction = normalize(pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward);
+
+    // vec3 direction = normalize(vec3(x, y, 0.) + camera.orientation);
 
     vec3 origin = camera.origin;
-    // vec3 direction = camera.orientation;
 
     traceRayEXT(topLevelAS, // acceleration structure
       rayFlags, // rayFlags

@@ -77,20 +77,21 @@ void main()
 
 
   // Vector towards the light
-  vec3 L;
+  vec3 l;
   float lightIntensity = push.lightIntensity;
   float lightDistance = 100000.;
-  // Point light
+  // Point light diffuse lighting
   if(push.lightType == 0)
   {
-    vec3 lDir = push.lightPosition - worldPos;
-    lightDistance = length(lDir);
-    lightIntensity /=  abs(lightDistance);
-    L = normalize(lDir);
+    vec3 l = push.lightPosition - worldPos;
+    float lDotNorm = dot(l, worldNrm);
+    lightDistance = length(l);
+    lightIntensity = (lDotNorm > 0) ? lightIntensity * lDotNorm / lightDistance : 0.;
+    l = normalize(l);
   }
   else // Directional light
   {
-    L = normalize(push.lightPosition);
+    l = normalize(push.lightPosition);
   }
 
   //const vec4 colorInterpolated =
@@ -98,11 +99,9 @@ void main()
 
   const vec4 colorInterpolated = vec4(1.);
 
-  float exposure = 0.5;
-  vec3 hdr = lightIntensity * vec3(colorInterpolated);
-  vec3 mapped = hdr * exposure / (hdr * exposure + vec3(1.0));
-  hitValue = pow(clamp(mapped, 0.0, 1.0), vec3(1.0/2.2));
+  vec4 outColor = lightIntensity * colorInterpolated;
+  outColor /= (outColor + 1.);
 
-  // hitValue = vec3(lightIntensity * vec3(colorInterpolated));
+  hitValue = vec3(outColor);
 
 }

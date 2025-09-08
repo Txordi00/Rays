@@ -377,9 +377,9 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     RayPush push{};
     push.clearColor = glm::vec4(0.f, 0.5f, 1.f, 1.f);
     push.numObjects = I->models.size();
-    push.lightIntensity = 2.f;
+    push.lightIntensity = 5.f;
     push.lightType = 0;
-    push.lightPosition = glm::vec3(-2.f, -6.f, 6.f);
+    push.lightPosition = glm::vec3(-2.f, -5.f, 6.f);
     vk::PushConstantsInfo pushInfo{};
     pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR

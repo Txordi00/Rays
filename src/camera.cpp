@@ -66,6 +66,7 @@ void Camera::lookLeft(const float &dx)
 
 void Camera::update()
 {
+    orientation = glm::normalize(orientation);
     viewMatrix = glm::lookAt(translation, translation + orientation, glm::vec3(0, 1, 0));
     if (cameraBuffer.buffer) {
         cameraData.origin = translation;
@@ -85,7 +86,7 @@ void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAll
                                             | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     cameraData.origin = translation;
-    cameraData.orientation = orientation;
+    cameraData.orientation = glm::normalize(orientation);
 
     utils::map_to_buffer(cameraBuffer, &cameraData);
 }
