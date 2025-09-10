@@ -3,25 +3,14 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+//#extension GL_EXT_debug_printf : enable
 
 layout(location = 0) rayPayloadInEXT vec3 hitValue;
 hitAttributeEXT vec3 attribs;
 
-struct Vertex {
-    vec3 position;
-    float uv_x;
-    vec3 normal;
-    float uv_y;
-    vec4 color;
-};
-
-layout(buffer_reference, std430) readonly buffer VertexBuffer{
-    Vertex vertices[];
-};
-
-layout(buffer_reference, std430) readonly buffer IndexBuffer{
-    uint indices[];
-};
+#include "types.glsl"
+#include "functions.glsl"
 
 layout(set = 1, binding = 0, scalar) uniform Ubo{
   mat4 worldMatrix;
@@ -76,30 +65,30 @@ void main()
   const vec3 worldNrm = normalize(vec3(nrm * gl_WorldToObjectEXT));
 
 
+  //const vec4 colorIn =
+    v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z;
+  const vec4 colorIn = vec4(1.);
+  const vec3 colorIn3 = vec3(colorIn);
+
   // Vector towards the light
   vec3 l;
-  float lightIntensity = push.lightIntensity;
+  vec3 diffuseC = colorIn3;
   float lightDistance = 100000.;
   // Point light diffuse lighting
   if(push.lightType == 0)
   {
     vec3 l = push.lightPosition - worldPos;
-    float lDotNorm = dot(l, worldNrm);
     lightDistance = length(l);
-    lightIntensity = (lDotNorm > 0) ? lightIntensity * lDotNorm / lightDistance : 0.;
     l = normalize(l);
+    diffuseC = diffuse(push.lightIntensity * colorIn3 / lightDistance, l, worldNrm) ;
   }
   else // Directional light
   {
     l = normalize(push.lightPosition);
   }
 
-  //const vec4 colorInterpolated =
-    v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z;
 
-  const vec4 colorInterpolated = vec4(1.);
-
-  vec4 outColor = lightIntensity * colorInterpolated;
+  vec3 outColor = diffuseC;
   outColor /= (outColor + 1.);
 
   hitValue = vec3(outColor);

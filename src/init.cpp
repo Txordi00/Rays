@@ -96,9 +96,6 @@ void Init::init_vulkan()
     vkb::InstanceBuilder instBuilder;
     auto instRet = instBuilder.set_app_name(PROJNAME)
                        .require_api_version(API_VERSION[0], API_VERSION[1], API_VERSION[2])
-                       // .enable_extensions({VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
-                       //                     VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
-                       //                     VK_KHR_SURFACE_EXTENSION_NAME})
                        .request_validation_layers(enableValidationLayers)
                        .use_default_debug_messenger()
                        .build();
@@ -141,6 +138,7 @@ void Init::init_vulkan()
     // asFeatures.setDescriptorBindingAccelerationStructureUpdateAfterBind(vk::True);
     vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
     rtPipelineFeatures.setRayTracingPipeline(vk::True);
+
     // Select a GPU
     vkb::PhysicalDeviceSelector physDevSelector{vkbInstance};
     vkb::PhysicalDevice vkbPhysDev

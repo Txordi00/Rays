@@ -29,7 +29,8 @@ void DescHelper::add_descriptor_set(const vk::DescriptorPoolSize &poolSize, cons
 void DescHelper::create_descriptor_pool()
 {
     vk::DescriptorPoolCreateInfo poolCreateInfo{};
-    poolCreateInfo.setMaxSets(poolSizes.size());
+    // Set +1 to the shader printf function
+    poolCreateInfo.setMaxSets(poolSizes.size() + 1);
     poolCreateInfo.setPoolSizes(poolSizes);
     if (updateAfterBind)
         poolCreateInfo.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind);
