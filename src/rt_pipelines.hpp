@@ -12,7 +12,7 @@ SimplePipelineData get_simple_rt_pipeline(const vk::Device &device);
 class RtPipelineBuilder
 {
 public:
-    enum StageIndices { eRaygen, eMiss, eClosestHit, eShaderGroupCount };
+    enum StageIndices { eRaygen, eMiss, eShadow, eClosestHit, eShaderGroupCount };
 
     RtPipelineBuilder(const vk::Device &device)
         : device{device}

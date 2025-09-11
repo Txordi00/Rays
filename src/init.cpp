@@ -483,6 +483,10 @@ void Init::init_rt()
     vk::PhysicalDeviceProperties2 physDevProp2{};
     physDevProp2.pNext = &rtProperties;
     physicalDevice.getProperties2(&physDevProp2);
+    if (rtProperties.maxRayRecursionDepth < MAX_RT_RECURSION)
+        throw std::runtime_error("Driver recursion depth not enough. Driver: "
+                                 + std::to_string(rtProperties.maxRayRecursionDepth)
+                                 + ". Required: " + std::to_string(MAX_RT_RECURSION));
 }
 
 void Init::load_meshes()
@@ -497,7 +501,7 @@ void Init::load_meshes()
         models[i]->create_mesh(cmdTransfer, transferFence, transferQueue);
     }
 
-    models[0]->position = glm::vec3(-5.f, 0.f, 7.f);
+    models[0]->position = glm::vec3(2.f, 2.f, 7.f);
     models[1]->position = glm::vec3(5.f, 0.f, 7.f);
     models[2]->position = glm::vec3(0.f, 0.f, 7.f);
 }

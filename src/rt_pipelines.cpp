@@ -14,6 +14,10 @@ void RtPipelineBuilder::create_shader_stages()
     stage.setModule(utils::load_shader(device, SIMPLE_RMISS_SHADER));
     stage.setStage(vk::ShaderStageFlagBits::eMissKHR);
     shaderStages[eMiss] = stage;
+    // Shadow (Miss shader)
+    stage.setModule(utils::load_shader(device, SIMPLE_SHADOW_SHADER));
+    stage.setStage(vk::ShaderStageFlagBits::eMissKHR);
+    shaderStages[eShadow] = stage;
     // Hit Group - Closest Hit
     stage.setModule(utils::load_shader(device, SIMPLE_RCHIT_SHADER));
     stage.setStage(vk::ShaderStageFlagBits::eClosestHitKHR);
@@ -37,6 +41,11 @@ void RtPipelineBuilder::create_shader_groups()
     // Miss
     group.setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
     group.setGeneralShader(eMiss);
+    shaderGroups.push_back(group);
+
+    // Shadow miss
+    group.setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+    group.setGeneralShader(eShadow);
     shaderGroups.push_back(group);
 
     // closest hit shader

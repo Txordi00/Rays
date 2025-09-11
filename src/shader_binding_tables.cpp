@@ -9,7 +9,7 @@
 //
 Buffer SbtHelper::create_shader_binding_table(const vk::Pipeline &rtPipeline)
 {
-    uint32_t missCount{1};
+    uint32_t missCount{2};
     uint32_t hitCount{1};
     uint32_t handleCount = 1 + missCount + hitCount;
     uint32_t handleSize = rtProperties.shaderGroupHandleSize;

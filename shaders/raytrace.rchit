@@ -7,7 +7,9 @@
 //#extension GL_EXT_debug_printf : enable
 
 layout(location = 0) rayPayloadInEXT vec3 hitValue;
+layout(location = 1) rayPayloadEXT bool isShadowed;
 hitAttributeEXT vec3 attribs;
+layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 
 #include "types.glsl"
 #include "functions.glsl"
@@ -32,6 +34,8 @@ layout(scalar, push_constant) uniform constants
 
 } push;
 
+const float tMin = 0.001;
+const float tMax = 10000.;
 
 void main()
 {
@@ -66,29 +70,53 @@ void main()
 
 
   //const vec4 colorIn =
-    v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z;
-  const vec4 colorIn = vec4(1.);
-  const vec3 colorIn3 = vec3(colorIn);
+    //v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z;
+  const vec3 colorIn = vec3(1.);
 
+  // Check if in shadow
   // Vector towards the light
-  vec3 l;
-  vec3 diffuseC = colorIn3;
-  float lightDistance = 100000.;
+  vec3 l = push.lightPosition - worldPos;
+  float lightDistance = length(l);
+  vec3 lNorm = normalize(l);
+  float attenuation = push.lightIntensity / lightDistance;
+
+  // Flags
+  uint  shadowFlags =
+      gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+  // We initialize to true, if the miss shader will be called it sets it to false
+  isShadowed = true;
+  traceRayEXT(topLevelAS,  // acceleration structure
+          shadowFlags,       // rayFlags
+          0xFF,        // cullMask
+          0,           // sbtRecordOffset
+          0,           // sbtRecordStride
+          1,           // missIndex
+          worldPos,      // ray origin
+          tMin,        // ray min range
+          l,      // ray direction
+          tMax,        // ray max range
+          1            // payload (location = 1)
+  );
+
+
   // Point light diffuse lighting
-  if(push.lightType == 0)
+  vec3 diffuseC = vec3(0.);
+  if(!isShadowed)
   {
-    vec3 l = push.lightPosition - worldPos;
-    lightDistance = length(l);
-    l = normalize(l);
-    diffuseC = diffuse(push.lightIntensity * colorIn3 / lightDistance, l, worldNrm) ;
-  }
-  else // Directional light
-  {
-    l = normalize(push.lightPosition);
+    diffuseC = diffuse(1., lNorm, worldNrm) * colorIn;
+    diffuseC *= attenuation;
   }
 
+  // Point light specular lighting
+  vec3 specularC = vec3(0.);
+  if(!isShadowed)
+  {
+    vec3 viewDir = normalize(gl_WorldRayDirectionEXT);
+    specularC = specular(4, viewDir, lNorm, worldNrm) * colorIn;
+    specularC *= attenuation;
+  }
 
-  vec3 outColor = diffuseC;
+  vec3 outColor = diffuseC + specularC;
   outColor /= (outColor + 1.);
 
   hitValue = vec3(outColor);
