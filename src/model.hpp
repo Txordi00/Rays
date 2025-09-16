@@ -12,10 +12,6 @@ public:
 
     void updateModelMatrix();
 
-    // void createGpuMesh(const vk::CommandBuffer &cmdTransfer,
-    //                    const vk::Fence &transferFence,
-    //                    const vk::Queue &transferQueue);
-
     void create_mesh(const vk::CommandBuffer &cmdTransfer,
                      const vk::Fence &transferFence,
                      const vk::Queue &transferQueue);
@@ -41,8 +37,6 @@ public:
 private:
     const vk::Device &device;
     const VmaAllocator &allocator;
-
-    // void create_buffers();
 
     const void *verticesData;
     const void *indicesData;

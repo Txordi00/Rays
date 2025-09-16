@@ -15,8 +15,6 @@ Model::Model(const vk::Device &device, const HostMeshAsset &cpuMesh, const VmaAl
     surfaces = cpuMesh.surfaces;
     verticesData = cpuMesh.vertices.data();
     indicesData = cpuMesh.indices.data();
-
-    // create_buffers();
 }
 
 void Model::updateModelMatrix()
@@ -36,14 +34,6 @@ void Model::updateModelMatrix()
     // This becomes modelMat = T * R
     modelMatrix = transMat * rotMat * scaleMat;
 }
-
-// void Model::createGpuMesh(const vk::CommandBuffer &cmdTransfer,
-//                           const vk::Fence &transferFence,
-//                           const vk::Queue &transferQueue)
-// {
-//     gpuMesh.meshBuffer = create_mesh(allocator, cmdTransfer, transferFence, transferQueue);
-//     gpuMesh.name = name;
-// }
 
 // OPTIMIZATION: This could be run on a separate thread in order to not force the main thread to wait
 // for fences
@@ -160,32 +150,10 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
     ObjectStorageData objectStorage;
     objectStorage.vertexBufferAddress = vertexBuffer.bufferAddress;
     objectStorage.indexBufferAddress = indexBuffer.bufferAddress;
+    objectStorage.numVertices = numVertices;
+    objectStorage.numIndices = numIndices;
     utils::map_to_buffer(storageBuffer, &objectStorage);
 }
-
-// void Model::create_buffers()
-// {
-//     uniformBuffer = utils::create_buffer(device,
-//                                          allocator,
-//                                          vk::DeviceSize(sizeof(UniformData)),
-//                                          vk::BufferUsageFlagBits::eUniformBuffer,
-//                                          VMA_MEMORY_USAGE_AUTO,
-//                                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-//                                              | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-//     storageBuffer = utils::create_buffer(device,
-//                                          allocator,
-//                                          vk::DeviceSize(sizeof(ObjectStorageData)),
-//                                          vk::BufferUsageFlagBits::eStorageBuffer,
-//                                          VMA_MEMORY_USAGE_AUTO,
-//                                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-//                                              | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-//     ObjectStorageData objectStorage;
-//     objectStorage.vertexBufferAddress = vertexBuffer.bufferAddress;
-//     objectStorage.indexBufferAddress = indexBuffer.bufferAddress;
-//     utils::map_to_buffer(storageBuffer, &objectStorage);
-// }
 
 void Model::destroyBuffers()
 {

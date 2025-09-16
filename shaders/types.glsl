@@ -6,10 +6,16 @@ struct Vertex {
     vec4 color;
 };
 
-layout(buffer_reference, std430) readonly buffer VertexBuffer{
-    Vertex vertices[];
+struct HitPayload
+{
+  vec3 hitValue;
 };
 
-layout(buffer_reference, std430) readonly buffer IndexBuffer{
-    uint indices[];
-};
+#define RayPushConstants RayPushConstants \
+    { \
+        vec4 clearColor; \
+        uint numObjects; \
+        vec3 lightPosition; \
+        float lightIntensity; \
+        uint lightType; \
+    }

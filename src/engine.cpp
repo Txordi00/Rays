@@ -12,6 +12,7 @@ import vulkan_hpp;
 #include <glm/ext.hpp>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
+#include <print>
 #include <thread>
 
 Engine::Engine()
@@ -151,7 +152,12 @@ void Engine::draw()
     vk::Fence frameFence = get_current_frame().renderFence;
 
     // Wait max 1s until the gpu finished rendering the last frame
-    VK_CHECK_RES(I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT));
+    vk::Result res = I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT);
+    if (res != vk::Result::eSuccess) {
+        std::cout << "Skipping frame" << std::endl;
+        return;
+    }
+    // std::cout << "resetfences" << std::endl;
     I->device.resetFences(frameFence);
 
     // Request image from the swapchain
@@ -162,13 +168,14 @@ void Engine::draw()
     acquireImageInfo.setTimeout(FENCE_TIMEOUT);
     acquireImageInfo.setDeviceMask(1); // First and only device in the group
 
+    // std::cout << "acquire" << std::endl;
     VK_CHECK_RES(I->device.acquireNextImage2KHR(&acquireImageInfo, &swapchainImageIndex));
 
     vk::Semaphore submitSemaphore = I->swapchainSemaphores[swapchainImageIndex];
 
-    // We can safely copy command buffers
     vk::CommandBuffer cmd = get_current_frame().mainCommandBuffer;
-    // Thanks to the fence, we are sure now that we can safely reset cmd and start recording again.
+    // Thanks to the fence, we are sure now (NOT ANYMORE!?)
+    // that we can safely reset cmd and start recording again.
     cmd.reset();
 
     // Record the next set of commands
@@ -180,20 +187,18 @@ void Engine::draw()
                             I->imageDraw.image,
                             vk::ImageLayout::eUndefined,
                             vk::ImageLayout::eGeneral);
-    // vk::ImageLayout::eColorAttachmentOptimal);
 
     utils::transition_image(cmd,
                             I->imageDepth.image,
                             vk::ImageLayout::eUndefined,
                             vk::ImageLayout::eDepthAttachmentOptimal);
 
-    // draw_meshes(cmd);
+    // raster(cmd);
     raytrace(cmd);
 
     // Transition the draw image to be sent and the swapchain image to receive it
     utils::transition_image(cmd,
                             I->imageDraw.image,
-                            // vk::ImageLayout::eColorAttachmentOptimal,
                             vk::ImageLayout::eGeneral,
                             vk::ImageLayout::eTransferSrcOptimal);
     utils::transition_image(cmd,
@@ -222,20 +227,22 @@ void Engine::draw()
 
     cmd.end();
     // Set the sync objects
-    //prepare the submission to the queue.
-    //we want to wait on the _presentSemaphore, as that semaphore is signaled when the swapchain is ready
-    //we will signal the _renderSemaphore, to signal that rendering has finished
+    // prepare the submission to the queue.
+    // we want to wait on the acquire semaphore, as that semaphore is signaled when the swapchain is ready
+    // we will signal the submitSemaphore, to signal that rendering has finished
     vk::CommandBufferSubmitInfo cmdInfo{};
     cmdInfo.setDeviceMask(1);
     cmdInfo.setCommandBuffer(cmd);
     vk::SemaphoreSubmitInfo semaphoreWaitInfo{};
     semaphoreWaitInfo.setSemaphore(acquireSemaphore);
-    semaphoreWaitInfo.setStageMask(vk::PipelineStageFlagBits2::eAllGraphics);
+    semaphoreWaitInfo.setStageMask(vk::PipelineStageFlagBits2::eAllGraphics
+                                   | vk::PipelineStageFlagBits2::eRayTracingShaderKHR);
     semaphoreWaitInfo.setDeviceIndex(0);
     semaphoreWaitInfo.setValue(1);
     vk::SemaphoreSubmitInfo semaphoreSignalInfo{};
     semaphoreSignalInfo.setSemaphore(submitSemaphore);
-    semaphoreSignalInfo.setStageMask(vk::PipelineStageFlagBits2::eAllGraphics);
+    semaphoreSignalInfo.setStageMask(vk::PipelineStageFlagBits2::eAllGraphics
+                                     | vk::PipelineStageFlagBits2::eRayTracingShaderKHR);
     semaphoreSignalInfo.setDeviceIndex(0);
     semaphoreSignalInfo.setValue(1);
     vk::SubmitInfo2 submitInfo{};
@@ -244,18 +251,27 @@ void Engine::draw()
     submitInfo.setSignalSemaphoreInfos(semaphoreSignalInfo);
 
     // submit command buffer to the queue and execute it.
-    // renderFence will now block until the graphic commands finish execution
-    I->graphicsQueue.submit2(submitInfo, frameFence);
+    // BEFORE: frameFence will now block until the graphic commands finish execution
+    // NOW: We pass over submit2 and will wait on present to finish during the next draw() execution
+    // std::cout << "submit" << std::endl;
+    I->graphicsQueue.submit2(submitInfo, nullptr);
+    // I->graphicsQueue.submit2(submitInfo, frameFence);
 
-    //prepare present
+    // prepare present
     // this will put the image we just rendered to into the visible window.
-    // we want to wait on the _renderSemaphore for that,
+    // we want to wait on the submitSemaphore for that,
     // as its necessary that drawing commands have finished before the image is displayed to the user
+    // We signal the frame fence in order for the next execution to now when it's safe to start
+    vk::SwapchainPresentFenceInfoKHR swapchainPresentInfo{};
+    swapchainPresentInfo.setFences(frameFence);
+    swapchainPresentInfo.setSwapchainCount(1);
     vk::PresentInfoKHR presentInfo{};
     presentInfo.setSwapchains(I->swapchain);
     presentInfo.setWaitSemaphores(submitSemaphore);
     presentInfo.setImageIndices(swapchainImageIndex);
+    presentInfo.setPNext(&swapchainPresentInfo);
 
+    // std::cout << "present" << std::endl;
     VK_CHECK_RES(I->graphicsQueue.presentKHR(presentInfo));
 
     frameNumber = (frameNumber + 1) % I->frameOverlap;
@@ -390,6 +406,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     cmd.pushConstants2(pushInfo);
 
     I->camera.update();
+
     for (int objId = 0; objId < I->models.size(); objId++) {
         glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
                               * I->models[objId]->modelMatrix;

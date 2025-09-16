@@ -151,17 +151,19 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
     for (int i = 0; i < blases.size(); i++) {
         glm::mat3x4 transformGlm = transforms[i];
         AccelerationStructure blas = blases[i];
-        vk::AccelerationStructureInstanceKHR tlas{};
+        vk::AccelerationStructureInstanceKHR instance{};
         vk::TransformMatrixKHR transformVk;
         memcpy(&transformVk, glm::value_ptr(transformGlm), sizeof(vk::TransformMatrixKHR));
-        tlas.setTransform(transformVk);
-        tlas.setInstanceCustomIndex(i); // gl_InstanceCustomIndexEXT
-        tlas.setAccelerationStructureReference(blas.addr);
-        tlas.setFlags(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
-        tlas.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
-        tlas.setInstanceShaderBindingTableRecordOffset(
+        instance.setTransform(transformVk);
+        instance.setInstanceCustomIndex(i); // gl_InstanceCustomIndexEXT
+        instance.setAccelerationStructureReference(blas.addr);
+        // instance.setFlags(vk::GeometryInstanceFlagBitsKHR::eForceOpaque
+        //                   | vk::GeometryInstanceFlagBitsKHR::eTriangleCullDisable
+        //                   | vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
+        instance.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
+        instance.setInstanceShaderBindingTableRecordOffset(
             0); // We will use the same hit group for all objects
-        instances.emplace_back(tlas);
+        instances.emplace_back(instance);
     }
 
     asCmd.reset();
@@ -197,7 +199,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
 
     // Find sizes
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
-    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace
+                       | vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess);
     buildInfo.setGeometries(topASGeometry);
     buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
     buildInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);

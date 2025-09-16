@@ -2,6 +2,8 @@
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_scalar_block_layout : enable
 
+#include "types.glsl"
+
 struct hitPayload
 {
   vec3 hitValue;
@@ -10,11 +12,7 @@ struct hitPayload
 layout(location = 0) rayPayloadInEXT hitPayload rayPayload;
 
 //push constants block
-layout(scalar, push_constant) uniform constants
-{
-    vec4 clearColor;
-    uint numObjects;
-} push;
+layout(scalar, push_constant) uniform RayPushConstants push;
 
 
 void main()

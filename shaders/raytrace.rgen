@@ -1,35 +1,37 @@
 #version 460
-#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_debug_printf : enable
+
+#include "types.glsl"
+#include "functions.glsl"
+
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
+layout(location = 0) rayPayloadEXT HitPayload rayPayload;
 
 layout(scalar, binding = 2, set = 0) uniform CameraData{
   vec3 origin;
   vec3 orientation;
 } camera;
 
-
-struct hitPayload
+layout(buffer_reference, scalar) readonly buffer VertexBuffer
 {
-  vec3 hitValue;
+    Vertex vertices[];
 };
 
-layout(location = 0) rayPayloadEXT hitPayload rayPayload;
+layout(buffer_reference, std430) readonly buffer IndexBuffer
+    {
+        uint indices[];
+    };
+
 
 //push constants block
-layout(scalar, push_constant) uniform constants
-{
-    vec4 clearColor;
-    uint numObjects;
-    vec3 lightPosition;
-    float lightIntensity;
-    uint lightType;
+layout(scalar, push_constant) uniform RayPushConstants push;
 
-} push;
 
 // const vec3 origin = vec3(0., 0., -10.);
 const float Ft = 0.700207531;
@@ -48,20 +50,30 @@ void main()
     const float wm1 = w - 1.;
     const float arFt = (w / h) * Ft;
 
-    float y = (-1. + 2. * (i + 0.5f) / hm1) * Ft;
-    float x = (-1. + 2. * (j + 0.5f) / wm1) * arFt;
+    const float y = (-1. + 2. * (i + 0.5f) / hm1) * Ft;
+    const float x = (-1. + 2. * (j + 0.5f) / wm1) * arFt;
 
-    vec3 forward = camera.orientation;
-    vec3 up = vec3(0.0, 1.0, 0.0);
-    vec3 right = cross(up, forward);
-    up = normalize(cross(forward, right));   // re-orthonormalize
+    const vec3 forward = camera.orientation;
+    //float forwardL = length(forward);
+    vec3 up = vec3(0.0, -1.0, 0.0);
+    const vec3 right = cross(forward, up);
+    //float rightL = length(right);
+    up = cross(forward, right);   // re-orthonormalize
+    //float upL = length(up);
+
 
     vec3 pixelCam = normalize(vec3(x, y, 1.)); // camera-space ray
-    vec3 direction = normalize(pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward);
+    vec3 direction = pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward;
+    float directionL = length(direction);
+    direction /= directionL;
+
 
     // vec3 direction = normalize(vec3(x, y, 0.) + camera.orientation);
 
     vec3 origin = camera.origin;
+    // printVal("x %f: ,", origin.x, -2., 2.);
+    // printVal("y %f: ,", origin.y, -2., 2.);
+    // printVal("z %f: ,", origin.z, -2., 2.);
 
     traceRayEXT(topLevelAS, // acceleration structure
       rayFlags, // rayFlags
