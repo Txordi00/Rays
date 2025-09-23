@@ -122,6 +122,7 @@ void Init::init_vulkan()
     features12.descriptorIndexing = vk::True;
     features12.descriptorBindingUniformBufferUpdateAfterBind = vk::True;
     features12.descriptorBindingStorageBufferUpdateAfterBind = vk::True;
+    features12.shaderStorageBufferArrayNonUniformIndexing = vk::True;
     features12.descriptorBindingPartiallyBound = vk::True;
     features12.runtimeDescriptorArray = vk::True;
     features12.scalarBlockLayout = vk::True;
