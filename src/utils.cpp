@@ -157,7 +157,8 @@ Buffer create_buffer(const vk::Device &device,
                                      &createdBuffer.allocationInfo);
     }
 
-    if (usageFlags & vk::BufferUsageFlagBits::eShaderDeviceAddress) {
+    if ((usageFlags & vk::BufferUsageFlagBits::eShaderDeviceAddress)
+        == vk::BufferUsageFlagBits::eShaderDeviceAddress) {
         vk::BufferDeviceAddressInfo addressInfo{};
         addressInfo.setBuffer(createdBuffer.buffer);
         createdBuffer.bufferAddress = device.getBufferAddress(addressInfo);

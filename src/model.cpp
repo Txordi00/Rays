@@ -150,8 +150,8 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
     ObjectStorageData objectStorage;
     objectStorage.vertexBufferAddress = vertexBuffer.bufferAddress;
     objectStorage.indexBufferAddress = indexBuffer.bufferAddress;
-    objectStorage.numVertices = numVertices;
-    objectStorage.numIndices = numIndices;
+    // objectStorage.numVertices = numVertices;
+    // objectStorage.numIndices = numIndices;
     utils::map_to_buffer(storageBuffer, &objectStorage);
 }
 

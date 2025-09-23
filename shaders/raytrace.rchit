@@ -4,7 +4,6 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_scalar_block_layout : enable
-//#extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_debug_printf : enable
 
 #include "types.glsl"
@@ -35,8 +34,6 @@ layout(buffer_reference, std430) readonly buffer IndexBuffer
 layout(set = 1, binding = 1, scalar) readonly buffer ObjectStorage {
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
-    uint numVertices;
-    uint numIndices;
 } objStorage[];
 
 //push constants block
@@ -65,79 +62,78 @@ void main()
   const vec3 vertPos1 = v1.position;
   const vec3 vertPos2 = v2.position;
 
-  const vec3 vertPos0a = gl_HitTriangleVertexPositionsEXT[0];
-  const vec3 vertPos1a = gl_HitTriangleVertexPositionsEXT[1];
-  const vec3 vertPos2a = gl_HitTriangleVertexPositionsEXT[2];
+  const vec3 vertPos0EXT = gl_HitTriangleVertexPositionsEXT[0];
+  const vec3 vertPos1EXT = gl_HitTriangleVertexPositionsEXT[1];
+  const vec3 vertPos2EXT = gl_HitTriangleVertexPositionsEXT[2];
 
-  float diff = length(vertPos0a-vertPos0);
-  if(diff > 0.01)
-    printVal("I%i ", objId, 0, 0);
+  float diff = length(vertPos0EXT-vertPos0);
+//  if(diff > 0.01)
+//    printVal("I%i ", objId, 0, 0);
 
-  const vec3 normal = normalize(cross(vertPos1 - vertPos0, vertPos2 - vertPos0));
-
-
-  const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-
-  // Computing the coordinates of the hit position
-  const vec3 pos
-  = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y + vertPos2 * barycentrics.z;
-  // Transforming the position to world space
-  const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
-
-  //const vec4 colorIn =
-    //v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z;
-  const vec3 colorIn = vec3(1.);
-
-  // Check if in shadow
-  // Vector towards the light
-  vec3 l = push.lightPosition - worldPos;
-  float lightDistance = length(l);
-  vec3 lNorm = normalize(l);
-  float attenuation = push.lightIntensity / lightDistance;
-
-  // Flags
-  uint shadowFlags =
-      gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-  // We initialize to true, if the miss shader will be called it sets it to false
-  isShadowed = false;
-//  traceRayEXT(topLevelAS,  // acceleration structure
-//          shadowFlags,       // rayFlags
-//          0xFF,        // cullMask
-//          0,           // sbtRecordOffset
-//          0,           // sbtRecordStride
-//          1,           // missIndex
-//          worldPos,      // ray origin
-//          tMin,        // ray min range
-//          lNorm,      // ray direction
-//          tMax,        // ray max range
-//          1            // payload (location = 1)
-//  );
+//  const vec3 normal = normalize(cross(vertPos1 - vertPos0, vertPos2 - vertPos0));
 
 
-  // Point light diffuse lighting
-  vec3 diffuseC = vec3(0.);
-  if(!isShadowed)
-  {
-    diffuseC = diffuse(1., lNorm, normal) * colorIn;
-    diffuseC *= attenuation;
-  }
+//  const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
-  // Point light specular lighting
-  vec3 specularC = vec3(0.);
-  if(!isShadowed)
-  {
-    vec3 viewDir = gl_WorldRayDirectionEXT;
-    float viewDirL2 = length(viewDir);
-    viewDir /= viewDirL2;
-    // printVal(viewDirL2, 1.0, 10000.0);
-    specularC = specular(4, viewDir, lNorm, normal) * colorIn;
-    specularC *= attenuation;
-  }
+//  // Computing the coordinates of the hit position
+//  const vec3 pos
+//  = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y + vertPos2 * barycentrics.z;
+//  // Transforming the position to world space
+//  const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
 
-  vec3 outColor = diffuseC + specularC;
+//  //const vec4 colorIn =
+//    //v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z;
+//  const vec3 colorIn = vec3(1.);
+
+//  // Check if in shadow
+//  // Vector towards the light
+//  vec3 l = push.lightPosition - worldPos;
+//  float lightDistance = length(l);
+//  vec3 lNorm = normalize(l);
+//  float attenuation = push.lightIntensity / lightDistance;
+
+//  // Flags
+//  uint shadowFlags =
+//      gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+//  // We initialize to true, if the miss shader will be called it sets it to false
+//  isShadowed = false;
+////  traceRayEXT(topLevelAS,  // acceleration structure
+////              shadowFlags, // rayFlags
+////              0xFF,        // cullMask
+////              0,           // sbtRecordOffset
+////              0,           // sbtRecordStride
+////              1,           // missIndex
+////              worldPos,    // ray origin
+////              tMin,        // ray min range
+////              lNorm,       // ray direction
+////              tMax,        // ray max range
+////              1            // payload (location = 1)
+////  );
+
+//  // Point light diffuse lighting
+//  vec3 diffuseC = vec3(0.);
+//  if(!isShadowed)
+//  {
+//    diffuseC = diffuse(1., lNorm, normal) * colorIn;
+//    diffuseC *= attenuation;
+//  }
+
+//  // Point light specular lighting
+//  vec3 specularC = vec3(0.);
+//  if(!isShadowed)
+//  {
+//    vec3 viewDir = gl_WorldRayDirectionEXT;
+//    float viewDirL2 = length(viewDir);
+//    viewDir /= viewDirL2;
+//    // printVal(viewDirL2, 1.0, 10000.0);
+//    specularC = specular(4, viewDir, lNorm, normal) * colorIn;
+//    specularC *= attenuation;
+//  }
+
+//  vec3 outColor = diffuseC + specularC;
 //  vec3 outColor = vec3(0.);
-  outColor = vec3(diff);
-  outColor /= (outColor + 1.);
+  vec3 outColor = vec3(diff);
+//  outColor /= (outColor + 1.);
 
   rayPayload.hitValue = outColor;
 }

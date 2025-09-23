@@ -133,8 +133,8 @@ struct ObjectStorageData
 {
     vk::DeviceAddress vertexBufferAddress;
     vk::DeviceAddress indexBufferAddress;
-    uint32_t numVertices;
-    uint32_t numIndices;
+    // uint32_t numVertices;
+    // uint32_t numIndices;
 };
 
 // camera data for the storage buffer

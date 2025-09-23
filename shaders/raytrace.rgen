@@ -88,5 +88,5 @@ void main()
       0 // payload (location = 0)
     );
 
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(rayPayload.hitValue, 1.));
+    imageStore(image, ivec2(j, i), vec4(rayPayload.hitValue, 1.));
 }
