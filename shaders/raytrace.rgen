@@ -54,26 +54,14 @@ void main()
     const float x = (-1. + 2. * (j + 0.5f) / wm1) * arFt;
 
     const vec3 forward = camera.orientation;
-    //float forwardL = length(forward);
     vec3 up = vec3(0.0, -1.0, 0.0);
     const vec3 right = cross(forward, up);
-    //float rightL = length(right);
     up = cross(forward, right);   // re-orthonormalize
-    //float upL = length(up);
-
 
     vec3 pixelCam = normalize(vec3(x, y, 1.)); // camera-space ray
-    vec3 direction = pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward;
-    float directionL = length(direction);
-    direction /= directionL;
+    const vec3 direction = pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward;
 
-
-    // vec3 direction = normalize(vec3(x, y, 0.) + camera.orientation);
-
-    vec3 origin = camera.origin;
-    // printVal("x %f: ,", origin.x, -2., 2.);
-    // printVal("y %f: ,", origin.y, -2., 2.);
-    // printVal("z %f: ,", origin.z, -2., 2.);
+    const vec3 origin = camera.origin;
 
     traceRayEXT(topLevelAS, // acceleration structure
       rayFlags, // rayFlags

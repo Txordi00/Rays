@@ -48,6 +48,7 @@ void Engine::run()
     DescriptorUpdater descUpdater{I->device};
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
     for (const auto &frame : I->frames) {
+        // Inform the shaders about all the different descriptors
         vk::DescriptorSet descriptorSetUniform = frame.descriptorSetUAB;
         vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
@@ -57,6 +58,29 @@ void Engine::run()
         descUpdater.add_image(descriptorSetRt, 1, imageView);
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
         descUpdater.update();
+
+        // Transition to general the images where we will be drawing.
+        // I do it here because we don't have to transition back thanks to VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION,
+        // so we will save many transitions.
+        vk::CommandBuffer cmd = frame.mainCommandBuffer;
+        cmd.reset();
+        // Record the next set of commands
+        vk::CommandBufferBeginInfo commandBufferBeginInfo{};
+        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+        cmd.begin(commandBufferBeginInfo);
+        utils::transition_image(cmd,
+                                I->imageDraw.image,
+                                vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::eGeneral,
+                                vk::PipelineStageFlagBits2::eTopOfPipe,
+                                vk::PipelineStageFlagBits2::eBottomOfPipe);
+        cmd.end();
+        vk::CommandBufferSubmitInfo cmdInfo{};
+        cmdInfo.setDeviceMask(1);
+        cmdInfo.setCommandBuffer(cmd);
+        vk::SubmitInfo2 submitInfo{};
+        submitInfo.setCommandBufferInfos(cmdInfo);
+        I->graphicsQueue.submit2(submitInfo, nullptr);
     }
 
     const float dx = 0.5f;
@@ -184,27 +208,26 @@ void Engine::draw()
     cmd.begin(commandBufferBeginInfo);
 
     utils::transition_image(cmd,
-                            I->imageDraw.image,
+                            I->swapchainImages[swapchainImageIndex],
                             vk::ImageLayout::eUndefined,
-                            vk::ImageLayout::eGeneral);
-
-    utils::transition_image(cmd,
-                            I->imageDepth.image,
-                            vk::ImageLayout::eUndefined,
-                            vk::ImageLayout::eDepthAttachmentOptimal);
+                            vk::ImageLayout::eGeneral,
+                            vk::PipelineStageFlagBits2::eTopOfPipe,
+                            vk::PipelineStageFlagBits2::eRayTracingShaderKHR);
 
     // raster(cmd);
     raytrace(cmd);
 
-    // Transition the draw image to be sent and the swapchain image to receive it
-    utils::transition_image(cmd,
-                            I->imageDraw.image,
-                            vk::ImageLayout::eGeneral,
-                            vk::ImageLayout::eTransferSrcOptimal);
-    utils::transition_image(cmd,
-                            I->swapchainImages[swapchainImageIndex],
-                            vk::ImageLayout::eUndefined,
-                            vk::ImageLayout::eTransferDstOptimal);
+    // Instead of many image transitions, thanks to the extension VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION
+    // we can go ahead only with memory barriers. For the moment we need only one.
+    vk::MemoryBarrier2 barrier{};
+    barrier.srcStageMask = vk::PipelineStageFlagBits2::eRayTracingShaderKHR;
+    barrier.dstStageMask = vk::PipelineStageFlagBits2::eBlit;
+    barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits2::eMemoryRead;
+
+    vk::DependencyInfo depInfo{};
+    depInfo.setMemoryBarriers(barrier);
+    cmd.pipelineBarrier2(depInfo);
 
     // Copy draw to swapchain
     utils::copy_image(cmd,
@@ -213,17 +236,14 @@ void Engine::draw()
                       vk::Extent2D{I->imageDraw.extent.width, I->imageDraw.extent.height},
                       I->swapchainExtent);
 
-    utils::transition_image(cmd,
-                            I->swapchainImages[swapchainImageIndex],
-                            vk::ImageLayout::eTransferDstOptimal,
-                            vk::ImageLayout::eColorAttachmentOptimal);
-
     draw_imgui(cmd, I->swapchainImageViews[swapchainImageIndex]);
 
     utils::transition_image(cmd,
                             I->swapchainImages[swapchainImageIndex],
-                            vk::ImageLayout::eColorAttachmentOptimal,
-                            vk::ImageLayout::ePresentSrcKHR);
+                            vk::ImageLayout::eGeneral,
+                            vk::ImageLayout::ePresentSrcKHR,
+                            vk::PipelineStageFlagBits2::eAllGraphics,
+                            vk::PipelineStageFlagBits2::eBottomOfPipe);
 
     cmd.end();
     // Set the sync objects

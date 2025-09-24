@@ -6,13 +6,15 @@ namespace utils {
 void transition_image(vk::CommandBuffer &cmd,
                       const vk::Image &image,
                       const vk::ImageLayout &currentLayout,
-                      const vk::ImageLayout &newLayout)
+                      const vk::ImageLayout &newLayout,
+                      const vk::PipelineStageFlags2 &srcStageMask,
+                      const vk::PipelineStageFlags2 &dstStageMask)
 {
     vk::ImageMemoryBarrier2 imageBarrier{};
     // The AllCommands flags can be optimized
-    imageBarrier.setSrcStageMask(vk::PipelineStageFlagBits2::eAllCommands);
+    imageBarrier.setSrcStageMask(srcStageMask);
     imageBarrier.setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite);
-    imageBarrier.setDstStageMask(vk::PipelineStageFlagBits2::eAllCommands);
+    imageBarrier.setDstStageMask(dstStageMask);
     imageBarrier.setDstAccessMask(vk::AccessFlagBits2::eMemoryWrite
                                   | vk::AccessFlagBits2::eMemoryRead);
 
@@ -65,9 +67,9 @@ void copy_image(vk::CommandBuffer &cmd,
 
     vk::BlitImageInfo2 blitInfo{};
     blitInfo.setDstImage(dst);
-    blitInfo.setDstImageLayout(vk::ImageLayout::eTransferDstOptimal);
+    blitInfo.setDstImageLayout(vk::ImageLayout::eGeneral);
     blitInfo.setSrcImage(src);
-    blitInfo.setSrcImageLayout(vk::ImageLayout::eTransferSrcOptimal);
+    blitInfo.setSrcImageLayout(vk::ImageLayout::eGeneral);
     blitInfo.setRegions(blitRegion);
     blitInfo.setFilter(vk::Filter::eLinear);
 
@@ -191,8 +193,7 @@ vk::ImageCreateInfo image_create_info(const vk::Format &format,
     imageCreateInfo.setArrayLayers(1);
     imageCreateInfo.setSamples(vk::SampleCountFlagBits::e1);
     imageCreateInfo.setTiling(vk::ImageTiling::eOptimal);
-    // ENABLE when the driver will support VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION
-    // imageCreateInfo.setInitialLayout(vk::ImageLayout::eGeneral);
+    imageCreateInfo.setInitialLayout(vk::ImageLayout::eUndefined);
     return imageCreateInfo;
 }
 

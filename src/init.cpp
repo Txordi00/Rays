@@ -129,14 +129,13 @@ void Init::init_vulkan()
     features12.bufferDeviceAddress = vk::True;
 
     // NOT SUPPORTED YET! ENABLE AS IT GETS SUPPORTED
-    // vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR unifiedImageLayoutsFeatures{};
-    // unifiedImageLayoutsFeatures.setUnifiedImageLayouts(vk::False);
-    // unifiedImageLayoutsFeatures.setUnifiedImageLayoutsVideo(vk::False);
+    vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR unifiedImageLayoutsFeatures{};
+    unifiedImageLayoutsFeatures.setUnifiedImageLayouts(vk::True);
+    unifiedImageLayoutsFeatures.setUnifiedImageLayoutsVideo(vk::True);
 
     std::vector<const char *> rtExtensions = {VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
                                               VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
                                               VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-                                              VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME,
                                               VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME};
     vk::PhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{};
     asFeatures.setAccelerationStructure(vk::True);
@@ -144,37 +143,33 @@ void Init::init_vulkan()
     vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
     rtPipelineFeatures.setRayTracingPipeline(vk::True);
 
-    vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR rtPFFeatures{};
-    rtPFFeatures.setRayTracingPositionFetch(vk::True);
-
     vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchainMaintenanceFeatures{};
     swapchainMaintenanceFeatures.setSwapchainMaintenance1(vk::True);
 
-    vk::PhysicalDeviceFeatures pdFeatures{};
-    pdFeatures.setRobustBufferAccess(vk::True);
-    vk::PhysicalDeviceRobustness2FeaturesKHR robustnessFeatures{};
-    robustnessFeatures.setRobustBufferAccess2(vk::True);
+    // vk::PhysicalDeviceFeatures pdFeatures{};
+    // pdFeatures.setRobustBufferAccess(vk::True);
+    // vk::PhysicalDeviceRobustness2FeaturesKHR robustnessFeatures{};
+    // robustnessFeatures.setRobustBufferAccess2(vk::True);
 
     // Select a GPU
     vkb::PhysicalDeviceSelector physDevSelector{vkbInstance};
 
-    auto resSelector
-        = physDevSelector.set_minimum_version(API_VERSION[0], API_VERSION[1])
-              .set_required_features_13(features13)
-              .set_required_features_12(features12)
-              .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
-              .add_required_extension(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME)
-              // .add_required_extension(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) // NOT SUPPORTED YET
-              // .add_required_extension_features(unifiedImageLayoutsFeatures)
-              .add_required_extensions(rtExtensions)
-              .add_required_extension_features(asFeatures)
-              .add_required_extension_features(rtPipelineFeatures)
-              .add_required_extension_features(rtPFFeatures)
-              .set_required_features(pdFeatures)
-              .add_required_extension_features(robustnessFeatures)
-              .add_required_extension_features(swapchainMaintenanceFeatures)
-              .set_surface(surface)
-              .select();
+    auto resSelector = physDevSelector.set_minimum_version(API_VERSION[0], API_VERSION[1])
+                           .set_required_features_13(features13)
+                           .set_required_features_12(features12)
+                           .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
+                           // .add_required_extension(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME)
+                           .add_required_extension(
+                               VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) // NOT SUPPORTED YET
+                           .add_required_extension_features(unifiedImageLayoutsFeatures)
+                           .add_required_extensions(rtExtensions)
+                           .add_required_extension_features(asFeatures)
+                           .add_required_extension_features(rtPipelineFeatures)
+                           // .set_required_features(pdFeatures)
+                           // .add_required_extension_features(robustnessFeatures)
+                           .add_required_extension_features(swapchainMaintenanceFeatures)
+                           .set_surface(surface)
+                           .select();
 
     // std::cout << resSelector.error() << std::endl;
     vkb::PhysicalDevice vkbPhysDev = resSelector.value();
@@ -517,27 +512,17 @@ void Init::init_rt()
 void Init::load_meshes()
 {
     GLTFLoader gltfLoader{};
-    gltfLoader.overrideColorsWithNormals = true;
+    gltfLoader.overrideColorsWithNormals = false;
     std::vector<std::shared_ptr<HostMeshAsset>> cpuMeshes = gltfLoader.loadGLTFMeshes(
         "../../assets/basicmesh.glb");
-    // models.resize(cpuMeshes.size());
-    // for (int i = 0; i < cpuMeshes.size(); i++) {
-    //     models[i] = std::make_shared<Model>(device, *cpuMeshes[i], allocator);
-    //     models[i]->create_mesh(cmdTransfer, transferFence, transferQueue);
-    // }
-    // models[0]->position = glm::vec3(2.f, 2.f, 7.f);
-    // models[1]->position = glm::vec3(5.f, 0.f, 7.f);
-    // models[2]->position = glm::vec3(0.f, 0.f, 7.f);
-
-    models.push_back(std::make_shared<Model>(device, *cpuMeshes[1], allocator));
-    models.push_back(std::make_shared<Model>(device, *cpuMeshes[2], allocator));
-    // models.push_back(std::make_shared<Model>(device, *cpuMeshes[2], allocator));
-    models[0]->create_mesh(cmdTransfer, transferFence, transferQueue);
-    models[1]->create_mesh(cmdTransfer, transferFence, transferQueue);
-    // models[2]->create_mesh(cmdTransfer, transferFence, transferQueue);
+    models.resize(cpuMeshes.size());
+    for (int i = 0; i < cpuMeshes.size(); i++) {
+        models[i] = std::make_shared<Model>(device, *cpuMeshes[i], allocator);
+        models[i]->create_mesh(cmdTransfer, transferFence, transferQueue);
+    }
     models[0]->position = glm::vec3(2.f, 2.f, 7.f);
-    models[1]->position = glm::vec3(0.f, 0.f, 7.f);
-    // models[1]->position = glm::vec3(-2.f, 0.f, 7.f);
+    models[1]->position = glm::vec3(5.f, 0.f, 7.f);
+    models[2]->position = glm::vec3(0.f, 0.f, 7.f);
 }
 
 void Init::create_as()

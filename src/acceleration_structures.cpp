@@ -308,8 +308,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
 
     // Find sizes
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
-    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace
-                       | vk::BuildAccelerationStructureFlagBitsKHR::eAllowDataAccess);
+    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
     buildInfo.setGeometries(topASGeometry);
     buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
     buildInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);

@@ -11,10 +11,13 @@ import vulkan_hpp;
 
 namespace utils {
 
-void transition_image(vk::CommandBuffer &cmd,
-                      const vk::Image &image,
-                      const vk::ImageLayout &currentLayout,
-                      const vk::ImageLayout &newLayout);
+void transition_image(
+    vk::CommandBuffer &cmd,
+    const vk::Image &image,
+    const vk::ImageLayout &currentLayout,
+    const vk::ImageLayout &newLayout,
+    const vk::PipelineStageFlags2 &srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
+    const vk::PipelineStageFlags2 &dstStageMask = vk::PipelineStageFlagBits2::eAllCommands);
 
 void copy_image(vk::CommandBuffer &cmd,
                 const vk::Image &src,
