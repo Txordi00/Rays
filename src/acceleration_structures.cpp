@@ -42,6 +42,8 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     triData.setIndexType(vk::IndexType::eUint32);
     triData.setIndexData(vk::DeviceOrHostAddressConstKHR{model->indexBuffer.bufferAddress});
 
+    vk::AccelerationStructureGeometryAabbsDataKHR aabbs{};
+
     vk::AccelerationStructureGeometryKHR geom{};
     geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
     geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest

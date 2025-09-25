@@ -58,4 +58,7 @@ private:
     // Efficiently create a vector of all the uniform buffers
     std::vector<Buffer> uniformBuffers;
     std::vector<Buffer> storageBuffers;
+
+    // RT push constants
+    RayPush rayPush{};
 };

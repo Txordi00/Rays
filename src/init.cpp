@@ -514,8 +514,8 @@ void Init::load_meshes()
     std::vector<Material> materials;
     Material m1{};
     m1.color = glm::vec3{1.f, 0.f, 0.f};
-    m1.diffuseR = 0.2f;
-    m1.specularR = 0.8f;
+    m1.diffuseR = 1.f;
+    m1.specularR = 1.f;
     m1.shininessN = 4;
     m1.ambientR = 1.f;
     m1.reflectiveness = 0.5f;
@@ -536,9 +536,9 @@ void Init::load_meshes()
     materials.push_back(m2);
     Material m3{};
     m3.color = glm::vec3{0.f, 1.f, 1.f};
-    m3.diffuseR = 0.f;
-    m3.specularR = 0.3f;
-    m3.shininessN = 5;
+    m3.diffuseR = 0.1f;
+    m3.specularR = 1.f;
+    m3.shininessN = 2;
     m3.ambientR = 1.f;
     m3.reflectiveness = 0.5f;
     m3.refractiveness = 1.f;
@@ -555,9 +555,9 @@ void Init::load_meshes()
         models[i] = std::make_shared<Model>(device, *cpuMeshes[i], allocator, materials[i]);
         models[i]->create_mesh(cmdTransfer, transferFence, transferQueue);
     }
-    models[0]->position = glm::vec3(2.f, 2.f, 7.f);
-    models[1]->position = glm::vec3(5.f, 0.f, 7.f);
-    models[2]->position = glm::vec3(0.f, 0.f, 7.f);
+    models[0]->position = glm::vec3(0.f, 2.f, 7.f);
+    models[1]->position = glm::vec3(2.f, 0.f, 7.f);
+    models[2]->position = glm::vec3(-2.f, 0.f, 7.f);
 }
 
 void Init::create_as()

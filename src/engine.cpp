@@ -28,6 +28,13 @@ Engine::Engine()
     std::ranges::transform(I->models,
                            std::back_inserter(storageBuffers),
                            [](const std::shared_ptr<Model> &m) { return m->storageBuffer; });
+
+    // Init push constants
+    rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
+    rayPush.numObjects = I->models.size();
+    rayPush.lightIntensity = 10.f;
+    rayPush.lightType = 0;
+    rayPush.lightPosition = glm::vec3(0.f, -5.f, 7.f);
 }
 
 Engine::~Engine()
@@ -409,18 +416,20 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
 
     cmd.bindDescriptorSets2(bindSetsInfo);
 
-    RayPush push{};
-    push.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
-    push.numObjects = I->models.size();
-    push.lightIntensity = 10.f;
-    push.lightType = 0;
-    push.lightPosition = glm::vec3(-2.f, -5.f, 5.f);
+    // rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
+    // rayPush.numObjects = I->models.size();
+    // rayPush.lightIntensity = 10.f;
+    // rayPush.lightType = 0;
+    static uint32_t t = 0;
+    const float tf = glm::radians(static_cast<float>(t));
+    rayPush.lightPosition = glm::vec3(5.f * std::cosf(tf), -5.f, 7.f + 5.f * std::sinf(tf));
+    t = (t + 1) % 360;
     vk::PushConstantsInfo pushInfo{};
     pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR
                            | vk::ShaderStageFlagBits::eClosestHitKHR
                            | vk::ShaderStageFlagBits::eMissKHR);
-    pushInfo.setValues<RayPush>(push);
+    pushInfo.setValues<RayPush>(rayPush);
     pushInfo.setOffset(0);
     cmd.pushConstants2(pushInfo);
 

@@ -113,7 +113,7 @@ void main()
   vec3 diffuseC = vec3(0.);
   if(!isShadowed)
   {
-    diffuseC = diffuse(1., l, normal) * colorIn;
+    diffuseC = diffuse(material, l, normal) * colorIn;
     diffuseC *= attenuation;
   }
 
@@ -123,7 +123,7 @@ void main()
   {
     vec3 viewDir = gl_WorldRayDirectionEXT; // already normalized
     printVal("%f ", length(viewDir), 0.99, 1.01);
-    specularC = specular(2, viewDir, l, normal) * colorIn;
+    specularC = specular(material, viewDir, l, normal) * colorIn;
     specularC *= attenuation;
   }
 
