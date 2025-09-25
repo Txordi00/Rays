@@ -128,13 +128,34 @@ struct UniformData
     glm::mat4 worldMatrix;
 };
 
+struct Material
+{
+    // Color
+    glm::vec3 color;
+    // specular reflectiveness
+    float specularR;
+    // Diffuse reflectiveness
+    float diffuseR;
+    // Ambient reflectiveness
+    float ambientR;
+    // Shininess factor N.
+    // From the approximation in https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
+    // with beta=1
+    int shininessN;
+    // Reflectiveness
+    float reflectiveness;
+    // Refractiveness
+    float refractiveness;
+    // Refractive index. n_2 in https://en.wikipedia.org/wiki/Snell's_law
+    float refractiveIndex;
+};
+
 // Per-object storage buffer data
 struct ObjectStorageData
 {
     vk::DeviceAddress vertexBufferAddress;
     vk::DeviceAddress indexBufferAddress;
-    // uint32_t numVertices;
-    // uint32_t numIndices;
+    Material material;
 };
 
 // camera data for the storage buffer

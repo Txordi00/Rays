@@ -5,9 +5,13 @@
 #include <glm/gtx/transform.hpp>
 #include <vk_mem_alloc.h>
 
-Model::Model(const vk::Device &device, const HostMeshAsset &cpuMesh, const VmaAllocator &allocator)
+Model::Model(const vk::Device &device,
+             const HostMeshAsset &cpuMesh,
+             const VmaAllocator &allocator,
+             const Material &material)
     : device{device}
     , allocator{allocator}
+    , material{material}
 {
     name = cpuMesh.name;
     numVertices = cpuMesh.vertices.size();
@@ -150,6 +154,7 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
     ObjectStorageData objectStorage;
     objectStorage.vertexBufferAddress = vertexBuffer.bufferAddress;
     objectStorage.indexBufferAddress = indexBuffer.bufferAddress;
+    objectStorage.material = material;
     // objectStorage.numVertices = numVertices;
     // objectStorage.numIndices = numIndices;
     utils::map_to_buffer(storageBuffer, &objectStorage);

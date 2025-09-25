@@ -18,7 +18,6 @@ public:
               const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
     ~ASBuilder();
     AccelerationStructure buildBLAS(const std::shared_ptr<Model> &model);
-    AccelerationStructure buildBLAS2(const std::shared_ptr<Model> &model);
     AccelerationStructure buildTLAS(const std::vector<AccelerationStructure> &blases,
                                     const std::vector<glm::mat3x4> &transforms);
 

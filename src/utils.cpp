@@ -224,6 +224,16 @@ void map_to_buffer(const Buffer &buffer, const void *data)
     memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
 }
 
+void normalize_material_factors(Material &m)
+{
+    float normFactor = m.specularR + m.diffuseR + m.ambientR + m.reflectiveness + m.refractiveness;
+    m.specularR /= normFactor;
+    m.diffuseR /= normFactor;
+    m.ambientR /= normFactor;
+    m.reflectiveness /= normFactor;
+    m.refractiveness /= normFactor;
+}
+
 // namespace init
 
 } // namespace utils

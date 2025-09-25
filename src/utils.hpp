@@ -46,6 +46,8 @@ glm::mat4 get_perspective_projection(const float fovy,
 
 uint32_t align_up(uint32_t x, uint32_t a);
 
+void normalize_material_factors(Material &material);
+
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,

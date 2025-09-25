@@ -15,7 +15,7 @@ hitAttributeEXT vec3 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 
 
-layout(set = 1, binding = 0, scalar) uniform Ubo{
+layout(set = 1, binding = 0, scalar) uniform Ubo {
   mat4 worldMatrix;
 } ubo[];
 
@@ -33,6 +33,7 @@ layout(buffer_reference, std430) readonly buffer IndexBuffer
 layout(set = 1, binding = 1, scalar) readonly buffer ObjectStorage {
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
+    Material material;
 } objStorage[];
 
 //push constants block
@@ -48,6 +49,7 @@ void main()
 
   VertexBuffer vBuffer = objStorage[nonuniformEXT(objId)].vertexBuffer;
   IndexBuffer iBuffer = objStorage[nonuniformEXT(objId)].indexBuffer;
+  Material material = objStorage[nonuniformEXT(objId)].material;
 
   const uint i0 = iBuffer.indices[primitiveIndex];
   const uint i1 = iBuffer.indices[primitiveIndex + 1];
@@ -77,8 +79,9 @@ void main()
   // Transforming the position to world space
   const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
 
-  const vec3 colorIn = vec3(
-    v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
+//  const vec3 colorIn =
+//    vec3(v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
+  const vec3 colorIn = material.color;
 //  const vec3 colorIn = vec3(1.);
 
   // Check if in shadow

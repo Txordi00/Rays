@@ -47,115 +47,6 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
     geom.setGeometry(triData);
 
-    // 2. Get build sizes
-    vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
-    buildInfo.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
-    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace
-                       | vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
-    buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
-    buildInfo.setGeometries(geom);
-
-    uint32_t primCount = model->numIndices / 3;
-    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo
-        = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
-                                                       buildInfo,
-                                                       primCount);
-
-    // 3. Allocate BLAS buffer
-    Buffer blasBuffer = utils::create_buffer(device,
-                                             allocator,
-                                             sizeInfo.accelerationStructureSize,
-                                             vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR
-                                                 | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                                             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                             0);
-
-    // 4. Create the acceleration structure object
-    vk::AccelerationStructureCreateInfoKHR asInfo{};
-    asInfo.setBuffer(blasBuffer.buffer);
-    asInfo.setSize(sizeInfo.accelerationStructureSize);
-    asInfo.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
-
-    vk::AccelerationStructureKHR blas = device.createAccelerationStructureKHR(asInfo);
-
-    // 5. Allocate scratch buffer
-    Buffer scratchBuffer
-        = utils::create_buffer(device,
-                               allocator,
-                               sizeInfo.buildScratchSize,
-                               vk::BufferUsageFlagBits::eStorageBuffer
-                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                               0,
-                               asProperties.minAccelerationStructureScratchOffsetAlignment);
-
-    // 6. Build command
-    buildInfo.setDstAccelerationStructure(blas);
-    buildInfo.setScratchData(scratchBuffer.bufferAddress);
-
-    vk::AccelerationStructureBuildRangeInfoKHR rangeInfo{};
-    rangeInfo.setPrimitiveCount(primCount);
-
-    asCmd.reset();
-
-    // Record the next set of commands
-    vk::CommandBufferBeginInfo commandBufferBeginInfo{};
-    commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-    asCmd.begin(commandBufferBeginInfo);
-
-    asCmd.buildAccelerationStructuresKHR(buildInfo, &rangeInfo);
-
-    // 7. Barrier: BLAS build writes → TLAS read later
-    vk::MemoryBarrier barrier{};
-    barrier.setSrcAccessMask(vk::AccessFlagBits::eAccelerationStructureWriteKHR);
-    barrier.setDstAccessMask(vk::AccessFlagBits::eAccelerationStructureReadKHR);
-    // vk::DependencyInfo depInfo{};
-    // asCmd.pipelineBarrier2(depInfo)
-    asCmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                          vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                          vk::DependencyFlags{},
-                          barrier,
-                          nullptr,
-                          nullptr);
-
-    // 8. Device address (needed by TLAS)
-    vk::AccelerationStructureDeviceAddressInfoKHR blasAddrInfo{};
-    blasAddrInfo.setAccelerationStructure(blas);
-    VkDeviceAddress blasAddr = device.getAccelerationStructureAddressKHR(blasAddrInfo);
-
-    // Queue submit
-    asCmd.end();
-    vk::SubmitInfo2 submitInfo{};
-    vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
-    submitInfo.setCommandBufferInfos(cmdInfo);
-    queue.submit2(submitInfo, asFence);
-
-    // 9. scratch buffer can be destroyed after queue finishes
-    utils::destroy_buffer(allocator, scratchBuffer);
-
-    return AccelerationStructure{blas, blasBuffer, blasAddr};
-}
-
-// NEED TO OPTIMIZE: Build for a vector of Model in batches, use a single (or a lower amount of)
-// scractch buffers.
-AccelerationStructure ASBuilder::buildBLAS2(const std::shared_ptr<Model> &model)
-{
-    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
-    device.resetFences(asFence);
-    // 1. Geometry description (single triangle array)
-    vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
-    triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
-    triData.setVertexData(vk::DeviceOrHostAddressConstKHR{model->vertexBuffer.bufferAddress});
-    triData.setVertexStride(sizeof(Vertex));
-    triData.setMaxVertex(model->numVertices - 1); // conservative
-    triData.setIndexType(vk::IndexType::eUint32);
-    triData.setIndexData(vk::DeviceOrHostAddressConstKHR{model->indexBuffer.bufferAddress});
-
-    vk::AccelerationStructureGeometryKHR geom{};
-    geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
-    geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
-    geom.setGeometry(triData);
-
     // The entire array will be used to build the BLAS.
     vk::AccelerationStructureBuildRangeInfoKHR offsets{};
     offsets.setFirstVertex(0);
@@ -390,7 +281,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Mod
     blases.clear();
     blases.reserve(models.size());
     for (const auto &m : models)
-        blases.emplace_back(buildBLAS2(m));
+        blases.emplace_back(buildBLAS(m));
 
     return buildTLAS(blases, transforms);
 }

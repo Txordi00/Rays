@@ -511,13 +511,48 @@ void Init::init_rt()
 
 void Init::load_meshes()
 {
+    std::vector<Material> materials;
+    Material m1{};
+    m1.color = glm::vec3{1.f, 0.f, 0.f};
+    m1.diffuseR = 0.2f;
+    m1.specularR = 0.8f;
+    m1.shininessN = 4;
+    m1.ambientR = 1.f;
+    m1.reflectiveness = 0.5f;
+    m1.refractiveness = 0.f;
+    m1.refractiveIndex = 1.f;
+    utils::normalize_material_factors(m1);
+    materials.push_back(m1);
+    Material m2{};
+    m2.color = glm::vec3{0.f, 1.f, 0.f};
+    m2.diffuseR = 0.7f;
+    m2.specularR = 0.3f;
+    m2.shininessN = 1;
+    m2.ambientR = 1.f;
+    m2.reflectiveness = 0.f;
+    m2.refractiveness = 0.f;
+    m2.refractiveIndex = 1.f;
+    utils::normalize_material_factors(m2);
+    materials.push_back(m2);
+    Material m3{};
+    m3.color = glm::vec3{0.f, 1.f, 1.f};
+    m3.diffuseR = 0.f;
+    m3.specularR = 0.3f;
+    m3.shininessN = 5;
+    m3.ambientR = 1.f;
+    m3.reflectiveness = 0.5f;
+    m3.refractiveness = 1.f;
+    m3.refractiveIndex = 1.1f;
+    utils::normalize_material_factors(m3);
+    materials.push_back(m3);
+
     GLTFLoader gltfLoader{};
     gltfLoader.overrideColorsWithNormals = false;
     std::vector<std::shared_ptr<HostMeshAsset>> cpuMeshes = gltfLoader.loadGLTFMeshes(
         "../../assets/basicmesh.glb");
     models.resize(cpuMeshes.size());
     for (int i = 0; i < cpuMeshes.size(); i++) {
-        models[i] = std::make_shared<Model>(device, *cpuMeshes[i], allocator);
+        models[i] = std::make_shared<Model>(device, *cpuMeshes[i], allocator, materials[i]);
         models[i]->create_mesh(cmdTransfer, transferFence, transferQueue);
     }
     models[0]->position = glm::vec3(2.f, 2.f, 7.f);

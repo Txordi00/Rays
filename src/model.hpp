@@ -3,11 +3,13 @@
 #include "loader.hpp"
 #include <glm/glm.hpp>
 
-
 class Model
 {
 public:
-    Model(const vk::Device &device, const HostMeshAsset &cpuMesh, const VmaAllocator &allocator);
+    Model(const vk::Device &device,
+          const HostMeshAsset &cpuMesh,
+          const VmaAllocator &allocator,
+          const Material &material);
     ~Model() = default;
 
     void updateModelMatrix();
@@ -37,6 +39,7 @@ public:
 private:
     const vk::Device &device;
     const VmaAllocator &allocator;
+    const Material &material;
 
     const void *verticesData;
     const void *indicesData;
