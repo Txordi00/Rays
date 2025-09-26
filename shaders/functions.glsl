@@ -36,7 +36,7 @@ float specular(const Material mat, const vec3 viewDir, const vec3 lightDir, cons
   // Specular factor computed as in the first approximation in wikipedia:
   // https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
   float specularFactor = (reflectionOverlap > 0.f)
-                             ? pow(reflectionOverlap * reflectionOverlap,
+                             ? mat.specularR * pow(reflectionOverlap * reflectionOverlap,
                                         mat.shininessN)
                              : 0.f;
   return specularFactor;

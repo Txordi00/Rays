@@ -420,10 +420,10 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     // rayPush.numObjects = I->models.size();
     // rayPush.lightIntensity = 10.f;
     // rayPush.lightType = 0;
-    static uint32_t t = 0;
+    static uint32_t t = 180;
     const float tf = glm::radians(static_cast<float>(t));
     rayPush.lightPosition = glm::vec3(5.f * std::cosf(tf), -5.f, 7.f + 5.f * std::sinf(tf));
-    t = (t + 1) % 360;
+    // t = (t + 1) % 360;
     vk::PushConstantsInfo pushInfo{};
     pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR

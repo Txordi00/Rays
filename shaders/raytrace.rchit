@@ -90,10 +90,10 @@ void main()
   float lightDistance = length(l);
   l /= lightDistance;
   float attenuation = push.lightIntensity / lightDistance;
-  const vec3 viewDir = gl_WorldRayDirectionEXT; // already normalized
+  const vec3 rayDir = gl_WorldRayDirectionEXT; // already normalized
 
   vec3 outColor = vec3(0.);
-  if(dot(l, normal) > 0. && dot(viewDir, normal) < 0.)
+  if(dot(l, normal) > 0. && dot(rayDir, normal) < 0.)
   {
     // Flags
     const uint shadowFlags =
@@ -113,24 +113,38 @@ void main()
                 1            // payload (location = 1)
     );
 
-    // Point light diffuse lighting
     vec3 diffuseC = vec3(0.);
+    vec3 specularC = vec3(0.);
+    vec3 reflectedC = vec3(0.);
+    rayPayload.hitValue = vec3(0.); // initialize the ray payload
     if(!isShadowed)
     {
+      // Reflection
+      const vec3 reflectedDir = reflect(rayDir, normal);
+      traceRayEXT(topLevelAS,  // acceleration structure
+                  gl_IncomingRayFlagsEXT, // rayFlags
+                  0xFF,        // cullMask
+                  0,           // sbtRecordOffset
+                  0,           // sbtRecordStride
+                  0,           // missIndex
+                  worldPos,    // ray origin
+                  tMin,        // ray min range
+                  reflectedDir,       // ray direction
+                  tMax,        // ray max range
+                  0            // payload
+      );
+      reflectedC = material.reflectiveness * rayPayload.hitValue;
+
+      // Point light diffuse lighting
       diffuseC = diffuse(material, l, normal) * colorIn;
       diffuseC *= attenuation;
-    }
 
-    // Point light specular lighting
-    vec3 specularC = vec3(0.);
-    if(!isShadowed)
-    {
-      printVal("%f ", length(viewDir), 0.99, 1.01);
-      specularC = specular(material, viewDir, l, normal) * colorIn;
+      // Point light specular lighting
+      specularC = specular(material, rayDir, l, normal) * colorIn;
       specularC *= attenuation;
     }
 
-    outColor = diffuseC + specularC;
+    outColor = reflectedC + diffuseC + specularC;
     outColor /= (outColor + 1.);
 }
   rayPayload.hitValue = outColor;
