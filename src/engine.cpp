@@ -32,7 +32,7 @@ Engine::Engine()
     // Init push constants
     rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
     rayPush.numObjects = I->models.size();
-    rayPush.lightIntensity = 10.f;
+    rayPush.lightIntensity = 50.f;
     rayPush.lightType = 0;
     rayPush.lightPosition = glm::vec3(0.f, -5.f, 7.f);
 }

@@ -90,45 +90,48 @@ void main()
   float lightDistance = length(l);
   l /= lightDistance;
   float attenuation = push.lightIntensity / lightDistance;
+  const vec3 viewDir = gl_WorldRayDirectionEXT; // already normalized
 
-  // Flags
-  const uint shadowFlags =
-      gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-  // We initialize to true, if the miss shader will be called it sets it to false
-  isShadowed = true;
-  traceRayEXT(topLevelAS,  // acceleration structure
-              shadowFlags, // rayFlags
-              0xFF,        // cullMask
-              0,           // sbtRecordOffset
-              0,           // sbtRecordStride
-              1,           // missIndex
-              worldPos,    // ray origin
-              tMin,        // ray min range
-              l,       // ray direction
-              tMax,        // ray max range
-              1            // payload (location = 1)
-  );
-
-  // Point light diffuse lighting
-  vec3 diffuseC = vec3(0.);
-  if(!isShadowed)
+  vec3 outColor = vec3(0.);
+  if(dot(l, normal) > 0. && dot(viewDir, normal) < 0.)
   {
-    diffuseC = diffuse(material, l, normal) * colorIn;
-    diffuseC *= attenuation;
-  }
+    // Flags
+    const uint shadowFlags =
+        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+    // We initialize to true, if the miss shader will be called it sets it to false
+    isShadowed = true;
+    traceRayEXT(topLevelAS,  // acceleration structure
+                shadowFlags, // rayFlags
+                0xFF,        // cullMask
+                0,           // sbtRecordOffset
+                0,           // sbtRecordStride
+                1,           // missIndex
+                worldPos,    // ray origin
+                tMin,        // ray min range
+                l,       // ray direction
+                tMax,        // ray max range
+                1            // payload (location = 1)
+    );
 
-  // Point light specular lighting
-  vec3 specularC = vec3(0.);
-  if(!isShadowed)
-  {
-    vec3 viewDir = gl_WorldRayDirectionEXT; // already normalized
-    printVal("%f ", length(viewDir), 0.99, 1.01);
-    specularC = specular(material, viewDir, l, normal) * colorIn;
-    specularC *= attenuation;
-  }
+    // Point light diffuse lighting
+    vec3 diffuseC = vec3(0.);
+    if(!isShadowed)
+    {
+      diffuseC = diffuse(material, l, normal) * colorIn;
+      diffuseC *= attenuation;
+    }
 
-  vec3 outColor = diffuseC + specularC;
-  outColor /= (outColor + 1.);
+    // Point light specular lighting
+    vec3 specularC = vec3(0.);
+    if(!isShadowed)
+    {
+      printVal("%f ", length(viewDir), 0.99, 1.01);
+      specularC = specular(material, viewDir, l, normal) * colorIn;
+      specularC *= attenuation;
+    }
 
+    outColor = diffuseC + specularC;
+    outColor /= (outColor + 1.);
+}
   rayPayload.hitValue = outColor;
 }

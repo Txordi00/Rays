@@ -33,7 +33,7 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
 {
     VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
     device.resetFences(asFence);
-    // 1. Geometry description (single triangle array)
+    // Geometry description (single triangle array)
     vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
     triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
     triData.setVertexData(vk::DeviceOrHostAddressConstKHR{model->vertexBuffer.bufferAddress});
@@ -42,11 +42,9 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     triData.setIndexType(vk::IndexType::eUint32);
     triData.setIndexData(vk::DeviceOrHostAddressConstKHR{model->indexBuffer.bufferAddress});
 
-    vk::AccelerationStructureGeometryAabbsDataKHR aabbs{};
-
     vk::AccelerationStructureGeometryKHR geom{};
     geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
-    geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
+    // geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
     geom.setGeometry(triData);
 
     // The entire array will be used to build the BLAS.
@@ -96,7 +94,7 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     blasCreate.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
     // blasCreate.setCreateFlags();
     blasCreate.setBuffer(blas.buffer.buffer);
-    // blasCreate.setDeviceAddress(blasBuffer.bufferAddress); // Set it or not?
+    // blasCreate.setDeviceAddress(); // BLAS address is not the same as blas-buffer address!
 
     blas.AS = device.createAccelerationStructureKHR(blasCreate);
 
@@ -109,7 +107,7 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     buildInfo.setScratchData(vk::DeviceOrHostAddressKHR{scratchBuffer.bufferAddress});
 
     // Record the next set of commands
-    asCmd.reset();
+    // asCmd.reset();
     vk::CommandBufferBeginInfo commandBufferBeginInfo{};
     commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     asCmd.begin(commandBufferBeginInfo);
@@ -117,17 +115,14 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     asCmd.buildAccelerationStructuresKHR(buildInfo, &offsets);
 
     // Barrier: BLAS build writes → TLAS read later
-    vk::MemoryBarrier barrier{};
-    barrier.setSrcAccessMask(vk::AccessFlagBits::eAccelerationStructureWriteKHR);
-    barrier.setDstAccessMask(vk::AccessFlagBits::eAccelerationStructureReadKHR);
-    // vk::DependencyInfo depInfo{};
-    // asCmd.pipelineBarrier2(depInfo)
-    asCmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                          vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                          vk::DependencyFlags{},
-                          barrier,
-                          nullptr,
-                          nullptr);
+    vk::MemoryBarrier2 barrier{};
+    barrier.setSrcAccessMask(vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
+    barrier.setDstAccessMask(vk::AccessFlagBits2::eAccelerationStructureReadKHR);
+    barrier.setSrcStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
+    barrier.setDstStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
+    vk::DependencyInfo barrierInfo{};
+    barrierInfo.setMemoryBarriers(barrier);
+    asCmd.pipelineBarrier2(barrierInfo);
 
     // Queue submit
     asCmd.end();
@@ -161,9 +156,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
         instance.setTransform(transformVk);
         instance.setInstanceCustomIndex(i); // gl_InstanceCustomIndexEXT
         instance.setAccelerationStructureReference(blas.addr);
-        instance.setFlags(vk::GeometryInstanceFlagBitsKHR::eForceOpaque
-                          | vk::GeometryInstanceFlagBitsKHR::eTriangleCullDisable
-                          | vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable);
+        // instance.setFlags(vk::GeometryInstanceFlagBitsKHR::eForceOpaque);
         instance.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
         instance.setInstanceShaderBindingTableRecordOffset(
             0); // We will use the same hit group for all objects
@@ -218,8 +211,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
     tlas.buffer = utils::create_buffer(device,
                                        allocator,
                                        sizeInfo.accelerationStructureSize,
-                                       vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR
-                                           | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                                       vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR,
                                        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                                        0);
 
@@ -231,11 +223,12 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
 
     tlas.AS = device.createAccelerationStructureKHR(asInfo);
 
-    vk::AccelerationStructureDeviceAddressInfoKHR tlasAddressInfo{};
-    tlasAddressInfo.setAccelerationStructure(tlas.AS);
-    tlas.addr = device.getAccelerationStructureAddressKHR(tlasAddressInfo);
+    // For now we do not need its device address
+    // vk::AccelerationStructureDeviceAddressInfoKHR tlasAddressInfo{};
+    // tlasAddressInfo.setAccelerationStructure(tlas.AS);
+    // tlas.addr = device.getAccelerationStructureAddressKHR(tlasAddressInfo);
 
-    // 5. Allocate scratch buffer
+    // Allocate scratch buffer
     Buffer scratchBuffer
         = utils::create_buffer(device,
                                allocator,
