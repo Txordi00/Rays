@@ -18,7 +18,7 @@ layout(scalar, binding = 2, set = 0) uniform CameraData{
   vec3 orientation;
 } camera;
 
-layout(buffer_reference, scalar) readonly buffer VertexBuffer
+layout(buffer_reference, std430) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
@@ -63,6 +63,8 @@ void main()
 
     const vec3 origin = camera.origin;
 
+    rayPayload.depth = 0;
+    rayPayload.hitValue = vec3(0.);
     traceRayEXT(topLevelAS, // acceleration structure
       rayFlags, // rayFlags
       0xFF, // cullMask

@@ -380,9 +380,7 @@ void Init::init_descriptors()
                                       frameOverlap);
     descHelperUAB->create_descriptor_pool();
     descHelperUAB->add_binding(
-        Binding{vk::DescriptorType::eUniformBuffer,
-                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eClosestHitKHR,
-                0});
+        Binding{vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, 0}); // ubo
     descHelperUAB->add_binding(
         Binding{vk::DescriptorType::eStorageBuffer,
                 vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eClosestHitKHR,
@@ -406,7 +404,7 @@ void Init::init_descriptors()
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1},
                                      frameOverlap);
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
-                                     frameOverlap);
+                                     frameOverlap); // camera
     descHelperRt->create_descriptor_pool();
     descHelperRt->add_binding(
         Binding{vk::DescriptorType::eAccelerationStructureKHR,

@@ -8,16 +8,11 @@
 #include "types.glsl"
 #include "functions.glsl"
 
-
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 hitAttributeEXT vec3 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 
-
-layout(set = 1, binding = 0, scalar) uniform Ubo {
-  mat4 worldMatrix;
-} ubo[];
 
 layout(buffer_reference, std430) readonly buffer VertexBuffer
 {
@@ -44,6 +39,7 @@ const float tMax = 10000.;
 
 void main()
 {
+  printVal("%i ", rayPayload.depth, 2, 1);
   const uint objId = gl_InstanceCustomIndexEXT;
   const uint primitiveIndex = gl_PrimitiveID * 3;
 
@@ -92,8 +88,12 @@ void main()
   float attenuation = push.lightIntensity / lightDistance;
   const vec3 rayDir = gl_WorldRayDirectionEXT; // already normalized
 
+  // Set depth +1
+  rayPayload.depth++;
+
+
   vec3 outColor = vec3(0.);
-  if(dot(l, normal) > 0. && dot(rayDir, normal) < 0.)
+  if(dot(l, normal) > 0. && dot(rayDir, normal) < 0. && rayPayload.depth <= 2)
   {
     // Flags
     const uint shadowFlags =
@@ -117,23 +117,26 @@ void main()
     vec3 specularC = vec3(0.);
     vec3 reflectedC = vec3(0.);
     rayPayload.hitValue = vec3(0.); // initialize the ray payload
+
     if(!isShadowed)
     {
-      // Reflection
-      const vec3 reflectedDir = reflect(rayDir, normal);
-      traceRayEXT(topLevelAS,  // acceleration structure
-                  gl_IncomingRayFlagsEXT, // rayFlags
-                  0xFF,        // cullMask
-                  0,           // sbtRecordOffset
-                  0,           // sbtRecordStride
-                  0,           // missIndex
-                  worldPos,    // ray origin
-                  tMin,        // ray min range
-                  reflectedDir,       // ray direction
-                  tMax,        // ray max range
-                  0            // payload
-      );
-      reflectedC = material.reflectiveness * rayPayload.hitValue;
+      // Reflections
+      if(rayPayload.depth <= 2) {
+        const vec3 reflectedDir = reflect(rayDir, normal);
+        traceRayEXT(topLevelAS,  // acceleration structure
+                    gl_IncomingRayFlagsEXT, // rayFlags
+                    0xFF,        // cullMask
+                    0,           // sbtRecordOffset
+                    0,           // sbtRecordStride
+                    0,           // missIndex
+                    worldPos,    // ray origin
+                    tMin,        // ray min range
+                    reflectedDir,       // ray direction
+                    tMax,        // ray max range
+                    0            // payload
+        );
+        reflectedC = material.reflectiveness * rayPayload.hitValue;
+      }
 
       // Point light diffuse lighting
       diffuseC = diffuse(material, l, normal) * colorIn;
@@ -147,5 +150,5 @@ void main()
     outColor = reflectedC + diffuseC + specularC;
     outColor /= (outColor + 1.);
 }
-  rayPayload.hitValue = outColor;
+  rayPayload.hitValue += outColor;
 }

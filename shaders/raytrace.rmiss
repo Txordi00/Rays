@@ -4,12 +4,7 @@
 
 #include "types.glsl"
 
-struct hitPayload
-{
-  vec3 hitValue;
-};
-
-layout(location = 0) rayPayloadInEXT hitPayload rayPayload;
+layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
 
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants push;

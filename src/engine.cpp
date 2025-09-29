@@ -185,7 +185,7 @@ void Engine::draw()
     vk::Result res = I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT);
     if (res != vk::Result::eSuccess) {
         std::cout << "Skipping frame" << std::endl;
-        return;
+        // return;
     }
     // std::cout << "resetfences" << std::endl;
     I->device.resetFences(frameFence);
@@ -202,6 +202,14 @@ void Engine::draw()
     VK_CHECK_RES(I->device.acquireNextImage2KHR(&acquireImageInfo, &swapchainImageIndex));
 
     vk::Semaphore submitSemaphore = I->swapchainSemaphores[swapchainImageIndex];
+
+    vk::MemoryBarrier2 barrier{};
+    barrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+    barrier.dstStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+    barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
+    barrier.dstAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
+    vk::DependencyInfo depInfo{};
+    depInfo.setMemoryBarriers(barrier);
 
     vk::CommandBuffer cmd = get_current_frame().mainCommandBuffer;
     // Thanks to the fence, we are sure now (NOT ANYMORE!?)
@@ -224,15 +232,12 @@ void Engine::draw()
     raytrace(cmd);
 
     // Instead of many image transitions, thanks to the extension VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION
-    // we can go ahead only with memory barriers. For the moment we need only one.
-    vk::MemoryBarrier2 barrier{};
-    barrier.srcStageMask = vk::PipelineStageFlagBits2::eRayTracingShaderKHR;
-    barrier.dstStageMask = vk::PipelineStageFlagBits2::eBlit;
-    barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite;
-    barrier.dstAccessMask = vk::AccessFlagBits2::eMemoryRead;
+    // we can go ahead only with memory barriers.
+    // barrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+    // barrier.dstStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+    // barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
+    // barrier.dstAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
 
-    vk::DependencyInfo depInfo{};
-    depInfo.setMemoryBarriers(barrier);
     cmd.pipelineBarrier2(depInfo);
 
     // Copy draw to swapchain
@@ -241,6 +246,8 @@ void Engine::draw()
                       I->swapchainImages[swapchainImageIndex],
                       vk::Extent2D{I->imageDraw.extent.width, I->imageDraw.extent.height},
                       I->swapchainExtent);
+
+    cmd.pipelineBarrier2(depInfo);
 
     draw_imgui(cmd, I->swapchainImageViews[swapchainImageIndex]);
 
@@ -299,6 +306,8 @@ void Engine::draw()
 
     // std::cout << "present" << std::endl;
     VK_CHECK_RES(I->graphicsQueue.presentKHR(presentInfo));
+
+    I->graphicsQueue.waitIdle();
 
     frameNumber = (frameNumber + 1) % I->frameOverlap;
 }
@@ -423,7 +432,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     static uint32_t t = 180;
     const float tf = glm::radians(static_cast<float>(t));
     rayPush.lightPosition = glm::vec3(5.f * std::cosf(tf), -5.f, 7.f + 5.f * std::sinf(tf));
-    // t = (t + 1) % 360;
+    t = (t + 1) % 360;
     vk::PushConstantsInfo pushInfo{};
     pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR
@@ -458,7 +467,7 @@ void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &image
 {
     vk::RenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.setImageView(imageView);
-    colorAttachmentInfo.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
+    colorAttachmentInfo.setImageLayout(vk::ImageLayout::eGeneral);
     colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
     colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
 

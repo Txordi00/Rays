@@ -9,6 +9,7 @@ struct Vertex {
 struct HitPayload
 {
   vec3 hitValue;
+  uint depth;
 };
 
 #define RayPushConstants RayPushConstants \
