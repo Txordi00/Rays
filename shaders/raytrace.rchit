@@ -35,121 +35,154 @@ layout(set = 1, binding = 1, scalar) readonly buffer ObjectStorage {
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants push;
 
-const float tMin = 0.001;
+const float tMin = 0.01;
 const float tMax = 10000.;
 
 void main()
 {
-  const uint objId = gl_InstanceCustomIndexEXT;
-  const uint primitiveIndex = gl_PrimitiveID * 3;
 
-  VertexBuffer vBuffer = objStorage[nonuniformEXT(objId)].vertexBuffer;
-  IndexBuffer iBuffer = objStorage[nonuniformEXT(objId)].indexBuffer;
-  Material material = objStorage[nonuniformEXT(objId)].material;
-
-  const uint i0 = iBuffer.indices[primitiveIndex];
-  const uint i1 = iBuffer.indices[primitiveIndex + 1];
-  const uint i2 = iBuffer.indices[primitiveIndex + 2];
-
-  const Vertex v0 = vBuffer.vertices[i0];
-  const Vertex v1 = vBuffer.vertices[i1];
-  const Vertex v2 = vBuffer.vertices[i2];
-
-  const vec3 vertPos0 = v0.position;
-  const vec3 vertPos1 = v1.position;
-  const vec3 vertPos2 = v2.position;
-
-  const vec3 norm0 = v0.normal;
-  const vec3 norm1 = v1.normal;
-  const vec3 norm2 = v2.normal;
-
-  const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-
-  // Computing the coordinates of the hit position
-  const vec3 pos
-  = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y + vertPos2 * barycentrics.z;
-
-//  const vec3 normal = normalize(cross(vertPos1 - vertPos0, vertPos2 - vertPos0));
-  const vec3 normal = norm0 * barycentrics.x + norm1 * barycentrics.y + norm2 * barycentrics.z; // already normalized
-
-  // Transforming the position to world space
-  const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
-
-//  const vec3 colorIn =
-//    vec3(v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
-  const vec3 colorIn = material.color;
-//  const vec3 colorIn = vec3(1.);
-
-  // Check if in shadow
-  // Vector towards the light
-  vec3 l = push.lightPosition - worldPos;
-  float lightDistance = length(l);
-  l /= lightDistance;
-  float attenuation = push.lightIntensity / lightDistance;
-  const vec3 rayDir = gl_WorldRayDirectionEXT; // already normalized
-
-  // Set depth +1
-  rayPayload.depth++;
-
-
-  vec3 outColor = vec3(0.);
-  if(dot(l, normal) > 0. && dot(rayDir, normal) < 0. && rayPayload.depth <= MAX_RT_DEPTH
-      && rayPayload.energyFactor > 0.1)
+  if(rayPayload.depth > MAX_RT_DEPTH)
+    return;
+  else
   {
-    // Flags
-    const uint shadowFlags =
-        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-    // We initialize to true, if the miss shader will be called it sets it to false
-    isShadowed = true;
-    traceRayEXT(topLevelAS,  // acceleration structure
-                shadowFlags, // rayFlags
-                0xFF,        // cullMask
-                0,           // sbtRecordOffset
-                0,           // sbtRecordStride
-                1,           // missIndex
-                worldPos,    // ray origin
-                tMin,        // ray min range
-                l,       // ray direction
-                tMax,        // ray max range
-                1            // payload (location = 1)
-    );
+    // Set depth +1
+    rayPayload.depth++;
 
-    vec3 diffuseC = vec3(0.);
-    vec3 specularC = vec3(0.);
-    vec3 reflectedC = vec3(0.);
-    rayPayload.hitValue = vec3(0.); // initialize the ray payload
+    const uint objId = gl_InstanceCustomIndexEXT;
+    const uint primitiveIndex = gl_PrimitiveID * 3;
 
-    if(!isShadowed)
+    VertexBuffer vBuffer = objStorage[nonuniformEXT(objId)].vertexBuffer;
+    IndexBuffer iBuffer = objStorage[nonuniformEXT(objId)].indexBuffer;
+    Material material = objStorage[nonuniformEXT(objId)].material;
+
+    const uint i0 = iBuffer.indices[primitiveIndex];
+    const uint i1 = iBuffer.indices[primitiveIndex + 1];
+    const uint i2 = iBuffer.indices[primitiveIndex + 2];
+
+    const Vertex v0 = vBuffer.vertices[i0];
+    const Vertex v1 = vBuffer.vertices[i1];
+    const Vertex v2 = vBuffer.vertices[i2];
+
+    const vec3 vertPos0 = v0.position;
+    const vec3 vertPos1 = v1.position;
+    const vec3 vertPos2 = v2.position;
+
+    const vec3 norm0 = v0.normal;
+    const vec3 norm1 = v1.normal;
+    const vec3 norm2 = v2.normal;
+
+    const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+
+    // Computing the coordinates of the hit position
+    const vec3 pos
+    = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y + vertPos2 * barycentrics.z;
+
+  //  const vec3 normal = normalize(cross(vertPos1 - vertPos0, vertPos2 - vertPos0));
+    const vec3 normal = norm0 * barycentrics.x + norm1 * barycentrics.y + norm2 * barycentrics.z; // already normalized
+
+    // Transforming the position to world space
+    const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
+
+  //  const vec3 colorIn =
+  //    vec3(v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
+    const vec3 colorIn = material.color;
+  //  const vec3 colorIn = vec3(1.);
+
+    // Check if in shadow
+    // Vector towards the light
+    vec3 l = push.lightPosition - worldPos;
+    float lightDistance = length(l);
+    l /= lightDistance;
+    float attenuation = push.lightIntensity / lightDistance;
+    const vec3 rayDir = gl_WorldRayDirectionEXT; // already normalized
+
+    vec3 outColor = vec3(0.);
+    if(dot(l, normal) > 0. /*&& dot(rayDir, normal) < 0.*/
+        && rayPayload.energyFactor > 0.1)
     {
-      // Reflections      
-      const vec3 reflectedDir = reflect(rayDir, normal);
+      // Flags
+      const uint shadowFlags =
+          gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+      // We initialize to true, if the miss shader will be called it sets it to false
+      isShadowed = true;
       traceRayEXT(topLevelAS,  // acceleration structure
-                  gl_IncomingRayFlagsEXT, // rayFlags
+                  shadowFlags, // rayFlags
                   0xFF,        // cullMask
                   0,           // sbtRecordOffset
                   0,           // sbtRecordStride
-                  0,           // missIndex
+                  1,           // missIndex
                   worldPos,    // ray origin
                   tMin,        // ray min range
-                  reflectedDir,       // ray direction
+                  l,       // ray direction
                   tMax,        // ray max range
-                  0            // payload
+                  1            // payload (location = 1)
       );
-      reflectedC = material.reflectiveness * rayPayload.hitValue;
 
-      // Point light diffuse lighting
-      diffuseC = diffuse(material, l, normal) * colorIn;
-      diffuseC *= attenuation;
+      vec3 diffuseC = vec3(0.);
+      vec3 specularC = vec3(0.);
+      vec3 reflectedC = vec3(0.);
+      vec3 refractedC = vec3(0.);
+      vec3 ambientC = vec3(0.);
+      rayPayload.hitValue = vec3(0.); // initialize the ray payload
 
-      // Point light specular lighting
-      specularC = specular(material, rayDir, l, normal) * colorIn;
-      specularC *= attenuation;
+      if(!isShadowed)
+      {
+        // Reflections. Avoid entering the final recursion because it's useless
+        if(rayPayload.depth < MAX_RT_DEPTH && material.reflectiveness > 0.01)
+        {
+          const vec3 reflectedDir = reflect(rayDir, normal);
+          traceRayEXT(topLevelAS,  // acceleration structure
+                      gl_IncomingRayFlagsEXT, // rayFlags
+                      0xFF,        // cullMask
+                      0,           // sbtRecordOffset
+                      0,           // sbtRecordStride
+                      0,           // missIndex
+                      worldPos,    // ray origin
+                      tMin,        // ray min range
+                      reflectedDir,       // ray direction
+                      tMax,        // ray max range
+                      0            // payload
+          );
+          reflectedC = material.reflectiveness * rayPayload.hitValue;
+        }
+
+        // Refractions. Avoid entering the final recursion because it's useless
+        // REFRACTION. Snell's law: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
+        if (rayPayload.depth < MAX_RT_DEPTH && material.refractiveness > 0.01) {
+            const float n = 1. / material.refractiveIndex;
+            const float cos1 = abs(dot(rayDir, normal));
+            const float cos22 = 1. - n * n * (1. - cos1 * cos1);
+            const float cos2 = sqrt(cos22);
+            const vec3 refractedDir = n * rayDir + (n * cos1 - cos2) * normal;
+            traceRayEXT(topLevelAS,  // acceleration structure
+                        gl_IncomingRayFlagsEXT, // rayFlags
+                        0xFF,        // cullMask
+                        0,           // sbtRecordOffset
+                        0,           // sbtRecordStride
+                        0,           // missIndex
+                        worldPos,    // ray origin
+                        tMin,        // ray min range
+                        refractedDir,       // ray direction
+                        tMax,        // ray max range
+                        0            // payload
+            );
+            refractedC = material.refractiveness * rayPayload.hitValue;
+        }
+
+        // Ambient lighting
+        ambientC = material.ambientR * colorIn;
+        // Point light diffuse lighting
+        diffuseC = attenuation * diffuse(material, l, normal) * colorIn;
+
+        // Point light specular lighting
+        specularC = attenuation * specular(material, rayDir, l, normal) * colorIn;
+      }
+
+      outColor = reflectedC + diffuseC + specularC + refractedC + ambientC;
+      outColor /= (outColor + 1.);
+  }
+    rayPayload.hitValue += rayPayload.energyFactor * outColor;
+    // After color transfer, lose energy
+    rayPayload.energyFactor *= 0.8;
     }
-
-    outColor = reflectedC + diffuseC + specularC;
-    outColor /= (outColor + 1.);
-}
-  rayPayload.hitValue += rayPayload.energyFactor * outColor;
-  // After color transfer, lose energy
-  rayPayload.energyFactor *= 0.8;
 }

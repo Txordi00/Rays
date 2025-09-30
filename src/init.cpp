@@ -517,19 +517,19 @@ void Init::load_meshes()
     m1.shininessN = 4;
     m1.ambientR = 1.f;
     m1.reflectiveness = 1.f;
-    m1.refractiveness = 1.f;
+    m1.refractiveness = 0.f;
     m1.refractiveIndex = 1.f;
     utils::normalize_material_factors(m1);
     materials.push_back(m1);
     Material m2{};
-    m2.color = glm::vec3{0.f, 1.f, 0.f};
-    m2.diffuseR = 0.7f;
-    m2.specularR = 1.f;
-    m2.shininessN = 1;
+    m2.color = glm::vec3{1.f, 1.f, 1.f};
+    m2.diffuseR = 0.2f;
+    m2.specularR = 0.2f;
     m2.ambientR = 1.f;
-    m2.reflectiveness = 1.f;
-    m2.refractiveness = 0.f;
-    m2.refractiveIndex = 1.f;
+    m2.reflectiveness = 0.5f;
+    m2.refractiveness = 1.f;
+    m2.shininessN = 1;
+    m2.refractiveIndex = 1.1f;
     utils::normalize_material_factors(m2);
     materials.push_back(m2);
     Material m3{};
@@ -539,8 +539,8 @@ void Init::load_meshes()
     m3.shininessN = 2;
     m3.ambientR = 1.f;
     m3.reflectiveness = 1.f;
-    m3.refractiveness = 1.f;
-    m3.refractiveIndex = 1.1f;
+    m3.refractiveness = 0.f;
+    m3.refractiveIndex = 1.f;
     utils::normalize_material_factors(m3);
     materials.push_back(m3);
 

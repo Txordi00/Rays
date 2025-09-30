@@ -59,7 +59,7 @@ void main()
     up = cross(forward, right);   // re-orthonormalize
 
     vec3 pixelCam = normalize(vec3(x, y, 1.)); // camera-space ray
-    const vec3 direction = pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward;
+    const vec3 direction = normalize(pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward);
 
     const vec3 origin = camera.origin;
 

@@ -22,24 +22,33 @@
 
 float diffuse(const Material mat, const vec3 lightDir, const vec3 normal)
 {
-  // Lambertian
-  float dotNL = max(dot(normal, lightDir), 0.);
-  //vec3  c     = diffuseR * dotNL;
-  return mat.diffuseR * dotNL;
+  if(mat.diffuseR > 0.01) {
+    // Lambertian
+    float dotNL = max(dot(normal, lightDir), 0.);
+    //vec3  c     = diffuseR * dotNL;
+    return mat.diffuseR * dotNL;
+  }
+  else
+    return 0.;
 }
 
 float specular(const Material mat, const vec3 viewDir, const vec3 lightDir, const vec3 normal)
 {
-  vec3 reflectionDir = reflect(lightDir, normal);
-  // Overlap of the reflection direction with the primary ray direction (view direction)
-  float reflectionOverlap = dot(viewDir, reflectionDir);
-  // Specular factor computed as in the first approximation in wikipedia:
-  // https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
-  float specularFactor = (reflectionOverlap > 0.f)
-                             ? mat.specularR * pow(reflectionOverlap * reflectionOverlap,
-                                        mat.shininessN)
-                             : 0.f;
-  return specularFactor;
+  if(mat.specularR > 0.01)
+  {
+    vec3 reflectionDir = reflect(lightDir, normal);
+    // Overlap of the reflection direction with the primary ray direction (view direction)
+    float reflectionOverlap = dot(viewDir, reflectionDir);
+    // Specular factor computed as in the first approximation in wikipedia:
+    // https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
+    float specularFactor = (reflectionOverlap > 0.f)
+        ? mat.specularR * pow(reflectionOverlap * reflectionOverlap,
+                              mat.shininessN)
+        : 0.f;
+    return specularFactor;
+  }
+  else
+    return 0.;
 }
 
 #define printVal(message, val, valMin, valMax) if(val < valMin || val > valMax){ \
