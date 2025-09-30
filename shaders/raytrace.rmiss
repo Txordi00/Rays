@@ -12,5 +12,5 @@ layout(scalar, push_constant) uniform RayPushConstants push;
 
 void main()
 {
-    rayPayload.hitValue = push.clearColor.xyz;
+    rayPayload.hitValue = push.clearColor.xyz * rayPayload.energyFactor * 0.8;
 }

@@ -204,10 +204,6 @@ void Engine::draw()
     vk::Semaphore submitSemaphore = I->swapchainSemaphores[swapchainImageIndex];
 
     vk::MemoryBarrier2 barrier{};
-    barrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
-    barrier.dstStageMask = vk::PipelineStageFlagBits2::eAllCommands;
-    barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
-    barrier.dstAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
     vk::DependencyInfo depInfo{};
     depInfo.setMemoryBarriers(barrier);
 
@@ -231,13 +227,10 @@ void Engine::draw()
     // raster(cmd);
     raytrace(cmd);
 
-    // Instead of many image transitions, thanks to the extension VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION
-    // we can go ahead only with memory barriers.
-    // barrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
-    // barrier.dstStageMask = vk::PipelineStageFlagBits2::eAllCommands;
-    // barrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
-    // barrier.dstAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
-
+    barrier.setSrcStageMask(vk::PipelineStageFlagBits2::eRayTracingShaderKHR);
+    barrier.setDstStageMask(vk::PipelineStageFlagBits2::eBlit);
+    barrier.setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite);
+    barrier.setDstAccessMask(vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
     cmd.pipelineBarrier2(depInfo);
 
     // Copy draw to swapchain
@@ -247,6 +240,10 @@ void Engine::draw()
                       vk::Extent2D{I->imageDraw.extent.width, I->imageDraw.extent.height},
                       I->swapchainExtent);
 
+    barrier.setSrcStageMask(vk::PipelineStageFlagBits2::eBlit);
+    barrier.setDstStageMask(vk::PipelineStageFlagBits2::eAllGraphics);
+    barrier.setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite);
+    barrier.setDstAccessMask(vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
     cmd.pipelineBarrier2(depInfo);
 
     draw_imgui(cmd, I->swapchainImageViews[swapchainImageIndex]);

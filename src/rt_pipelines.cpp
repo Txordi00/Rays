@@ -76,7 +76,17 @@ vk::PipelineLayout RtPipelineBuilder::buildPipelineLayout(
 
 vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipelineLayout)
 {
-    // Assemble the shader stages and recursion depth info into the ray tracing pipeline
+    // Recursion depth parameter
+    vk::SpecializationMapEntry mapEntry{};
+    mapEntry.setConstantID(2);
+    mapEntry.setOffset(0);
+    mapEntry.setSize(sizeof(uint32_t));
+    vk::SpecializationInfo specInfo{};
+    specInfo.setMapEntries(mapEntry);
+    specInfo.setDataSize(sizeof(uint32_t));
+    specInfo.setData<const uint32_t>(MAX_RT_RECURSION);
+    // attach specInfo to its shader stage
+    shaderStages[eClosestHit].setPSpecializationInfo(&specInfo);
     vk::RayTracingPipelineCreateInfoKHR rtPipelineInfo{};
     rtPipelineInfo.setStages(shaderStages); // Stages are shaders
     // In this case, shaderGroups.size() == 3: we have one raygen group,

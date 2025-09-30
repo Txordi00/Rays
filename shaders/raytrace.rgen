@@ -65,6 +65,7 @@ void main()
 
     rayPayload.depth = 0;
     rayPayload.hitValue = vec3(0.);
+    rayPayload.energyFactor = 1.;
     traceRayEXT(topLevelAS, // acceleration structure
       rayFlags, // rayFlags
       0xFF, // cullMask

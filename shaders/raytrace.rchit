@@ -10,6 +10,7 @@
 
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
+layout(constant_id = 2) const uint MAX_RT_DEPTH = 3;
 hitAttributeEXT vec3 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 
@@ -39,7 +40,6 @@ const float tMax = 10000.;
 
 void main()
 {
-  printVal("%i ", rayPayload.depth, 2, 1);
   const uint objId = gl_InstanceCustomIndexEXT;
   const uint primitiveIndex = gl_PrimitiveID * 3;
 
@@ -93,7 +93,8 @@ void main()
 
 
   vec3 outColor = vec3(0.);
-  if(dot(l, normal) > 0. && dot(rayDir, normal) < 0. && rayPayload.depth <= 2)
+  if(dot(l, normal) > 0. && dot(rayDir, normal) < 0. && rayPayload.depth <= MAX_RT_DEPTH
+      && rayPayload.energyFactor > 0.1)
   {
     // Flags
     const uint shadowFlags =
@@ -120,23 +121,21 @@ void main()
 
     if(!isShadowed)
     {
-      // Reflections
-      if(rayPayload.depth <= 2) {
-        const vec3 reflectedDir = reflect(rayDir, normal);
-        traceRayEXT(topLevelAS,  // acceleration structure
-                    gl_IncomingRayFlagsEXT, // rayFlags
-                    0xFF,        // cullMask
-                    0,           // sbtRecordOffset
-                    0,           // sbtRecordStride
-                    0,           // missIndex
-                    worldPos,    // ray origin
-                    tMin,        // ray min range
-                    reflectedDir,       // ray direction
-                    tMax,        // ray max range
-                    0            // payload
-        );
-        reflectedC = material.reflectiveness * rayPayload.hitValue;
-      }
+      // Reflections      
+      const vec3 reflectedDir = reflect(rayDir, normal);
+      traceRayEXT(topLevelAS,  // acceleration structure
+                  gl_IncomingRayFlagsEXT, // rayFlags
+                  0xFF,        // cullMask
+                  0,           // sbtRecordOffset
+                  0,           // sbtRecordStride
+                  0,           // missIndex
+                  worldPos,    // ray origin
+                  tMin,        // ray min range
+                  reflectedDir,       // ray direction
+                  tMax,        // ray max range
+                  0            // payload
+      );
+      reflectedC = material.reflectiveness * rayPayload.hitValue;
 
       // Point light diffuse lighting
       diffuseC = diffuse(material, l, normal) * colorIn;
@@ -150,5 +149,7 @@ void main()
     outColor = reflectedC + diffuseC + specularC;
     outColor /= (outColor + 1.);
 }
-  rayPayload.hitValue += outColor;
+  rayPayload.hitValue += rayPayload.energyFactor * outColor;
+  // After color transfer, lose energy
+  rayPayload.energyFactor *= 0.8;
 }

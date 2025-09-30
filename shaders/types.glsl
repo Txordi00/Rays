@@ -10,6 +10,7 @@ struct HitPayload
 {
   vec3 hitValue;
   uint depth;
+  float energyFactor;
 };
 
 #define RayPushConstants RayPushConstants \
