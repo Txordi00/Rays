@@ -529,7 +529,7 @@ void Init::load_meshes()
     m2.reflectiveness = 0.5f;
     m2.refractiveness = 1.f;
     m2.shininessN = 1;
-    m2.refractiveIndex = 1.1f;
+    m2.refractiveIndex = 0.9f;
     utils::normalize_material_factors(m2);
     materials.push_back(m2);
     Material m3{};

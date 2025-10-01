@@ -5,8 +5,8 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_debug_printf : enable
 
-#include "functions.glsl"
 #include "types.glsl"
+#include "functions.glsl"
 
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
@@ -96,9 +96,10 @@ void main()
         l /= lightDistance;
         float attenuation = push.lightIntensity / lightDistance;
         const vec3 rayDir = gl_WorldRayDirectionEXT; // already normalized
+        const bool facingToLight = (dot(l, normal) > 0.);
 
         vec3 outColor = vec3(0.);
-        if (dot(l, normal) > 0. && rayPayload.energyFactor > ENERGY_MIN) {
+        if (rayPayload.energyFactor > ENERGY_MIN) {
             // SHADOWS
             const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
                                      | gl_RayFlagsSkipClosestHitShaderEXT;
@@ -116,8 +117,6 @@ void main()
                         tMax,        // ray max range
                         1            // payload (location = 1)
             );
-            if (isShadowed)
-                return;
 
             vec3 diffuseC = vec3(0.);
             vec3 specularC = vec3(0.);
@@ -128,6 +127,18 @@ void main()
             float cos1 = -dot(rayDir, normal); // If positive, we are outside the object
 
             if (cos1 > 0.) {
+                // Ambient lighting
+                ambientC = material.ambientR * colorIn;
+
+                // Lighting depending on the point light
+                if (!isShadowed && facingToLight) {
+                    // Point light diffuse lighting
+                    diffuseC = attenuation * diffuse(material, l, normal) * colorIn;
+
+                    // Point light specular lighting
+                    specularC = attenuation * specular(material, rayDir, l, normal) * colorIn;
+                }
+
                 // Reflections. Avoid entering the final recursion because it's useless
                 if (rayPayload.depth < MAX_RT_DEPTH && material.reflectiveness > 0.01) {
                     const vec3 reflectedDir = reflect(rayDir, normal);
@@ -145,14 +156,6 @@ void main()
                     );
                     reflectedC = material.reflectiveness * rayPayload.hitValue;
                 }
-
-                // Ambient lighting
-                ambientC = material.ambientR * colorIn;
-                // Point light diffuse lighting
-                diffuseC = attenuation * diffuse(material, l, normal) * colorIn;
-
-                // Point light specular lighting
-                specularC = attenuation * specular(material, rayDir, l, normal) * colorIn;
 
                 // Refractions. Avoid entering the final recursion because it's useless
                 // REFRACTION. Snell's law: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
@@ -182,7 +185,7 @@ void main()
                 const float cos22 = 1. - n * n * (1. - cos1 * cos1);
                 const float cos2 = sqrt(cos22);
                 const vec3 refractedDir = n * rayDir + (n * cos1 - cos2) * normal;
-                rayPayload.depth--; // This is in order to avoid having the last hit inside a geometry
+                //                rayPayload.depth--; // This is in order to avoid having the last hit inside a geometry
                 traceRayEXT(topLevelAS,             // acceleration structure
                             gl_IncomingRayFlagsEXT, // rayFlags
                             0xFF,                   // cullMask
@@ -195,7 +198,10 @@ void main()
                             tMax,                   // ray max range
                             0                       // payload
                 );
-                refractedC = material.refractiveness * rayPayload.hitValue;
+                // We do not want to accumulate the color of the same material twice,
+                // that's why we skip setting a color refractedC
+                rayPayload.energyFactor *= (1. / ENERGY_LOSS);
+                // refractedC = material.refractiveness * rayPayload.hitValue;
             }
             // Compute the color contribution of this hit
             outColor = reflectedC + diffuseC + specularC + refractedC + ambientC;
