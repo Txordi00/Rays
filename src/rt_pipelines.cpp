@@ -78,7 +78,7 @@ vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipeline
 {
     // Recursion depth parameter
     vk::SpecializationMapEntry mapEntry{};
-    mapEntry.setConstantID(2);
+    mapEntry.setConstantID(0);
     mapEntry.setOffset(0);
     mapEntry.setSize(sizeof(uint32_t));
     vk::SpecializationInfo specInfo{};
@@ -93,7 +93,8 @@ vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipeline
     // one miss shader group, and one hit group.
     rtPipelineInfo.setGroups(shaderGroups);
 
-    rtPipelineInfo.setMaxPipelineRayRecursionDepth(MAX_RT_RECURSION); // Ray depth
+    rtPipelineInfo.setMaxPipelineRayRecursionDepth(MAX_RT_RECURSION
+                                                   + 1); // Ray depth. Add +1 just in case
 
     rtPipelineInfo.setLayout(pipelineLayout);
 

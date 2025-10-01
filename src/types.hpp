@@ -39,7 +39,7 @@ const unsigned int API_VERSION[3] = {1, 4, 0};
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
 const unsigned int MINIMUM_FRAME_OVERLAP = 2;
 const uint64_t FENCE_TIMEOUT = 100000000;
-const uint32_t MAX_RT_RECURSION = 4;
+const uint32_t MAX_RT_RECURSION = 3;
 
 #define SIMPLE_MESH_FRAG_SHADER "shaders/simple_mesh.frag.spv"
 #define SIMPLE_MESH_VERT_SHADER "shaders/simple_mesh.vert.spv"
