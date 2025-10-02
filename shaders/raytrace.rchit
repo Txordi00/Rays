@@ -77,9 +77,9 @@ void main()
         const vec3 pos = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y
                          + vertPos2 * barycentrics.z;
 
-        //  const vec3 normal = normalize(cross(vertPos1 - vertPos0, vertPos2 - vertPos0));
         const vec3 normal = norm0 * barycentrics.x + norm1 * barycentrics.y
                             + norm2 * barycentrics.z; // already normalized
+//        normal = normalize(vec3(normal * gl_WorldToObjectEXT));
 
         // Transforming the position to world space
         const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
@@ -123,10 +123,10 @@ void main()
             vec3 reflectedC = vec3(0.);
             vec3 refractedC = vec3(0.);
             vec3 ambientC = vec3(0.);
-            rayPayload.hitValue = vec3(0.);    // initialize the ray payload
-            float cos1 = -dot(rayDir, normal); // If positive, we are outside the object
+            const float cos1 = -dot(rayDir, normal); // If positive, we are outside the object
+            const bool entering = cos1 > 0.;
 
-            if (cos1 > 0.) {
+            if (entering) {
                 // Ambient lighting
                 ambientC = material.ambientR * colorIn;
 
@@ -156,53 +156,51 @@ void main()
                     );
                     reflectedC = material.reflectiveness * rayPayload.hitValue;
                 }
-
+            }
                 // Refractions. Avoid entering the final recursion because it's useless
                 // REFRACTION. Snell's law: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
                 if (rayPayload.depth < MAX_RT_DEPTH && material.refractiveness > 0.01) {
-                    const float n = 1. / material.refractiveIndex;
-                    const float cos22 = 1. - n * n * (1. - cos1 * cos1);
-                    const float cos2 = sqrt(cos22);
-                    const vec3 refractedDir = n * rayDir + (n * cos1 - cos2) * normal;
-                    traceRayEXT(topLevelAS,             // acceleration structure
-                                gl_IncomingRayFlagsEXT, // rayFlags
-                                0xFF,                   // cullMask
-                                0,                      // sbtRecordOffset
-                                0,                      // sbtRecordStride
-                                0,                      // missIndex
-                                worldPos,               // ray origin
-                                tMin,                   // ray min range
-                                refractedDir,           // ray direction
-                                tMax,                   // ray max range
-                                0                       // payload
-                    );
-                    refractedC = material.refractiveness * rayPayload.hitValue;
+                    // Flip n1 and n2 depending on whether we are inside or outside the object
+                    const float n = (entering) ? 1. / material.refractiveIndex : material.refractiveIndex;
+                    const vec3 normalTmp = (entering) ? normal : -normal;
+                    const vec3 refractedDir = refract(rayDir, normalTmp, n);
+                    if(dot(refractedDir, refractedDir) > 0.)
+                    {
+                        traceRayEXT(topLevelAS,             // acceleration structure
+                                    gl_IncomingRayFlagsEXT, // rayFlags
+                                    0xFF,                   // cullMask
+                                    0,                      // sbtRecordOffset
+                                    0,                      // sbtRecordStride
+                                    0,                      // missIndex
+                                    worldPos,               // ray origin
+                                    tMin,                   // ray min range
+                                    refractedDir,           // ray direction
+                                    tMax,                   // ray max range
+                                    0                       // payload
+                        );
+                    }
+//                    else // If Snell's refraction fails, we compute a reflection instead
+//                    {
+//                        const vec3 reflectedDir = reflect(rayDir, normalTmp);
+//                        traceRayEXT(topLevelAS,             // acceleration structure
+//                                    gl_IncomingRayFlagsEXT, // rayFlags
+//                                    0xFF,                   // cullMask
+//                                    0,                      // sbtRecordOffset
+//                                    0,                      // sbtRecordStride
+//                                    0,                      // missIndex
+//                                    worldPos,               // ray origin
+//                                    tMin,                   // ray min range
+//                                    reflectedDir,           // ray direction
+//                                    tMax,                   // ray max range
+//                                    0                       // payload
+//                        );
+//                    }
+                    if(entering)
+                        refractedC = material.refractiveness * rayPayload.hitValue;
+                    else // We add the energy loss back because we don't want to lose energy twice on enter and exit
+                        rayPayload.energyFactor /= ENERGY_LOSS;
                 }
-            } else if (rayPayload.depth < MAX_RT_DEPTH && material.refractiveness > 0.01) {
-                // Refractions from the inside
-                const float n = 1. / material.refractiveIndex;
-                cos1 *= -1.;
-                const float cos22 = 1. - n * n * (1. - cos1 * cos1);
-                const float cos2 = sqrt(cos22);
-                const vec3 refractedDir = n * rayDir + (n * cos1 - cos2) * normal;
-                //                rayPayload.depth--; // This is in order to avoid having the last hit inside a geometry
-                traceRayEXT(topLevelAS,             // acceleration structure
-                            gl_IncomingRayFlagsEXT, // rayFlags
-                            0xFF,                   // cullMask
-                            0,                      // sbtRecordOffset
-                            0,                      // sbtRecordStride
-                            0,                      // missIndex
-                            worldPos,               // ray origin
-                            tMin,                   // ray min range
-                            refractedDir,           // ray direction
-                            tMax,                   // ray max range
-                            0                       // payload
-                );
-                // We do not want to accumulate the color of the same material twice,
-                // that's why we skip setting a color refractedC
-                rayPayload.energyFactor *= (1. / ENERGY_LOSS);
-                // refractedC = material.refractiveness * rayPayload.hitValue;
-            }
+//            }
             // Compute the color contribution of this hit
             outColor = reflectedC + diffuseC + specularC + refractedC + ambientC;
             outColor /= (outColor + 1.);
