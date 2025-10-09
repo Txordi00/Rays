@@ -130,8 +130,27 @@ TEST_CASE("Test matrix data padding", "[gltf-tools]") {
 	}
 }
 
+TEST_CASE("Test matrix transpose", "[gltf-tools]") {
+	// First a case that doesn't require any padding
+	std::array<float, 4> mat2 {{
+		1, 2,
+		3, 4
+	}};
+	REQUIRE(fastgltf::getElementByteSize(fastgltf::AccessorType::Mat2, fastgltf::ComponentType::Float) == mat2.size() * sizeof(float));
+
+	static constexpr std::array<float, 4> transposed {{
+		1, 3, 2, 4
+	}};
+	for (std::size_t i = 0; i < 4; ++i) {
+		REQUIRE(float(i + 1) == fastgltf::internal::getAccessorComponentAt<float>(
+				fastgltf::ComponentType::Float, fastgltf::AccessorType::Mat2, reinterpret_cast<std::byte*>(mat2.data()), i, false, false));
+		REQUIRE(transposed[i] == fastgltf::internal::getAccessorComponentAt<float>(
+				fastgltf::ComponentType::Float, fastgltf::AccessorType::Mat2, reinterpret_cast<std::byte*>(mat2.data()), i, false, true));
+	}
+}
+
 TEST_CASE("Test accessor", "[gltf-tools]") {
-    auto lightsLamp = sampleModels / "2.0" / "LightsPunctualLamp" / "glTF";
+    auto lightsLamp = sampleAssets / "Models" / "LightsPunctualLamp" / "glTF";
 
 	fastgltf::GltfFileStream jsonData(lightsLamp / "LightsPunctualLamp.gltf");
 	REQUIRE(jsonData.isOpen());
@@ -220,7 +239,7 @@ TEST_CASE("Test accessor", "[gltf-tools]") {
 }
 
 TEST_CASE("Test sparse accessor", "[gltf-tools]") {
-    auto simpleSparseAccessor = sampleModels / "2.0" / "SimpleSparseAccessor" / "glTF";
+    auto simpleSparseAccessor = sampleAssets / "Models" / "SimpleSparseAccessor" / "glTF";
 
 	fastgltf::GltfFileStream jsonData(simpleSparseAccessor / "SimpleSparseAccessor.gltf");
 	REQUIRE(jsonData.isOpen());

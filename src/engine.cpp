@@ -185,7 +185,7 @@ void Engine::draw()
     vk::Result res = I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT);
     if (res != vk::Result::eSuccess) {
         std::cout << "Skipping frame" << std::endl;
-        // return;
+        return;
     }
     // std::cout << "resetfences" << std::endl;
     I->device.resetFences(frameFence);
@@ -256,6 +256,7 @@ void Engine::draw()
                             vk::PipelineStageFlagBits2::eBottomOfPipe);
 
     cmd.end();
+
     // Set the sync objects
     // prepare the submission to the queue.
     // we want to wait on the acquire semaphore, as that semaphore is signaled when the swapchain is ready
@@ -283,7 +284,6 @@ void Engine::draw()
     // submit command buffer to the queue and execute it.
     // BEFORE: frameFence will now block until the graphic commands finish execution
     // NOW: We pass over submit2 and will wait on present to finish during the next draw() execution
-    // std::cout << "submit" << std::endl;
     I->graphicsQueue.submit2(submitInfo, nullptr);
     // I->graphicsQueue.submit2(submitInfo, frameFence);
 
@@ -291,7 +291,7 @@ void Engine::draw()
     // this will put the image we just rendered to into the visible window.
     // we want to wait on the submitSemaphore for that,
     // as its necessary that drawing commands have finished before the image is displayed to the user
-    // We signal the frame fence in order for the next execution to now when it's safe to start
+    // We signal the frame fence in order for the next execution to know when it's safe to start
     vk::SwapchainPresentFenceInfoKHR swapchainPresentInfo{};
     swapchainPresentInfo.setFences(frameFence);
     swapchainPresentInfo.setSwapchainCount(1);
@@ -301,10 +301,7 @@ void Engine::draw()
     presentInfo.setImageIndices(swapchainImageIndex);
     presentInfo.setPNext(&swapchainPresentInfo);
 
-    // std::cout << "present" << std::endl;
     VK_CHECK_RES(I->graphicsQueue.presentKHR(presentInfo));
-
-    I->graphicsQueue.waitIdle();
 
     frameNumber = (frameNumber + 1) % I->frameOverlap;
 }

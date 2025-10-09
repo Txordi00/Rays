@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2024 spnda
+ * Copyright (C) 2022 - 2025 Sean Apeler
  * This file is part of fastgltf <https://github.com/spnda/fastgltf>.
  *
  * Permission is hereby granted, free of charge, to any person
@@ -102,7 +102,7 @@ constexpr std::string_view fragmentShaderSource = R"(
     const uint HAS_BASE_COLOR_TEXTURE = 1;
 
     layout(location = 0) uniform sampler2D albedoTexture;
-    layout(location = 0, std140) uniform MaterialUniforms {
+    layout(binding = 0, std140) uniform MaterialUniforms {
         vec4 baseColorFactor;
         float alphaCutoff;
         uint flags;
@@ -348,7 +348,6 @@ bool loadGltf(Viewer* viewer, std::filesystem::path path) {
         constexpr auto gltfOptions =
             fastgltf::Options::DontRequireValidAssetMember |
             fastgltf::Options::AllowDouble |
-            fastgltf::Options::LoadGLBBuffers |
             fastgltf::Options::LoadExternalBuffers |
             fastgltf::Options::LoadExternalImages |
 			fastgltf::Options::GenerateMeshIndices;

@@ -26,7 +26,7 @@ TEST_CASE("Test simple glTF composition", "[write-tests]") {
 }
 
 TEST_CASE("Read glTF, write it, and then read it again and validate", "[write-tests]") {
-	auto cubePath = sampleModels / "2.0" / "Cube" / "glTF";
+	auto cubePath = sampleAssets / "Models" / "Cube" / "glTF";
 	fastgltf::GltfFileStream cubeJsonData(cubePath / "Cube.gltf");
 	REQUIRE(cubeJsonData.isOpen());
 
@@ -48,7 +48,7 @@ TEST_CASE("Read glTF, write it, and then read it again and validate", "[write-te
 }
 
 TEST_CASE("Rewrite read glTF with multiple material extensions", "[write-tests]") {
-	auto dishPath = sampleModels / "2.0" / "IridescentDishWithOlives" / "glTF";
+	auto dishPath = sampleAssets / "Models" / "IridescentDishWithOlives" / "glTF";
 	fastgltf::GltfFileStream dishJsonData(dishPath / "IridescentDishWithOlives.gltf");
 	REQUIRE(dishJsonData.isOpen());
 
@@ -75,7 +75,7 @@ TEST_CASE("Rewrite read glTF with multiple material extensions", "[write-tests]"
 }
 
 TEST_CASE("Try writing a glTF with all buffers and images", "[write-tests]") {
-    auto cubePath = sampleModels / "2.0" / "Cube" / "glTF";
+    auto cubePath = sampleAssets / "Models" / "Cube" / "glTF";
 
 	fastgltf::GltfFileStream cubeJson(cubePath / "Cube.gltf");
 	REQUIRE(cubeJson.isOpen());
@@ -103,7 +103,7 @@ TEST_CASE("Try writing a glTF with all buffers and images", "[write-tests]") {
 }
 
 TEST_CASE("Try writing a GLB with all buffers and images", "[write-tests]") {
-    auto cubePath = sampleModels / "2.0" / "Cube" / "glTF";
+    auto cubePath = sampleAssets / "Models" / "Cube" / "glTF";
 
 	fastgltf::GltfFileStream cubeJson(cubePath / "Cube.gltf");
 	REQUIRE(cubeJson.isOpen());
@@ -221,10 +221,10 @@ TEST_CASE("Test all local models and re-export them", "[write-tests]") {
 
 TEST_CASE("Test Unicode exporting", "[write-tests]") {
 #if FASTGLTF_CPP_20
-	auto unicodePath = sampleModels / "2.0" / std::filesystem::path(u8"Unicode❤♻Test") / "glTF";
+	auto unicodePath = sampleAssets / "Models" / std::filesystem::path(u8"Unicode❤♻Test") / "glTF";
 	fastgltf::GltfFileStream jsonData(unicodePath / std::filesystem::path(u8"Unicode❤♻Test.gltf"));
 #else
-	auto unicodePath = sampleModels / "2.0" / std::filesystem::u8path(u8"Unicode❤♻Test") / "glTF";
+	auto unicodePath = sampleAssets / "Models" / std::filesystem::u8path(u8"Unicode❤♻Test") / "glTF";
 	fastgltf::GltfFileStream jsonData(unicodePath / std::filesystem::u8path(u8"Unicode❤♻Test.gltf"));
 #endif
 	REQUIRE(jsonData.isOpen());
@@ -258,10 +258,10 @@ TEST_CASE("Test Unicode exporting", "[write-tests]") {
 
 TEST_CASE("Test URI normalization and removing backslashes", "[write-tests]") {
 #if FASTGLTF_CPP_20
-	auto unicodePath = sampleModels / "2.0" / std::filesystem::path(u8"Unicode❤♻Test") / "glTF";
+	auto unicodePath = sampleAssets / "Models" / std::filesystem::path(u8"Unicode❤♻Test") / "glTF";
 	fastgltf::GltfFileStream jsonData(unicodePath / std::filesystem::path(u8"Unicode❤♻Test.gltf"));
 #else
-	auto unicodePath = sampleModels / "2.0" / std::filesystem::u8path(u8"Unicode❤♻Test") / "glTF";
+	auto unicodePath = sampleAssets / "Models" / std::filesystem::u8path(u8"Unicode❤♻Test") / "glTF";
 	fastgltf::GltfFileStream jsonData(unicodePath / std::filesystem::u8path(u8"Unicode❤♻Test.gltf"));
 #endif
 	REQUIRE(jsonData.isOpen());
@@ -302,4 +302,151 @@ TEST_CASE("Test URI normalization and removing backslashes", "[write-tests]") {
 	std::string_view imageUri;
 	REQUIRE(imageObject["uri"].get_string().get(imageUri) == simdjson::SUCCESS);
 	REQUIRE(imageUri == "textures1/Unicode❤♻Texture.bin");
+}
+
+TEST_CASE("Test floating point round-trip precision", "[write-tests]") {
+	auto cubePath = sampleAssets / "Models" / "Duck" / "glTF-Binary";
+
+	fastgltf::Parser parser;
+
+	auto original = [&parser, &cubePath]() {
+		fastgltf::GltfFileStream cubeJson(cubePath / "Duck.glb");
+		REQUIRE(cubeJson.isOpen());
+
+		auto asset = parser.loadGltfBinary(cubeJson, cubePath,
+			fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages);
+		REQUIRE(asset.error() == fastgltf::Error::None);
+		REQUIRE(fastgltf::validate(asset.get()) == fastgltf::Error::None);
+		return std::move(asset.get());
+	}();
+
+	fastgltf::FileExporter exporter;
+	auto exportedPath = path / "export_glb" / "Duck_rewritten.glb";
+	REQUIRE(exporter.writeGltfBinary(original, exportedPath) == fastgltf::Error::None);
+
+	// Now read the exported file again, and check if the floating-point values are the same as the original asset.
+	auto reimported = [&parser, &exportedPath] {
+		fastgltf::GltfFileStream rewrittenJson(exportedPath);
+		REQUIRE(rewrittenJson.isOpen());
+
+		auto asset = parser.loadGltfBinary(rewrittenJson, exportedPath.parent_path());
+		REQUIRE(asset.error() == fastgltf::Error::None);
+		REQUIRE(fastgltf::validate(asset.get()) == fastgltf::Error::None);
+		return std::move(asset.get());
+	}();
+
+	REQUIRE(original.accessors.size() == reimported.accessors.size());
+	for (std::size_t i = 0; i < reimported.accessors.size(); ++i) {
+		const auto& accessor_a = original.accessors[i];
+		const auto& accessor_b = reimported.accessors[i];
+
+		REQUIRE(accessor_a.min.has_value());
+		REQUIRE(accessor_b.min.has_value());
+		REQUIRE(accessor_a.min->type() == accessor_b.min->type());
+		if (!accessor_a.min->isType<double>())
+			continue;
+
+		const auto& min_a = accessor_a.min.value();
+		const auto& min_b = accessor_b.min.value();
+		REQUIRE(min_a.size() == min_b.size());
+		for (std::size_t j = 0; j < min_a.size(); ++j) {
+			REQUIRE(min_a.get<double>(j) == min_b.get<double>(j));
+		}
+
+		REQUIRE(accessor_a.max->type() == accessor_b.max->type());
+		if (!accessor_a.max->isType<double>())
+			continue;
+
+		const auto& max_a = accessor_a.max.value();
+		const auto& max_b = accessor_b.max.value();
+		REQUIRE(max_a.size() == max_b.size());
+		for (std::size_t j = 0; j < max_a.size(); ++j) {
+			REQUIRE(max_a.get<double>(j) == max_b.get<double>(j));
+		}
+	}
+
+	REQUIRE(original.materials.size() == reimported.materials.size());
+	for (std::size_t i = 0; i < reimported.materials.size(); ++i) {
+		const auto& material_a = original.materials[i];
+		const auto& material_b = reimported.materials[i];
+
+		for (std::size_t j = 0; j < 4; ++j) {
+			REQUIRE(material_a.pbrData.baseColorFactor[j] == material_b.pbrData.baseColorFactor[j]);
+		}
+		REQUIRE(material_a.pbrData.metallicFactor == material_b.pbrData.metallicFactor);
+		REQUIRE(material_a.pbrData.roughnessFactor == material_b.pbrData.roughnessFactor);
+
+		for (std::size_t j = 0; j < 3; ++j) {
+			REQUIRE(material_a.emissiveFactor[j] == material_b.emissiveFactor[j]);
+		}
+		REQUIRE(material_a.alphaCutoff == material_b.alphaCutoff);
+	}
+}
+
+TEST_CASE("Test Accessor::updateBoundsToInclude", "[write-tests]") {
+	SECTION("Scalar") {
+		fastgltf::Accessor accessor;
+
+		accessor.updateBoundsToInclude(static_cast<std::int64_t>(2));
+		accessor.updateBoundsToInclude(static_cast<std::int64_t>(4));
+		accessor.updateBoundsToInclude(static_cast<std::int64_t>(-2));
+
+		REQUIRE(accessor.max.has_value());
+		REQUIRE(accessor.max->isType<std::int64_t>());
+		REQUIRE(accessor.max->size() == 1);
+		REQUIRE(accessor.max->get<std::int64_t>(0) == 4);
+
+		REQUIRE(accessor.min.has_value());
+		REQUIRE(accessor.min->isType<std::int64_t>());
+		REQUIRE(accessor.min->size() == 1);
+		REQUIRE(accessor.min->get<std::int64_t>(0) == -2);
+	}
+
+	SECTION("Doubles") {
+		fastgltf::Accessor accessor;
+
+		accessor.updateBoundsToInclude(fastgltf::math::f64vec3(1.0, 2.0, 3.0));
+		accessor.updateBoundsToInclude(fastgltf::math::f64vec3(2.0, 3.0, -4.0));
+		accessor.updateBoundsToInclude(fastgltf::math::f64vec3(0.0, 0.0, 0.0));
+
+		REQUIRE(accessor.max.has_value());
+		REQUIRE(accessor.max->size() == 3);
+		REQUIRE(accessor.max->isType<double>());
+		REQUIRE(!accessor.max->isType<std::int64_t>());
+		REQUIRE(accessor.max->get<double>(0) == 2.0);
+		REQUIRE(accessor.max->get<double>(1) == 3.0);
+		REQUIRE(accessor.max->get<double>(2) == 3.0);
+
+		REQUIRE(accessor.min.has_value());
+		REQUIRE(accessor.min->size() == 3);
+		REQUIRE(accessor.min->isType<double>());
+		REQUIRE(!accessor.min->isType<std::int64_t>());
+		REQUIRE(accessor.min->get<double>(0) == 0.0);
+		REQUIRE(accessor.min->get<double>(1) == 0.0);
+		REQUIRE(accessor.min->get<double>(2) == -4.0);
+	}
+
+	SECTION("Integers") {
+		fastgltf::Accessor accessor;
+
+		accessor.updateBoundsToInclude(fastgltf::math::s64vec3(1, 2, 3));
+		accessor.updateBoundsToInclude(fastgltf::math::s64vec3(2, 3, -4));
+		accessor.updateBoundsToInclude(fastgltf::math::s64vec3(0, 0, 0));
+
+		REQUIRE(accessor.max.has_value());
+		REQUIRE(accessor.max->size() == 3);
+		REQUIRE(!accessor.max->isType<double>());
+		REQUIRE(accessor.max->isType<std::int64_t>());
+		REQUIRE(accessor.max->get<std::int64_t>(0) == 2);
+		REQUIRE(accessor.max->get<std::int64_t>(1) == 3);
+		REQUIRE(accessor.max->get<std::int64_t>(2) == 3);
+
+		REQUIRE(accessor.min.has_value());
+		REQUIRE(accessor.min->size() == 3);
+		REQUIRE(!accessor.min->isType<double>());
+		REQUIRE(accessor.min->isType<std::int64_t>());
+		REQUIRE(accessor.min->get<std::int64_t>(0) == 0);
+		REQUIRE(accessor.min->get<std::int64_t>(1) == 0);
+		REQUIRE(accessor.min->get<std::int64_t>(2) == -4);
+	}
 }

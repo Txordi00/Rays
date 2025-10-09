@@ -71,7 +71,7 @@ void main()
         const vec3 norm1 = v1.normal;
         const vec3 norm2 = v2.normal;
 
-        const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+        const vec3 barycentrics = vec3(1. - attribs.x - attribs.y, attribs.x, attribs.y);
 
         // Computing the coordinates of the hit position
         const vec3 pos = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y
@@ -79,7 +79,6 @@ void main()
 
         const vec3 normal = norm0 * barycentrics.x + norm1 * barycentrics.y
                             + norm2 * barycentrics.z; // already normalized
-//        normal = normalize(vec3(normal * gl_WorldToObjectEXT));
 
         // Transforming the position to world space
         const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
@@ -87,7 +86,6 @@ void main()
         //  const vec3 colorIn =
         //    vec3(v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
         const vec3 colorIn = material.color;
-        //  const vec3 colorIn = vec3(1.);
 
         // Check if in shadow
         // Vector towards the light
@@ -178,29 +176,29 @@ void main()
                                     tMax,                   // ray max range
                                     0                       // payload
                         );
+                    } // If Snell's refraction fails it means that the ray is reflected and not refracted.
+                    // Since we took that case into consideration already, only do it if the reflection was skipped.
+                    else if (material.reflectiveness < 0.01)
+                    {
+                        const vec3 reflectedDir = reflect(rayDir, normalTmp);
+                        traceRayEXT(topLevelAS,             // acceleration structure
+                                    gl_IncomingRayFlagsEXT, // rayFlags
+                                    0xFF,                   // cullMask
+                                    0,                      // sbtRecordOffset
+                                    0,                      // sbtRecordStride
+                                    0,                      // missIndex
+                                    worldPos,               // ray origin
+                                    tMin,                   // ray min range
+                                    reflectedDir,           // ray direction
+                                    tMax,                   // ray max range
+                                    0                       // payload
+                        );
                     }
-//                    else // If Snell's refraction fails, we compute a reflection instead
-//                    {
-//                        const vec3 reflectedDir = reflect(rayDir, normalTmp);
-//                        traceRayEXT(topLevelAS,             // acceleration structure
-//                                    gl_IncomingRayFlagsEXT, // rayFlags
-//                                    0xFF,                   // cullMask
-//                                    0,                      // sbtRecordOffset
-//                                    0,                      // sbtRecordStride
-//                                    0,                      // missIndex
-//                                    worldPos,               // ray origin
-//                                    tMin,                   // ray min range
-//                                    reflectedDir,           // ray direction
-//                                    tMax,                   // ray max range
-//                                    0                       // payload
-//                        );
-//                    }
                     if(entering)
                         refractedC = material.refractiveness * rayPayload.hitValue;
                     else // We add the energy loss back because we don't want to lose energy twice on enter and exit
                         rayPayload.energyFactor /= ENERGY_LOSS;
                 }
-//            }
             // Compute the color contribution of this hit
             outColor = reflectedC + diffuseC + specularC + refractedC + ambientC;
             outColor /= (outColor + 1.);

@@ -1,6 +1,7 @@
 #include "init.hpp"
 #include "acceleration_structures.hpp"
 #include "loader.hpp"
+#include "loader2.hpp"
 #include "rt_pipelines.hpp"
 #include "utils.hpp"
 
@@ -524,9 +525,9 @@ void Init::load_meshes()
     Material m2{};
     m2.color = glm::vec3{1.f, 1.f, 1.f};
     m2.diffuseR = 0.2f;
-    m2.specularR = 0.2f;
+    m2.specularR = 0.6f;
     m2.ambientR = 1.f;
-    m2.reflectiveness = 0.5f;
+    m2.reflectiveness = 0.1f;
     m2.refractiveness = 1.f;
     m2.shininessN = 1;
     m2.refractiveIndex = 0.9f;
@@ -534,11 +535,11 @@ void Init::load_meshes()
     materials.push_back(m2);
     Material m3{};
     m3.color = glm::vec3{0.f, 1.f, 1.f};
-    m3.diffuseR = 0.2f;
-    m3.specularR = 1.f;
-    m3.shininessN = 2;
+    m3.diffuseR = 0.8f;
+    m3.specularR = 0.2f;
+    m3.shininessN = 1;
     m3.ambientR = 1.f;
-    m3.reflectiveness = 1.f;
+    m3.reflectiveness = 0.f;
     m3.refractiveness = 0.f;
     m3.refractiveIndex = 1.f;
     utils::normalize_material_factors(m3);
@@ -556,6 +557,9 @@ void Init::load_meshes()
     models[0]->position = glm::vec3(0.f, 2.f, 7.f);
     models[1]->position = glm::vec3(2.f, 0.f, 7.f);
     models[2]->position = glm::vec3(-2.f, 0.f, 7.f);
+
+    GLTFLoader2 loader2{};
+    loader2.load_gltf_asset("../../assets/ABeautifulGame.glb");
 }
 
 void Init::create_as()

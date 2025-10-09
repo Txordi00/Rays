@@ -82,7 +82,7 @@ TEST_CASE("Test if glTF type detection works", "[gltf-loader]") {
     fastgltf::Parser parser;
 
     SECTION("glTF") {
-        auto gltfPath = sampleModels / "2.0" / "ABeautifulGame" / "glTF";
+        auto gltfPath = sampleAssets / "Models" / "ABeautifulGame" / "glTF";
         REQUIRE(std::filesystem::exists(gltfPath));
 		fastgltf::GltfFileStream jsonData(gltfPath / "ABeautifulGame.gltf");
 		REQUIRE(jsonData.isOpen());
@@ -96,7 +96,7 @@ TEST_CASE("Test if glTF type detection works", "[gltf-loader]") {
     }
 
     SECTION("GLB") {
-        auto glbPath = sampleModels / "2.0" / "BoomBox" / "glTF-Binary";
+        auto glbPath = sampleAssets / "Models" / "BoomBox" / "glTF-Binary";
         REQUIRE(std::filesystem::exists(glbPath));
 		fastgltf::GltfFileStream jsonData(glbPath / "BoomBox.glb");
 		REQUIRE(jsonData.isOpen());
@@ -138,7 +138,7 @@ TEST_CASE("Loading some basic glTF", "[gltf-loader]") {
     }
 
     SECTION("Loading basic Cube.gltf") {
-        auto cubePath = sampleModels / "2.0" / "Cube" / "glTF";
+        auto cubePath = sampleAssets / "Models" / "Cube" / "glTF";
 		fastgltf::GltfFileStream jsonData(cubePath / "Cube.gltf");
 		REQUIRE(jsonData.isOpen());
 
@@ -176,7 +176,7 @@ TEST_CASE("Loading some basic glTF", "[gltf-loader]") {
     }
 
     SECTION("Loading basic Box.gltf") {
-        auto boxPath = sampleModels / "2.0" / "Box" / "glTF";
+        auto boxPath = sampleAssets / "Models" / "Box" / "glTF";
 		fastgltf::GltfFileStream jsonData(boxPath / "Box.gltf");
 		REQUIRE(jsonData.isOpen());
 
@@ -203,7 +203,7 @@ TEST_CASE("Loading some basic glTF", "[gltf-loader]") {
 
 
 TEST_CASE("Loading glTF animation", "[gltf-loader]") {
-    auto animatedCube = sampleModels / "2.0" / "AnimatedCube" / "glTF";
+    auto animatedCube = sampleAssets / "Models" / "AnimatedCube" / "glTF";
 	fastgltf::GltfFileStream jsonData(animatedCube / "AnimatedCube.gltf");
 	REQUIRE(jsonData.isOpen());
 
@@ -229,7 +229,7 @@ TEST_CASE("Loading glTF animation", "[gltf-loader]") {
 }
 
 TEST_CASE("Loading glTF skins", "[gltf-loader]") {
-    auto simpleSkin = sampleModels / "2.0" / "SimpleSkin" / "glTF";
+    auto simpleSkin = sampleAssets / "Models" / "SimpleSkin" / "glTF";
 	fastgltf::GltfFileStream jsonData(simpleSkin / "SimpleSkin.gltf");
 	REQUIRE(jsonData.isOpen());
 
@@ -255,7 +255,7 @@ TEST_CASE("Loading glTF skins", "[gltf-loader]") {
 }
 
 TEST_CASE("Loading glTF cameras", "[gltf-loader]") {
-    auto cameras = sampleModels / "2.0" / "Cameras" / "glTF";
+    auto cameras = sampleAssets / "Models" / "Cameras" / "glTF";
 	fastgltf::GltfFileStream jsonData(cameras / "Cameras.gltf");
 	REQUIRE(jsonData.isOpen());
 
@@ -285,7 +285,7 @@ TEST_CASE("Loading glTF cameras", "[gltf-loader]") {
 }
 
 TEST_CASE("Validate models with re-used parser", "[gltf-loader]") {
-	auto sponza = sampleModels / "2.0" / "Sponza" / "glTF";
+	auto sponza = sampleAssets / "Models" / "Sponza" / "glTF";
 	fastgltf::Parser parser;
 
 	SECTION("Validate Sponza.gltf") {
@@ -298,7 +298,7 @@ TEST_CASE("Validate models with re-used parser", "[gltf-loader]") {
 	}
 
 	SECTION("Validate BrainStem.gltf") {
-		auto brainStem = sampleModels / "2.0" / "BrainStem" / "glTF";
+		auto brainStem = sampleAssets / "Models" / "BrainStem" / "glTF";
 		fastgltf::GltfFileStream jsonData(brainStem / "BrainStem.gltf");
 		REQUIRE(jsonData.isOpen());
 
@@ -309,7 +309,7 @@ TEST_CASE("Validate models with re-used parser", "[gltf-loader]") {
 }
 
 TEST_CASE("Test allocation callbacks for embedded buffers", "[gltf-loader]") {
-    auto boxPath = sampleModels / "2.0" / "Box" / "glTF-Embedded";
+    auto boxPath = sampleAssets / "Models" / "Box" / "glTF-Embedded";
 	fastgltf::GltfFileStream jsonData(boxPath / "Box.gltf");
 	REQUIRE(jsonData.isOpen());
 
@@ -347,12 +347,13 @@ TEST_CASE("Test allocation callbacks for embedded buffers", "[gltf-loader]") {
 }
 
 TEST_CASE("Test base64 decoding callbacks", "[gltf-loader]") {
-    auto boxPath = sampleModels / "2.0" / "Box" / "glTF-Embedded";
+    auto boxPath = sampleAssets / "Models" / "Box" / "glTF-Embedded";
 	fastgltf::GltfFileStream jsonData(boxPath / "Box.gltf");
 	REQUIRE(jsonData.isOpen());
 
     size_t decodeCounter = 0;
-    auto decodeCallback = [](std::string_view encodedData, uint8_t* outputData, size_t padding, size_t outputSize, void* userPointer) {
+    auto decodeCallback = [](const std::string_view encodedData, uint8_t* outputData,
+        const size_t padding, [[maybe_unused]] size_t outputSize, void* userPointer) {
         (*static_cast<size_t*>(userPointer))++;
         fastgltf::base64::decode_inplace(encodedData, outputData, padding);
     };
@@ -367,7 +368,7 @@ TEST_CASE("Test base64 decoding callbacks", "[gltf-loader]") {
 }
 
 TEST_CASE("Validate sparse accessor parsing", "[gltf-loader]") {
-    auto simpleSparseAccessor = sampleModels / "2.0" / "SimpleSparseAccessor" / "glTF";
+    auto simpleSparseAccessor = sampleAssets / "Models" / "SimpleSparseAccessor" / "glTF";
 	fastgltf::GltfFileStream jsonData(simpleSparseAccessor / "SimpleSparseAccessor.gltf");
 	REQUIRE(jsonData.isOpen());
 
@@ -389,7 +390,7 @@ TEST_CASE("Validate sparse accessor parsing", "[gltf-loader]") {
 }
 
 TEST_CASE("Validate morph target parsing", "[gltf-loader]") {
-    auto simpleMorph = sampleModels / "2.0" / "SimpleMorph" / "glTF";
+    auto simpleMorph = sampleAssets / "Models" / "SimpleMorph" / "glTF";
 	fastgltf::GltfFileStream jsonData(simpleMorph / "SimpleMorph.gltf");
 	REQUIRE(jsonData.isOpen());
 
@@ -423,75 +424,82 @@ TEST_CASE("Validate morph target parsing", "[gltf-loader]") {
 }
 
 TEST_CASE("Test accessors min/max", "[gltf-loader]") {
-    auto lightsLamp = sampleModels / "2.0" / "LightsPunctualLamp" / "glTF";
+	auto lightsLamp = sampleAssets / "Models" / "LightsPunctualLamp" / "glTF";
 	fastgltf::GltfFileStream jsonData(lightsLamp / "LightsPunctualLamp.gltf");
 	REQUIRE(jsonData.isOpen());
 
 	fastgltf::Parser parser(fastgltf::Extensions::KHR_lights_punctual);
-    auto asset = parser.loadGltfJson(jsonData, lightsLamp, noOptions, fastgltf::Category::Accessors);
-    REQUIRE(asset.error() == fastgltf::Error::None);
+	auto asset = parser.loadGltfJson(jsonData, lightsLamp, noOptions, fastgltf::Category::Accessors);
+	REQUIRE(asset.error() == fastgltf::Error::None);
 	REQUIRE(fastgltf::validate(asset.get()) == fastgltf::Error::None);
 
-    REQUIRE(std::find_if(asset->extensionsUsed.begin(), asset->extensionsUsed.end(), [](auto& string) {
-        return string == fastgltf::extensions::KHR_lights_punctual;
-    }) != asset->extensionsUsed.end());
+	REQUIRE(std::find_if(asset->extensionsUsed.begin(), asset->extensionsUsed.end(), [](auto& string) {
+		return string == fastgltf::extensions::KHR_lights_punctual;
+	}) != asset->extensionsUsed.end());
 
-    REQUIRE(asset->accessors.size() == 15);
-    auto& accessors = asset->accessors;
+	REQUIRE(asset->accessors.size() == 15);
+	auto& accessors = asset->accessors;
 
-    {
-        auto& firstAccessor = accessors[0];
-        const auto* max = std::get_if<FASTGLTF_STD_PMR_NS::vector<std::int64_t>>(&firstAccessor.max);
-        const auto* min = std::get_if<FASTGLTF_STD_PMR_NS::vector<std::int64_t>>(&firstAccessor.min);
-        REQUIRE(max != nullptr);
-        REQUIRE(min != nullptr);
-        REQUIRE(max->size() == fastgltf::getNumComponents(firstAccessor.type));
-        REQUIRE(max->size() == 1);
-        REQUIRE(min->size() == 1);
-        REQUIRE(max->front() == 3211);
-        REQUIRE(min->front() == 0);
-    }
+	{
+		auto& firstAccessor = accessors[0];
+		const auto& max = firstAccessor.max;
+		const auto& min = firstAccessor.min;
+		REQUIRE(max.has_value());
+		REQUIRE(min.has_value());
+		REQUIRE(max->size() == fastgltf::getNumComponents(firstAccessor.type));
+		REQUIRE(max->size() == 1);
+		REQUIRE(min->size() == 1);
+		REQUIRE(max->isType<std::int64_t>());
+		REQUIRE(min->isType<std::int64_t>());
+		REQUIRE(max->get<std::int64_t>(0) == 3211);
+		REQUIRE(min->get<std::int64_t>(0) == 0);
+	}
 
-    {
-        auto& secondAccessor = accessors[1];
-        const auto* max = std::get_if<FASTGLTF_STD_PMR_NS::vector<double>>(&secondAccessor.max);
-        const auto* min = std::get_if<FASTGLTF_STD_PMR_NS::vector<double>>(&secondAccessor.min);
-        REQUIRE(max != nullptr);
-        REQUIRE(min != nullptr);
-        REQUIRE(max->size() == fastgltf::getNumComponents(secondAccessor.type));
-        REQUIRE(max->size() == 3);
-        REQUIRE(min->size() == 3);
+	{
+    	auto& secondAccessor = accessors[1];
+    	const auto& max = secondAccessor.max;
+    	const auto& min = secondAccessor.min;
+		REQUIRE(max.has_value());
+		REQUIRE(min.has_value());
+		REQUIRE(max->size() == fastgltf::getNumComponents(secondAccessor.type));
+		REQUIRE(max->size() == 3);
+		REQUIRE(min->size() == 3);
 
-		REQUIRE(max->at(0) == Catch::Approx(0.81497824192047119));
-		REQUIRE(max->at(1) == Catch::Approx(1.8746249675750732));
-		REQUIRE(max->at(2) == Catch::Approx(0.32295516133308411));
+		REQUIRE(max->isType<double>());
+		REQUIRE(min->isType<double>());
 
-		REQUIRE(min->at(0) == Catch::Approx(-0.12269512563943863));
-		REQUIRE(min->at(1) == Catch::Approx(0.013025385327637196));
-		REQUIRE(min->at(2) == Catch::Approx(-0.32393229007720947));
-    }
+		REQUIRE(max->get<double>(0) == Catch::Approx(0.81497824192047119));
+		REQUIRE(max->get<double>(1) == Catch::Approx(1.8746249675750732));
+		REQUIRE(max->get<double>(2) == Catch::Approx(0.32295516133308411));
 
-    {
-        auto& fifthAccessor = accessors[4];
-        const auto* max = std::get_if<FASTGLTF_STD_PMR_NS::vector<double>>(&fifthAccessor.max);
-        const auto* min = std::get_if<FASTGLTF_STD_PMR_NS::vector<double>>(&fifthAccessor.min);
-        REQUIRE(max != nullptr);
-        REQUIRE(min != nullptr);
-        REQUIRE(max->size() == fastgltf::getNumComponents(fifthAccessor.type));
-        REQUIRE(max->size() == 4);
-        REQUIRE(min->size() == 4);
+		REQUIRE(min->get<double>(0) == Catch::Approx(-0.12269512563943863));
+		REQUIRE(min->get<double>(1) == Catch::Approx(0.013025385327637196));
+		REQUIRE(min->get<double>(2) == Catch::Approx(-0.32393229007720947));
+	}
 
-        REQUIRE(max->back() == 1.0);
-    }
+	{
+		auto& fifthAccessor = accessors[4];
+		const auto& max = fifthAccessor.max;
+		const auto& min = fifthAccessor.min;
+		REQUIRE(max.has_value());
+		REQUIRE(min.has_value());
+		REQUIRE(max->size() == fastgltf::getNumComponents(fifthAccessor.type));
+		REQUIRE(max->size() == 4);
+		REQUIRE(min->size() == 4);
+		REQUIRE(max->isType<double>());
+		REQUIRE(min->isType<double>());
+
+		REQUIRE(max->get<double>(3) == 1.0);
+	}
 }
 
 TEST_CASE("Test unicode characters", "[gltf-loader]") {
 #if FASTGLTF_CPP_20
-	auto unicodePath = sampleModels / "2.0" / std::filesystem::path(u8"Unicode❤♻Test") / "glTF";
+	auto unicodePath = sampleAssets / "Models" / std::filesystem::path(u8"Unicode❤♻Test") / "glTF";
 	fastgltf::GltfFileStream jsonData(unicodePath / std::filesystem::path(u8"Unicode❤♻Test.gltf"));
 	REQUIRE(jsonData.isOpen());
 #else
-	auto unicodePath = sampleModels / "2.0" / std::filesystem::u8path(u8"Unicode❤♻Test") / "glTF";
+	auto unicodePath = sampleAssets / "Models" / std::filesystem::u8path(u8"Unicode❤♻Test") / "glTF";
 	fastgltf::GltfFileStream jsonData(unicodePath / std::filesystem::u8path(u8"Unicode❤♻Test.gltf"));
 	REQUIRE(jsonData.isOpen());
 #endif
@@ -507,10 +515,15 @@ TEST_CASE("Test unicode characters", "[gltf-loader]") {
 	REQUIRE(!asset->buffers.empty());
 	auto bufferUri = std::get<fastgltf::sources::URI>(asset->buffers[0].data);
 	REQUIRE(bufferUri.uri.path() == "Unicode❤♻Binary.bin");
+#if FASTGLTF_CPP_20
+	REQUIRE(bufferUri.uri.fspath() == std::filesystem::path{ u8"Unicode❤♻Binary.bin" });
+#else
+	REQUIRE(bufferUri.uri.fspath() == std::filesystem::u8path("Unicode❤♻Binary.bin"));
+#endif
 }
 
 TEST_CASE("Test extras callback", "[gltf-loader]") {
-	auto materialVariants = sampleModels / "2.0" / "MaterialsVariantsShoe" / "glTF";
+	auto materialVariants = sampleAssets / "Models" / "MaterialsVariantsShoe" / "glTF";
 	std::vector<std::string> nodeNames;
 
 	// lambda callback to parse the glTF JSON from the jsonData buffer
@@ -588,7 +601,7 @@ TEST_CASE("Test extras callback", "[gltf-loader]") {
 #if defined(FASTGLTF_HAS_MEMORY_MAPPED_FILE)
 TEST_CASE("Test glTF file loading", "[gltf-loader]") {
 	SECTION("Mapped files") {
-		auto cubePath = sampleModels / "2.0" / "Cube" / "glTF";
+		auto cubePath = sampleAssets / "Models" / "Cube" / "glTF";
 		auto mappedFile = fastgltf::MappedGltfFile::FromPath(cubePath / "Cube.gltf");
 		REQUIRE(mappedFile.error() == fastgltf::Error::None);
 

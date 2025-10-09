@@ -261,7 +261,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
     vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
     submitInfo.setCommandBufferInfos(cmdInfo);
     queue.submit2(submitInfo, asFence);
-    queue.waitIdle();
+    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
+    // queue.waitIdle();
 
     // Scratch buffer can be destroyed after queue finishes
     utils::destroy_buffer(allocator, scratchBuffer);

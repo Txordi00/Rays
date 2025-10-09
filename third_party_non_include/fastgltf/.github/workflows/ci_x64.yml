@@ -13,7 +13,8 @@ on:
 
 env:
   BUILD_TYPE: Release
-  SAMPLE_MODELS_LOCATION: tests/gltf/glTF-Sample-Models
+  SAMPLE_ASSETS_LOCATION: tests/gltf/glTF-Sample-Assets
+  PHYSICS_SAMPLE_ASSETS_LOCATION: tests/gltf/glTF_Physics
 
 jobs:
   build_windows:
@@ -24,19 +25,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Download cached sample models
+      - name: Download cached sample assets
         uses: actions/cache@v4
-        id: sample-models-cache
+        id: sample-assets-cache
         with:
-          path: ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
-          key: gltf-sample-models
+          path: ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
+          key: gltf-sample-assets
 
-      - name: Download dependencies
-        run: python3 fetch_test_deps.py
-
-      - name: Clone glTF-Sample-Models
-        if: steps.sample-models-cache.outputs.cache-hit != 'true'
-        run: git clone https://github.com/KhronosGroup/glTF-Sample-Models ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
+      - name: Clone gltf-sample-assets
+        if: steps.sample-assets-cache.outputs.cache-hit != 'true'
+        run: git clone https://github.com/KhronosGroup/glTF-Sample-Assets ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
 
       - name: Configure CMake
         run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DFASTGLTF_ENABLE_TESTS=ON -DFASTGLTF_COMPILE_AS_CPP20=${{ matrix.cpp20 }}
@@ -52,22 +50,30 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Download cached sample models
+      - name: Download cached sample assets
         uses: actions/cache@v4
-        id: sample-models-cache
+        id: sample-assets-cache
         with:
-          path: ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
-          key: gltf-sample-models
+          path: ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
+          key: gltf-sample-assets
 
-      - name: Download dependencies
-        run: python3 fetch_test_deps.py
+      - name: Clone gltf-sample-assets
+        if: steps.sample-assets-cache.outputs.cache-hit != 'true'
+        run: git clone https://github.com/KhronosGroup/glTF-Sample-Assets ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
+        
+      - name: Download cached physics sample assets
+        uses: actions/cache@v4
+        id: physics-sample-assets-cache
+        with:
+          path: ${{ github.workspace }}/${{ env.PHYSICS_SAMPLE_ASSETS_LOCATION }}
+          key: gltf-physics-sample-assets
 
-      - name: Clone glTF-Sample-Models
-        if: steps.sample-models-cache.outputs.cache-hit != 'true'
-        run: git clone https://github.com/KhronosGroup/glTF-Sample-Models ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
+      - name: Clone gltf-physics
+        if: steps.physics-sample-assets-cache.outputs.cache-hit != 'true'
+        run: git clone https://github.com/eoineoineoin/glTF_Physics ${{ github.workspace }}/${{ env.PHYSICS_SAMPLE_ASSETS_LOCATION }}
 
       - name: Configure CMake
-        run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DFASTGLTF_ENABLE_TESTS=ON -DFASTGLTF_ENABLE_DEPRECATED_EXT=ON
+        run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DFASTGLTF_ENABLE_TESTS=ON -DFASTGLTF_ENABLE_DEPRECATED_EXT=ON -DFASTGLTF_ENABLE_KHR_PHYSICS_RIGID_BODIES=ON
 
       - name: Build (Windows)
         run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --target tests/fastgltf_tests --verbose
@@ -78,44 +84,40 @@ jobs:
   build_linux:
     strategy:
       matrix:
-        c_compiler: [gcc-9, gcc-10, clang-13, clang-15]
+        c_compiler: [gcc-12, gcc-13, gcc-14, clang-16, clang-17, clang-18]
+        os: [ubuntu-24.04]
         cpp20: [NO, YES]
-        exclude:
-          # gcc 9 is too old to support C++20, and Clang 13/14 have an issue with the libstdc++ version on the runner images.
-          - c_compiler: gcc-9
-            cpp20: YES
-          - c_compiler: clang-13
-            cpp20: YES
         include:
-          - cxx_compiler: g++-9
-            c_compiler: gcc-9
-          - cxx_compiler: g++-10
-            c_compiler: gcc-10
-          - cxx_compiler: clang++-13
-            c_compiler: clang-13
-          - cxx_compiler: clang++-15
-            c_compiler: clang-15
+          - cxx_compiler: g++-12
+            c_compiler: gcc-12
+          - cxx_compiler: g++-13
+            c_compiler: gcc-13
+          - cxx_compiler: g++-14
+            c_compiler: gcc-14
+          - cxx_compiler: clang++-16
+            c_compiler: clang-16
+          - cxx_compiler: clang++-17
+            c_compiler: clang-17
+          - cxx_compiler: clang++-18
+            c_compiler: clang-18
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     env:
       CC: ${{ matrix.c_compiler }}
       CXX: ${{ matrix.cxx_compiler }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Download cached sample models
+      - name: Download cached sample assets
         uses: actions/cache@v4
-        id: sample-models-cache
+        id: sample-assets-cache
         with:
-          path: ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
-          key: gltf-sample-models
+          path: ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
+          key: gltf-sample-assets
 
-      - name: Download dependencies
-        run: python3 fetch_test_deps.py
-
-      - name: Clone glTF-Sample-Models
-        if: steps.sample-models-cache.outputs.cache-hit != 'true'
-        run: git clone https://github.com/KhronosGroup/glTF-Sample-Models ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
+      - name: Clone gltf-sample-assets
+        if: steps.sample-assets-cache.outputs.cache-hit != 'true'
+        run: git clone https://github.com/KhronosGroup/glTF-Sample-Assets ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
 
       - name: Configure CMake
         run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DFASTGLTF_ENABLE_TESTS=ON -DFASTGLTF_COMPILE_AS_CPP20=${{ matrix.cpp20 }}
@@ -129,38 +131,53 @@ jobs:
   build_linux_deprecated_extensions:
     strategy:
       matrix:
-        c_compiler: [gcc-9, gcc-10, clang-13]
+        c_compiler: [gcc-12, gcc-13, gcc-14, clang-16, clang-17, clang-18]
+        os: [ubuntu-24.04]
         include:
-          - cxx_compiler: g++-9
-            c_compiler: gcc-9
-          - cxx_compiler: g++-10
-            c_compiler: gcc-10
-          - cxx_compiler: clang++-13
-            c_compiler: clang-13
+          - cxx_compiler: g++-12
+            c_compiler: gcc-12
+          - cxx_compiler: g++-13
+            c_compiler: gcc-13
+          - cxx_compiler: g++-14
+            c_compiler: gcc-14
+          - cxx_compiler: clang++-16
+            c_compiler: clang-16
+          - cxx_compiler: clang++-17
+            c_compiler: clang-17
+          - cxx_compiler: clang++-18
+            c_compiler: clang-18
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     env:
       CC: ${{ matrix.c_compiler }}
       CXX: ${{ matrix.cxx_compiler }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Download cached sample models
+      - name: Download cached sample assets
         uses: actions/cache@v4
-        id: sample-models-cache
+        id: sample-assets-cache
         with:
-          path: ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
-          key: gltf-sample-models
+          path: ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
+          key: gltf-sample-assets
 
-      - name: Download dependencies
-        run: python3 fetch_test_deps.py
+      - name: Clone gltf-sample-assets
+        if: steps.sample-assets-cache.outputs.cache-hit != 'true'
+        run: git clone https://github.com/KhronosGroup/glTF-Sample-Assets ${{ github.workspace }}/${{ env.SAMPLE_ASSETS_LOCATION }}
+        
+      - name: Download cached physics sample assets
+        uses: actions/cache@v4
+        id: physics-sample-assets-cache
+        with:
+          path: ${{ github.workspace }}/${{ env.PHYSICS_SAMPLE_ASSETS_LOCATION }}
+          key: gltf-physics-sample-assets
 
-      - name: Clone glTF-Sample-Models
-        if: steps.sample-models-cache.outputs.cache-hit != 'true'
-        run: git clone https://github.com/KhronosGroup/glTF-Sample-Models ${{ github.workspace }}/${{ env.SAMPLE_MODELS_LOCATION }}
+      - name: Clone gltf-physics
+        if: steps.physics-sample-assets-cache.outputs.cache-hit != 'true'
+        run: git clone https://github.com/eoineoineoin/glTF_Physics ${{ github.workspace }}/${{ env.PHYSICS_SAMPLE_ASSETS_LOCATION }}
 
       - name: Configure CMake
-        run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DFASTGLTF_ENABLE_TESTS=ON -DFASTGLTF_ENABLE_DEPRECATED_EXT=ON
+        run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DFASTGLTF_ENABLE_TESTS=ON -DFASTGLTF_ENABLE_DEPRECATED_EXT=ON -DFASTGLTF_ENABLE_KHR_PHYSICS_RIGID_BODIES=ON
 
       - name: Build
         run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --target fastgltf_tests --verbose

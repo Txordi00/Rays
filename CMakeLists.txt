@@ -41,6 +41,7 @@ add_library(imgui STATIC "include/imgui/imgui.cpp" "include/imgui/imgui_demo.cpp
   "include/imgui/imgui_impl_sdl3.cpp" "include/imgui/imgui_impl_vulkan.cpp")
 target_link_libraries(imgui PRIVATE Vulkan::Vulkan)
 # Fastgltf
+set(FASTGLTF_COMPILE_AS_CPP20 YES)
 add_subdirectory("third_party_non_include/fastgltf")
 
 # Vk-bootstrap
