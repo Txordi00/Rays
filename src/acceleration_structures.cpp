@@ -270,7 +270,7 @@ void ASBuilder::init()
     asPool = device.createCommandPool(commandPoolCreateInfo);
     vk::DeviceQueueInfo2 queueInfo{};
     queueInfo.setQueueFamilyIndex(queueFamilyIndex);
-    queueInfo.setQueueIndex(0); // Why I cannot use index 1?
+    queueInfo.setQueueIndex(0); // Why can't I use index 1?
     queue = device.getQueue2(queueInfo);
 
     vk::CommandBufferAllocateInfo cmdAllocInfo{};

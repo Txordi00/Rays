@@ -42,14 +42,21 @@ vk::SamplerMipmapMode extract_mipmap_mode(const fastgltf::Filter &filter);
 class GLTFLoader2
 {
 public:
-    GLTFLoader2(const vk::Device &device);
+    GLTFLoader2(const vk::Device &device,
+                const VmaAllocator &allocator,
+                const uint32_t queueFamilyIndex);
 
-    ~GLTFLoader2() = default;
+    ~GLTFLoader2();
 
     std::optional<std::shared_ptr<GLTFObj>> load_gltf_asset(const std::filesystem::path &path);
 
 private:
     const vk::Device &device;
-    // const ImageData &checkerboardImage;
+    const VmaAllocator &allocator;
+    vk::Queue queue;
+    vk::CommandPool gltfCmdPool;
+    vk::CommandBuffer gltfCmd;
+    vk::Fence gltfFence;
+    ImageData checkerboardImage;
     fastgltf::Parser parser{};
 };

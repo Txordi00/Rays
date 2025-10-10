@@ -44,6 +44,15 @@ ImageData create_image(const vk::Device &device,
                        const vk::Extent3D &extent,
                        const void *data = nullptr);
 
+void map_to_image(const vk::Device &device,
+                  const VmaAllocator &allocator,
+                  const vk::CommandBuffer &cmd,
+                  const vk::Fence &fence,
+                  const vk::Queue &queue,
+                  const vk::Image &image,
+                  const vk::Extent3D &extent,
+                  const void *data);
+
 void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
 
 void map_to_buffer(const Buffer &buffer, const void *data);

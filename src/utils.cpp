@@ -244,67 +244,62 @@ ImageData create_image(const vk::Device &device,
 
     // Thanks to the extension UINIFIED_IMAGE_LAYOUTS, we can safely move to
     // the layout General and forget about layout transitions without paying
-    // any performance tax.
+    // any performance tax. Stage flags set to none since we already wait for fences.
     utils::cmd_submit(device, queue, fence, cmd, [&](const vk::CommandBuffer &cmd) {
-        utils::transition_image(cmd, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+        utils::transition_image(cmd,
+                                image,
+                                vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::eGeneral,
+                                vk::PipelineStageFlagBits2::eNone,
+                                vk::PipelineStageFlagBits2::eNone);
     });
 
-    // // We need to move the data into the image
-    // if (data != nullptr) {
-    //     vk::DeviceSize dataSize = extent.width * extent.height * extent.depth * 4;
-    //     Buffer tmpBuffer
-    //         = create_buffer(device,
-    //                         allocator,
-    //                         dataSize,
-    //                         vk::BufferUsageFlagBits::eTransferSrc,
-    //                         VMA_MEMORY_USAGE_AUTO,
-    //                         VMA_ALLOCATION_CREATE_MAPPED_BIT
-    //                             | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
-    //     memcpy(tmpBuffer.allocationInfo.pMappedData, data, dataSize);
-
-    // utils::cmd_submit(
-    //     device, queue[&](VkCommandBuffer cmd) {
-    //         vkutil::transition_image(cmd,
-    //                                  new_image.image,
-    //                                  VK_IMAGE_LAYOUT_UNDEFINED,
-    //                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    //         VkBufferImageCopy copyRegion = {};
-    //         copyRegion.bufferOffset = 0;
-    //         copyRegion.bufferRowLength = 0;
-    //         copyRegion.bufferImageHeight = 0;
-
-    //         copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    //         copyRegion.imageSubresource.mipLevel = 0;
-    //         copyRegion.imageSubresource.baseArrayLayer = 0;
-    //         copyRegion.imageSubresource.layerCount = 1;
-    //         copyRegion.imageExtent = size;
-
-    //         // copy the buffer into the image
-    //         vkCmdCopyBufferToImage(cmd,
-    //                                uploadbuffer.buffer,
-    //                                new_image.image,
-    //                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    //                                1,
-    //                                &copyRegion);
-
-    //         if (mipmapped) {
-    //             vkutil::generate_mipmaps(cmd,
-    //                                      new_image.image,
-    //                                      VkExtent2D{new_image.imageExtent.width,
-    //                                                 new_image.imageExtent.height});
-    //         } else {
-    //             vkutil::transition_image(cmd,
-    //                                      new_image.image,
-    //                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    //                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    //         }
-    //     });
-    // destroy_buffer(uploadbuffer);
-    // }
+    // Map data if requested so
+    if (data != nullptr)
+        utils::map_to_image(device, allocator, cmd, fence, queue, image.image, extent, data);
 
     return image;
+}
+
+void map_to_image(const vk::Device &device,
+                  const VmaAllocator &allocator,
+                  const vk::CommandBuffer &cmd,
+                  const vk::Fence &fence,
+                  const vk::Queue &queue,
+                  const vk::Image &image,
+                  const vk::Extent3D &extent,
+                  const void *data)
+{
+    // We need to move the data into the image
+    assert(data != nullptr && "Data to map must be non-null");
+    vk::DeviceSize dataSize = extent.width * extent.height * extent.depth * 4;
+    Buffer tmpBuffer = create_buffer(device,
+                                     allocator,
+                                     dataSize,
+                                     vk::BufferUsageFlagBits::eTransferSrc,
+                                     VMA_MEMORY_USAGE_AUTO,
+                                     VMA_ALLOCATION_CREATE_MAPPED_BIT
+                                         | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+    memcpy(tmpBuffer.allocationInfo.pMappedData, data, dataSize);
+
+    utils::cmd_submit(device, queue, fence, cmd, [&](const vk::CommandBuffer &cmd) {
+        //
+        vk::ImageSubresourceLayers subResource{};
+        subResource.setAspectMask(vk::ImageAspectFlagBits::eColor);
+        subResource.setLayerCount(1);
+        vk::BufferImageCopy2 copyRegion{};
+        copyRegion.setImageExtent(extent);
+        copyRegion.setImageSubresource(subResource);
+        vk::CopyBufferToImageInfo2 copyInfo{};
+        copyInfo.setSrcBuffer(tmpBuffer.buffer);
+        copyInfo.setDstImage(image);
+        copyInfo.setDstImageLayout(vk::ImageLayout::eGeneral);
+        copyInfo.setRegions(copyRegion);
+
+        cmd.copyBufferToImage2(copyInfo);
+    });
+    utils::destroy_buffer(allocator, tmpBuffer);
 }
 
 void cmd_submit(const vk::Device &device,
@@ -380,6 +375,7 @@ vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
 
 } // namespace init
 
+// namespace init
 
 // namespace init
 
