@@ -251,63 +251,24 @@ void Init::create_draw_data()
     imageDraw.format = vk::Format::eR32G32B32A32Sfloat;
     imageDraw.extent = drawExtent;
 
-    // We should be able to erase Storage if we get rid of the background compute pipeline
-    vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
-                                         | vk::ImageUsageFlagBits::eTransferSrc
-                                         | vk::ImageUsageFlagBits::eStorage
-                                         | vk::ImageUsageFlagBits::eColorAttachment;
+    // We need ColorAttachment for the graphics pipeline and Storage for the RT pipeline
+    constexpr vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
+                                                   | vk::ImageUsageFlagBits::eTransferSrc
+                                                   | vk::ImageUsageFlagBits::eStorage
+                                                   | vk::ImageUsageFlagBits::eColorAttachment;
 
-    vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(imageDraw.format,
-                                                                         drawUsageFlags,
-                                                                         drawExtent);
+    imageDraw = utils::create_image(device,
+                                    allocator,
+                                    vk::Format::eR32G32B32A32Sfloat,
+                                    drawUsageFlags,
+                                    drawExtent);
 
-    VmaAllocationCreateInfo allocationCreateInfo{};
-    allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    // allocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    // Efficiently create and allocate the image with VMA
-    vmaCreateImage(allocator,
-                   (VkImageCreateInfo *) &imageCreateInfo,
-                   &allocationCreateInfo,
-                   (VkImage *) &imageDraw.image,
-                   &imageDraw.allocation,
-                   nullptr);
-
-    // Create the handle vk::ImageView. Not possible to do this with VMA
-    vk::ImageViewCreateInfo imageViewCreateInfo
-        = utils::init::image_view_create_info(imageDraw.format,
-                                              imageDraw.image,
-                                              vk::ImageAspectFlagBits::eColor);
-    imageDraw.imageView = device.createImageView(imageViewCreateInfo);
-
-    // The same for the depth image & image view:
-    imageDepth.format = vk::Format::eD32Sfloat;
-    imageDepth.extent = drawExtent;
-
-    vk::ImageUsageFlags depthUsageFlags = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-    vk::ImageCreateInfo depthCreateInfo = utils::init::image_create_info(imageDepth.format,
-                                                                         depthUsageFlags,
-                                                                         imageDepth.extent);
-
-    VmaAllocationCreateInfo depthAllocationInfo{};
-    depthAllocationInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    vmaCreateImage(allocator,
-                   (VkImageCreateInfo *) &depthCreateInfo,
-                   &depthAllocationInfo,
-                   (VkImage *) &imageDepth.image,
-                   &imageDepth.allocation,
-                   nullptr);
-
-    vk::ImageViewCreateInfo depthViewInfo
-        = utils::init::image_view_create_info(imageDepth.format,
-                                              imageDepth.image,
-                                              vk::ImageAspectFlagBits::eDepth);
-
-    try {
-        imageDepth.imageView = device.createImageView(depthViewInfo);
-    } catch (const std::exception &e) {
-        VK_CHECK_EXC(e);
-    }
+    constexpr vk::ImageUsageFlags depthUsageFlags = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    imageDepth = utils::create_image(device,
+                                     allocator,
+                                     vk::Format::eD32Sfloat,
+                                     depthUsageFlags,
+                                     drawExtent);
 }
 
 void Init::create_camera()
@@ -558,8 +519,8 @@ void Init::load_meshes()
     models[1]->position = glm::vec3(2.f, 0.f, 7.f);
     models[2]->position = glm::vec3(-2.f, 0.f, 7.f);
 
-    GLTFLoader2 loader2{};
-    loader2.load_gltf_asset("../../assets/ABeautifulGame.glb");
+    // GLTFLoader2 loader2{};
+    // loader2.load_gltf_asset("../../assets/ABeautifulGame.glb");
 }
 
 void Init::create_as()

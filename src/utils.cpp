@@ -3,7 +3,7 @@
 #include <iostream>
 
 namespace utils {
-void transition_image(vk::CommandBuffer &cmd,
+void transition_image(const vk::CommandBuffer &cmd,
                       const vk::Image &image,
                       const vk::ImageLayout &currentLayout,
                       const vk::ImageLayout &newLayout,
@@ -42,7 +42,7 @@ void transition_image(vk::CommandBuffer &cmd,
     cmd.pipelineBarrier2(depInfo);
 }
 
-void copy_image(vk::CommandBuffer &cmd,
+void copy_image(const vk::CommandBuffer &cmd,
                 const vk::Image &src,
                 const vk::Image &dst,
                 const vk::Extent2D &srcRes,
@@ -232,6 +232,52 @@ void normalize_material_factors(Material &m)
     m.ambientR /= normFactor;
     m.reflectiveness /= normFactor;
     m.refractiveness /= normFactor;
+}
+
+ImageData create_image(const vk::Device &device,
+                       const VmaAllocator &allocator,
+                       const vk::Format &format,
+                       const vk::ImageUsageFlags &flags,
+                       const vk::Extent3D &extent)
+{
+    ImageData image;
+
+    // Overkill format
+    image.format = format;
+    image.extent = extent;
+
+    // We should be able to erase Storage if we get rid of the background compute pipeline
+    constexpr vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
+                                                   | vk::ImageUsageFlagBits::eTransferSrc
+                                                   | vk::ImageUsageFlagBits::eStorage
+                                                   | vk::ImageUsageFlagBits::eColorAttachment;
+
+    const vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(format,
+                                                                               flags,
+                                                                               extent);
+
+    VmaAllocationCreateInfo allocationCreateInfo{};
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    // Efficiently create and allocate the image with VMA
+    vmaCreateImage(allocator,
+                   (VkImageCreateInfo *) &imageCreateInfo,
+                   &allocationCreateInfo,
+                   (VkImage *) &image.image,
+                   &image.allocation,
+                   nullptr);
+
+    // Only 2 options: Color or depth. Decide depending on the format
+    const vk::ImageAspectFlags aspectFlags = (format == vk::Format::eD32Sfloat)
+                                                 ? vk::ImageAspectFlagBits::eDepth
+                                                 : vk::ImageAspectFlagBits::eColor;
+
+    // Create the handle vk::ImageView. Not possible to do this with VMA
+    const vk::ImageViewCreateInfo imageViewCreateInfo
+        = utils::init::image_view_create_info(format, image.image, aspectFlags);
+    image.imageView = device.createImageView(imageViewCreateInfo);
+
+    return image;
 }
 
 // namespace init

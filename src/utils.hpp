@@ -12,14 +12,14 @@ import vulkan_hpp;
 namespace utils {
 
 void transition_image(
-    vk::CommandBuffer &cmd,
+    const vk::CommandBuffer &cmd,
     const vk::Image &image,
     const vk::ImageLayout &currentLayout,
     const vk::ImageLayout &newLayout,
     const vk::PipelineStageFlags2 &srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
     const vk::PipelineStageFlags2 &dstStageMask = vk::PipelineStageFlagBits2::eAllCommands);
 
-void copy_image(vk::CommandBuffer &cmd,
+void copy_image(const vk::CommandBuffer &cmd,
                 const vk::Image &src,
                 const vk::Image &dst,
                 const vk::Extent2D &srcRes,
@@ -32,6 +32,12 @@ Buffer create_buffer(const vk::Device &device,
                      const VmaMemoryUsage &memoryUsage,
                      const VmaAllocationCreateFlags &allocationFlags,
                      const vk::DeviceSize alignment = 0);
+
+ImageData create_image(const vk::Device &device,
+                       const VmaAllocator &allocator,
+                       const vk::Format &format,
+                       const vk::ImageUsageFlags &flags,
+                       const vk::Extent3D &extent);
 
 void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
 
@@ -58,22 +64,5 @@ vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
                                                const vk::ImageAspectFlags &aspectMask);
 
 } // namespace init
-
-// struct DeletionQueue
-// {
-//     std::deque<std::function<void()>> deletors;
-
-//     void push_function(std::function<void()> &&function) { deletors.push_back(function); }
-
-//     void flush()
-//     {
-//         // reverse iterate the deletion queue to execute all the functions
-//         for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
-//             (*it)(); //call functors
-//         }
-
-//         deletors.clear();
-//     }
-// };
 
 } // namespace utils

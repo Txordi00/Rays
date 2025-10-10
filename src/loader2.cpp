@@ -1,6 +1,20 @@
 #include "loader2.hpp"
 #include <print>
 
+GLTFLoader2::GLTFLoader2(const vk::Device &device)
+    : device{device}
+{
+    // Checkerboard image
+    uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
+    uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+    std::array<uint32_t, 16 * 16> pixels; // for 16x16 checkerboard texture
+    for (int x = 0; x < 16; x++) {
+        for (int y = 0; y < 16; y++) {
+            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+        }
+    }
+}
+
 std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
     const std::filesystem::path &path)
 {
@@ -45,6 +59,8 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
     std::vector<std::shared_ptr<Node>> nodes;
     std::vector<ImageData> images;
     std::vector<std::shared_ptr<Material2>> materials;
+
+    // Checkerboard image
 
     return {};
 }
