@@ -61,6 +61,15 @@ struct SimplePipelineData
     vk::Pipeline pipeline;
 };
 
+struct ImageData
+{
+    vk::Image image;
+    vk::ImageView imageView;
+    VmaAllocation allocation;
+    vk::Extent3D extent;
+    vk::Format format;
+};
+
 struct FrameData
 {
     vk::CommandPool commandPool;
@@ -69,15 +78,8 @@ struct FrameData
     vk::Fence renderFence;
     vk::DescriptorSet descriptorSetUAB;
     vk::DescriptorSet descriptorSetRt;
-};
-
-struct ImageData
-{
-    vk::Image image;
-    vk::ImageView imageView;
-    VmaAllocation allocation;
-    vk::Extent3D extent;
-    vk::Format format;
+    ImageData imageDraw;
+    ImageData imageDepth;
 };
 
 struct Buffer

@@ -27,10 +27,10 @@ Init::Init()
     init_vulkan();
     init_rt();
     create_swapchain(W, H);
-    create_draw_data();
     create_camera();
     init_commands();
     init_sync_structures();
+    create_draw_data();
     load_meshes();
     create_as();
     init_descriptors();
@@ -79,10 +79,12 @@ void Init::clean()
             device.destroySemaphore(sem);
         destroy_swapchain();
         instance.destroySurfaceKHR(surface);
-        device.destroyImageView(imageDraw.imageView);
-        vmaDestroyImage(allocator, imageDraw.image, imageDraw.allocation);
-        device.destroyImageView(imageDepth.imageView);
-        vmaDestroyImage(allocator, imageDepth.image, imageDepth.allocation);
+        for (const auto &f : frames) {
+            device.destroyImageView(f.imageDraw.imageView);
+            vmaDestroyImage(allocator, f.imageDraw.image, f.imageDraw.allocation);
+            device.destroyImageView(f.imageDepth.imageView);
+            vmaDestroyImage(allocator, f.imageDepth.image, f.imageDepth.allocation);
+        }
         vmaDestroyAllocator(allocator);
         device.destroy();
         vkb::destroy_debug_utils_messenger(instance, debugMessenger);
@@ -227,17 +229,17 @@ void Init::create_swapchain(uint32_t width, uint32_t height)
     // Get the swapchain VkObjects and convert them to vk::Objects
     swapchainImageFormat = static_cast<vk::Format>(vkbSwapchain.image_format);
     std::vector<VkImage> swapchainImagesC = vkbSwapchain.get_images().value();
-    swapchainImages.resize(swapchainImagesC.size());
-    for (size_t i = 0; i < swapchainImagesC.size(); i++)
-        swapchainImages[i] = static_cast<vk::Image>(swapchainImagesC[i]);
     std::vector<VkImageView> swapchainImageViewsC = vkbSwapchain.get_image_views().value();
-    swapchainImageViews.resize(swapchainImageViewsC.size());
-    for (size_t i = 0; i < swapchainImageViewsC.size(); i++)
-        swapchainImageViews[i] = static_cast<vk::ImageView>(swapchainImageViewsC[i]);
-    swapchainSemaphores.resize(swapchainImagesC.size());
+    swapchainImages.resize(swapchainImagesC.size());
+    for (size_t i = 0; i < swapchainImagesC.size(); i++) {
+        swapchainImages[i].image = static_cast<vk::Image>(swapchainImagesC[i]);
+        swapchainImages[i].imageView = static_cast<vk::ImageView>(swapchainImageViewsC[i]);
+        swapchainImages[i].format = swapchainImageFormat;
+    }
 
+    // Allocate the semaphores vector as well
+    swapchainSemaphores.resize(swapchainImagesC.size());
     // Select the number of frames that we are going to process per thread
-    // frameOverlap = std::max(vkbSwapchain.image_count, MINIMUM_FRAME_OVERLAP);
     frameOverlap = MINIMUM_FRAME_OVERLAP;
     frames.resize(frameOverlap);
 }
@@ -247,28 +249,36 @@ void Init::create_draw_data()
     // Same extent as the window
     vk::Extent3D drawExtent{swapchainExtent, 1};
 
-    // Overkill format
-    imageDraw.format = vk::Format::eR32G32B32A32Sfloat;
-    imageDraw.extent = drawExtent;
-
     // We need ColorAttachment for the graphics pipeline and Storage for the RT pipeline
     constexpr vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
                                                    | vk::ImageUsageFlagBits::eTransferSrc
                                                    | vk::ImageUsageFlagBits::eStorage
                                                    | vk::ImageUsageFlagBits::eColorAttachment;
-
-    imageDraw = utils::create_image(device,
-                                    allocator,
-                                    vk::Format::eR32G32B32A32Sfloat,
-                                    drawUsageFlags,
-                                    drawExtent);
-
     constexpr vk::ImageUsageFlags depthUsageFlags = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-    imageDepth = utils::create_image(device,
-                                     allocator,
-                                     vk::Format::eD32Sfloat,
-                                     depthUsageFlags,
-                                     drawExtent);
+
+    // Overkill format
+    for (auto &f : frames) {
+        f.imageDraw.format = vk::Format::eR32G32B32A32Sfloat;
+        f.imageDraw.extent = drawExtent;
+
+        f.imageDraw = utils::create_image(device,
+                                          allocator,
+                                          f.mainCommandBuffer,
+                                          f.renderFence,
+                                          graphicsQueue,
+                                          vk::Format::eR32G32B32A32Sfloat,
+                                          drawUsageFlags,
+                                          drawExtent);
+
+        f.imageDepth = utils::create_image(device,
+                                           allocator,
+                                           f.mainCommandBuffer,
+                                           f.renderFence,
+                                           graphicsQueue,
+                                           vk::Format::eD32Sfloat,
+                                           depthUsageFlags,
+                                           drawExtent);
+    }
 }
 
 void Init::create_camera()
@@ -386,8 +396,8 @@ void Init::init_descriptors()
 void Init::init_pipelines()
 {
     simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
-                                                          imageDraw.format,
-                                                          imageDepth.format,
+                                                          frames[0].imageDraw.format,
+                                                          frames[0].imageDepth.format,
                                                           {uboDescriptorSetLayout});
 
     RtPipelineBuilder rtPipelineBuilder{device};
@@ -540,10 +550,9 @@ void Init::create_as()
 void Init::destroy_swapchain()
 {
     device.destroySwapchainKHR(swapchain);
-    for (auto imageView : swapchainImageViews) {
-        device.destroyImageView(imageView);
+    for (const auto &sc : swapchainImages) {
+        device.destroyImageView(sc.imageView);
     }
-    swapchainImageViews.clear();
     swapchainImages.clear();
 }
 

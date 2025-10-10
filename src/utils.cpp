@@ -1,10 +1,11 @@
 #include "utils.hpp"
 #include <fstream>
+#include <functional>
 #include <iostream>
 
 namespace utils {
 void transition_image(const vk::CommandBuffer &cmd,
-                      const vk::Image &image,
+                      const ImageData &image,
                       const vk::ImageLayout &currentLayout,
                       const vk::ImageLayout &newLayout,
                       const vk::PipelineStageFlags2 &srcStageMask,
@@ -21,7 +22,7 @@ void transition_image(const vk::CommandBuffer &cmd,
     imageBarrier.setOldLayout(currentLayout);
     imageBarrier.setNewLayout(newLayout);
 
-    vk::ImageAspectFlags aspectMask = (newLayout == vk::ImageLayout::eDepthAttachmentOptimal)
+    vk::ImageAspectFlags aspectMask = (image.format == vk::Format::eD32Sfloat)
                                           ? vk::ImageAspectFlagBits::eDepth
                                           : vk::ImageAspectFlagBits::eColor;
 
@@ -33,11 +34,10 @@ void transition_image(const vk::CommandBuffer &cmd,
     imSubresrcRange.setLayerCount(vk::RemainingArrayLayers);
     imageBarrier.setSubresourceRange(imSubresrcRange);
 
-    imageBarrier.setImage(image);
+    imageBarrier.setImage(image.image);
 
     vk::DependencyInfo depInfo{};
-    depInfo.setImageMemoryBarrierCount(1);
-    depInfo.setPImageMemoryBarriers(&imageBarrier);
+    depInfo.setImageMemoryBarriers(imageBarrier);
 
     cmd.pipelineBarrier2(depInfo);
 }
@@ -179,6 +179,168 @@ uint32_t align_up(uint32_t x, uint32_t a)
     return uint32_t((x + (uint32_t(a) - 1)) & ~uint32_t(a - 1));
 }
 
+void map_to_buffer(const Buffer &buffer, const void *data)
+{
+    assert(buffer.allocationInfo.pMappedData && "Buffer must be mapped!");
+    memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
+}
+
+void normalize_material_factors(Material &m)
+{
+    float normFactor = m.specularR + m.diffuseR + m.ambientR + m.reflectiveness + m.refractiveness;
+    m.specularR /= normFactor;
+    m.diffuseR /= normFactor;
+    m.ambientR /= normFactor;
+    m.reflectiveness /= normFactor;
+    m.refractiveness /= normFactor;
+}
+
+ImageData create_image(const vk::Device &device,
+                       const VmaAllocator &allocator,
+                       const vk::CommandBuffer &cmd,
+                       const vk::Fence &fence,
+                       const vk::Queue &queue,
+                       const vk::Format &format,
+                       const vk::ImageUsageFlags &flags,
+                       const vk::Extent3D &extent,
+                       const void *data)
+{
+    ImageData image;
+
+    // Overkill format
+    image.format = format;
+    image.extent = extent;
+
+    // We should be able to erase Storage if we get rid of the background compute pipeline
+    constexpr vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
+                                                   | vk::ImageUsageFlagBits::eTransferSrc
+                                                   | vk::ImageUsageFlagBits::eStorage
+                                                   | vk::ImageUsageFlagBits::eColorAttachment;
+
+    const vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(format,
+                                                                               flags,
+                                                                               extent);
+
+    VmaAllocationCreateInfo allocationCreateInfo{};
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+    // Efficiently create and allocate the image with VMA
+    vmaCreateImage(allocator,
+                   (VkImageCreateInfo *) &imageCreateInfo,
+                   &allocationCreateInfo,
+                   (VkImage *) &image.image,
+                   &image.allocation,
+                   nullptr);
+
+    // Only 2 options: Color or depth. Decide depending on the format
+    const vk::ImageAspectFlags aspectFlags = (format == vk::Format::eD32Sfloat)
+                                                 ? vk::ImageAspectFlagBits::eDepth
+                                                 : vk::ImageAspectFlagBits::eColor;
+
+    // Create the handle vk::ImageView. Not possible to do this with VMA
+    const vk::ImageViewCreateInfo imageViewCreateInfo
+        = utils::init::image_view_create_info(format, image.image, aspectFlags);
+    image.imageView = device.createImageView(imageViewCreateInfo);
+
+    // Thanks to the extension UINIFIED_IMAGE_LAYOUTS, we can safely move to
+    // the layout General and forget about layout transitions without paying
+    // any performance tax.
+    utils::cmd_submit(device, queue, fence, cmd, [&](const vk::CommandBuffer &cmd) {
+        utils::transition_image(cmd, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+    });
+
+    // // We need to move the data into the image
+    // if (data != nullptr) {
+    //     vk::DeviceSize dataSize = extent.width * extent.height * extent.depth * 4;
+    //     Buffer tmpBuffer
+    //         = create_buffer(device,
+    //                         allocator,
+    //                         dataSize,
+    //                         vk::BufferUsageFlagBits::eTransferSrc,
+    //                         VMA_MEMORY_USAGE_AUTO,
+    //                         VMA_ALLOCATION_CREATE_MAPPED_BIT
+    //                             | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+    //     memcpy(tmpBuffer.allocationInfo.pMappedData, data, dataSize);
+
+    // utils::cmd_submit(
+    //     device, queue[&](VkCommandBuffer cmd) {
+    //         vkutil::transition_image(cmd,
+    //                                  new_image.image,
+    //                                  VK_IMAGE_LAYOUT_UNDEFINED,
+    //                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    //         VkBufferImageCopy copyRegion = {};
+    //         copyRegion.bufferOffset = 0;
+    //         copyRegion.bufferRowLength = 0;
+    //         copyRegion.bufferImageHeight = 0;
+
+    //         copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    //         copyRegion.imageSubresource.mipLevel = 0;
+    //         copyRegion.imageSubresource.baseArrayLayer = 0;
+    //         copyRegion.imageSubresource.layerCount = 1;
+    //         copyRegion.imageExtent = size;
+
+    //         // copy the buffer into the image
+    //         vkCmdCopyBufferToImage(cmd,
+    //                                uploadbuffer.buffer,
+    //                                new_image.image,
+    //                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    //                                1,
+    //                                &copyRegion);
+
+    //         if (mipmapped) {
+    //             vkutil::generate_mipmaps(cmd,
+    //                                      new_image.image,
+    //                                      VkExtent2D{new_image.imageExtent.width,
+    //                                                 new_image.imageExtent.height});
+    //         } else {
+    //             vkutil::transition_image(cmd,
+    //                                      new_image.image,
+    //                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    //                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    //         }
+    //     });
+    // destroy_buffer(uploadbuffer);
+    // }
+
+    return image;
+}
+
+void cmd_submit(const vk::Device &device,
+                const vk::Queue &queue,
+                const vk::Fence &fence,
+                const vk::CommandBuffer &cmd,
+                std::function<void(const vk::CommandBuffer &cmd)> &&function)
+{
+    // We should be good to go without waitForFences() and reset() here
+    device.resetFences(fence);
+    // cmd.reset();
+
+    // begin the command buffer recording. We will use this command buffer exactly
+    // once, so we want to let vulkan know that
+    vk::CommandBufferBeginInfo cmdBegin{};
+    cmdBegin.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    cmd.begin(cmdBegin);
+
+    // Function to record
+    function(cmd);
+
+    // Do not record anything else
+    cmd.end();
+
+    vk::CommandBufferSubmitInfo cmdInfo{};
+    cmdInfo.setCommandBuffer(cmd);
+    cmdInfo.setDeviceMask(1);
+    vk::SubmitInfo2 submitInfo{};
+    submitInfo.setCommandBufferInfos(cmdInfo);
+
+    // submit command buffer to the queue and execute it.
+    // Fence will block the host until the commands in cmd finish execution
+    queue.submit2(submitInfo, fence);
+    VK_CHECK_RES(device.waitForFences(fence, vk::True, FENCE_TIMEOUT));
+}
+
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
@@ -218,67 +380,6 @@ vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
 
 } // namespace init
 
-void map_to_buffer(const Buffer &buffer, const void *data)
-{
-    assert(buffer.allocationInfo.pMappedData && "Buffer must be mapped!");
-    memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
-}
-
-void normalize_material_factors(Material &m)
-{
-    float normFactor = m.specularR + m.diffuseR + m.ambientR + m.reflectiveness + m.refractiveness;
-    m.specularR /= normFactor;
-    m.diffuseR /= normFactor;
-    m.ambientR /= normFactor;
-    m.reflectiveness /= normFactor;
-    m.refractiveness /= normFactor;
-}
-
-ImageData create_image(const vk::Device &device,
-                       const VmaAllocator &allocator,
-                       const vk::Format &format,
-                       const vk::ImageUsageFlags &flags,
-                       const vk::Extent3D &extent)
-{
-    ImageData image;
-
-    // Overkill format
-    image.format = format;
-    image.extent = extent;
-
-    // We should be able to erase Storage if we get rid of the background compute pipeline
-    constexpr vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
-                                                   | vk::ImageUsageFlagBits::eTransferSrc
-                                                   | vk::ImageUsageFlagBits::eStorage
-                                                   | vk::ImageUsageFlagBits::eColorAttachment;
-
-    const vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(format,
-                                                                               flags,
-                                                                               extent);
-
-    VmaAllocationCreateInfo allocationCreateInfo{};
-    allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-    // Efficiently create and allocate the image with VMA
-    vmaCreateImage(allocator,
-                   (VkImageCreateInfo *) &imageCreateInfo,
-                   &allocationCreateInfo,
-                   (VkImage *) &image.image,
-                   &image.allocation,
-                   nullptr);
-
-    // Only 2 options: Color or depth. Decide depending on the format
-    const vk::ImageAspectFlags aspectFlags = (format == vk::Format::eD32Sfloat)
-                                                 ? vk::ImageAspectFlagBits::eDepth
-                                                 : vk::ImageAspectFlagBits::eColor;
-
-    // Create the handle vk::ImageView. Not possible to do this with VMA
-    const vk::ImageViewCreateInfo imageViewCreateInfo
-        = utils::init::image_view_create_info(format, image.image, aspectFlags);
-    image.imageView = device.createImageView(imageViewCreateInfo);
-
-    return image;
-}
 
 // namespace init
 

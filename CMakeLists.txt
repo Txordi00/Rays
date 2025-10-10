@@ -49,7 +49,7 @@ include(FetchContent)
 FetchContent_Declare(
     fetch_vk_bootstrap
     GIT_REPOSITORY "https://github.com/charles-lunarg/vk-bootstrap"
-    GIT_TAG        "v1.4.321" #suggest using a tag so the library doesn't update whenever new commits are pushed to a branch
+    GIT_TAG        "v1.4.328" #suggest using a tag so the library doesn't update whenever new commits are pushed to a branch
 )
 FetchContent_MakeAvailable(fetch_vk_bootstrap)
 

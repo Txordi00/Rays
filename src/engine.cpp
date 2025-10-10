@@ -49,7 +49,6 @@ void Engine::run()
 
     // Set all the resource descriptors at once. We don't need more if we don't change any
     // resources
-    vk::ImageView imageView = I->imageDraw.imageView;
     vk::AccelerationStructureKHR tlas = I->tlas.AS;
     DescriptorUpdater descUpdater{I->device};
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
@@ -61,32 +60,9 @@ void Engine::run()
         descUpdater.add_uniform(descriptorSetUniform, 0, uniformBuffers);
         descUpdater.add_storage(descriptorSetUniform, 1, storageBuffers);
         descUpdater.add_as(descriptorSetRt, 0, tlas);
-        descUpdater.add_image(descriptorSetRt, 1, imageView);
+        descUpdater.add_image(descriptorSetRt, 1, frame.imageDraw.imageView);
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
         descUpdater.update();
-
-        // Transition to general the images where we will be drawing.
-        // I do it here because we don't have to transition back thanks to VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION,
-        // so we will save many transitions.
-        vk::CommandBuffer cmd = frame.mainCommandBuffer;
-        cmd.reset();
-        // Record the next set of commands
-        vk::CommandBufferBeginInfo commandBufferBeginInfo{};
-        commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-        cmd.begin(commandBufferBeginInfo);
-        utils::transition_image(cmd,
-                                I->imageDraw.image,
-                                vk::ImageLayout::eUndefined,
-                                vk::ImageLayout::eGeneral,
-                                vk::PipelineStageFlagBits2::eTopOfPipe,
-                                vk::PipelineStageFlagBits2::eBottomOfPipe);
-        cmd.end();
-        vk::CommandBufferSubmitInfo cmdInfo{};
-        cmdInfo.setDeviceMask(1);
-        cmdInfo.setCommandBuffer(cmd);
-        vk::SubmitInfo2 submitInfo{};
-        submitInfo.setCommandBufferInfos(cmdInfo);
-        I->graphicsQueue.submit2(submitInfo, nullptr);
     }
 
     const float dx = 0.5f;
@@ -180,6 +156,7 @@ void Engine::draw()
 {
     vk::Semaphore acquireSemaphore = get_current_frame().renderSemaphore;
     vk::Fence frameFence = get_current_frame().renderFence;
+    ImageData imageDraw = get_current_frame().imageDraw;
 
     // Wait max 1s until the gpu finished rendering the last frame
     vk::Result res = I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT);
@@ -235,9 +212,9 @@ void Engine::draw()
 
     // Copy draw to swapchain
     utils::copy_image(cmd,
-                      I->imageDraw.image,
-                      I->swapchainImages[swapchainImageIndex],
-                      vk::Extent2D{I->imageDraw.extent.width, I->imageDraw.extent.height},
+                      imageDraw.image,
+                      I->swapchainImages[swapchainImageIndex].image,
+                      vk::Extent2D{imageDraw.extent.width, imageDraw.extent.height},
                       I->swapchainExtent);
 
     barrier.setSrcStageMask(vk::PipelineStageFlagBits2::eBlit);
@@ -246,7 +223,7 @@ void Engine::draw()
     barrier.setDstAccessMask(vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
     cmd.pipelineBarrier2(depInfo);
 
-    draw_imgui(cmd, I->swapchainImageViews[swapchainImageIndex]);
+    draw_imgui(cmd, I->swapchainImages[swapchainImageIndex].imageView);
 
     utils::transition_image(cmd,
                             I->swapchainImages[swapchainImageIndex],
@@ -308,14 +285,17 @@ void Engine::draw()
 
 void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 {
+    ImageData imageDraw = get_current_frame().imageDraw;
+    ImageData imageDepth = get_current_frame().imageDepth;
+
     vk::RenderingAttachmentInfo colorAttachmentInfo{};
-    colorAttachmentInfo.setImageView(I->imageDraw.imageView);
+    colorAttachmentInfo.setImageView(imageDraw.imageView);
     colorAttachmentInfo.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
     colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
     colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
 
     vk::RenderingAttachmentInfo depthAttachmentInfo{};
-    depthAttachmentInfo.setImageView(I->imageDepth.imageView);
+    depthAttachmentInfo.setImageView(imageDepth.imageView);
     depthAttachmentInfo.setImageLayout(vk::ImageLayout::eDepthAttachmentOptimal);
     depthAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eClear);
     depthAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
@@ -405,7 +385,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
 
     vk::DescriptorSet descriptorSetUniform = get_current_frame().descriptorSetUAB;
     vk::DescriptorSet descriptorSetRt = get_current_frame().descriptorSetRt;
-    vk::ImageView imageView = I->imageDraw.imageView;
+    vk::ImageView imageView = get_current_frame().imageDraw.imageView;
     vk::AccelerationStructureKHR tlas = I->tlas.AS;
 
     std::vector<vk::DescriptorSet> descriptorSets = {descriptorSetRt, descriptorSetUniform};

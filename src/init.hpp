@@ -48,13 +48,12 @@ public:
     vk::SwapchainKHR swapchain;
     vk::Format swapchainImageFormat;
     vk::Extent2D swapchainExtent;
-    std::vector<vk::Image> swapchainImages;
-    std::vector<vk::ImageView> swapchainImageViews;
+    std::vector<ImageData> swapchainImages;
     std::vector<vk::Semaphore> swapchainSemaphores;
 
     // Draw date
-    ImageData imageDraw;
-    ImageData imageDepth;
+    // ImageData imageDraw;
+    // ImageData imageDepth;
     // vk::Extent2D imageDrawExtent;
 
     // Camera

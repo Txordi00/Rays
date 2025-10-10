@@ -106,30 +106,19 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     buildInfo.setDstAccelerationStructure(blas.AS);
     buildInfo.setScratchData(vk::DeviceOrHostAddressKHR{scratchBuffer.bufferAddress});
 
-    // Record the next set of commands
-    // asCmd.reset();
-    vk::CommandBufferBeginInfo commandBufferBeginInfo{};
-    commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-    asCmd.begin(commandBufferBeginInfo);
-
-    asCmd.buildAccelerationStructuresKHR(buildInfo, &offsets);
-
-    // Barrier: BLAS build writes → TLAS read later
-    vk::MemoryBarrier2 barrier{};
-    barrier.setSrcAccessMask(vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
-    barrier.setDstAccessMask(vk::AccessFlagBits2::eAccelerationStructureReadKHR);
-    barrier.setSrcStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
-    barrier.setDstStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
-    vk::DependencyInfo barrierInfo{};
-    barrierInfo.setMemoryBarriers(barrier);
-    asCmd.pipelineBarrier2(barrierInfo);
-
-    // Queue submit
-    asCmd.end();
-    vk::SubmitInfo2 submitInfo{};
-    vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
-    submitInfo.setCommandBufferInfos(cmdInfo);
-    queue.submit2(submitInfo, asFence);
+    // Record and submit the command buffer
+    utils::cmd_submit(device, queue, asFence, asCmd, [&](const vk::CommandBuffer &cmd) {
+        cmd.buildAccelerationStructuresKHR(buildInfo, &offsets);
+        // Barrier: BLAS build writes → TLAS read later
+        vk::MemoryBarrier2 barrier{};
+        barrier.setSrcAccessMask(vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
+        barrier.setDstAccessMask(vk::AccessFlagBits2::eAccelerationStructureReadKHR);
+        barrier.setSrcStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
+        barrier.setDstStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
+        vk::DependencyInfo barrierInfo{};
+        barrierInfo.setMemoryBarriers(barrier);
+        cmd.pipelineBarrier2(barrierInfo);
+    });
 
     // Scratch buffer can be destroyed after queue finishes
     utils::destroy_buffer(allocator, scratchBuffer);
@@ -250,19 +239,9 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
 
     // Build the TLAS
     // Record the next set of commands
-    vk::CommandBufferBeginInfo commandBufferBeginInfo{};
-    commandBufferBeginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-    asCmd.begin(commandBufferBeginInfo);
-
-    asCmd.buildAccelerationStructuresKHR(buildInfo, &buildRangeInfo);
-
-    asCmd.end();
-    vk::SubmitInfo2 submitInfo{};
-    vk::CommandBufferSubmitInfo cmdInfo{asCmd, 1};
-    submitInfo.setCommandBufferInfos(cmdInfo);
-    queue.submit2(submitInfo, asFence);
-    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
-    // queue.waitIdle();
+    utils::cmd_submit(device, queue, asFence, asCmd, [&](const vk::CommandBuffer &cmd) {
+        cmd.buildAccelerationStructuresKHR(buildInfo, &buildRangeInfo);
+    });
 
     // Scratch buffer can be destroyed after queue finishes
     utils::destroy_buffer(allocator, scratchBuffer);
