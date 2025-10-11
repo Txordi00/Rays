@@ -104,9 +104,49 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
     std::vector<std::shared_ptr<DeviceMeshAsset2>> meshes;
     std::vector<std::shared_ptr<Node>> nodes;
     std::vector<ImageData> images;
-    std::vector<std::shared_ptr<Material2>> materials;
+    std::vector<std::shared_ptr<GLTFMaterial>> materials;
 
-    // Checkerboard image
+    // Load textures
+    images.reserve(asset->images.size());
+    for (const fastgltf::Image &im : asset->images) {
+        images.emplace_back(checkerboardImage);
+    }
+
+    // create buffer to hold the material data
+    const vk::DeviceSize materialConstantsSize = sizeof(GLTFMaterial::MaterialConstants)
+                                                 * asset->materials.size();
+    scene->materialConstantsBuffer
+        = utils::create_buffer(device,
+                               allocator,
+                               materialConstantsSize,
+                               vk::BufferUsageFlagBits::eUniformBuffer,
+                               VMA_MEMORY_USAGE_AUTO,
+                               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                   | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    GLTFMaterial::MaterialConstants *pMatConstants = (GLTFMaterial::MaterialConstants *)
+                                                         scene->materialConstantsBuffer
+                                                             .allocationInfo.pMappedData;
+
+    // Loop over the PBR materials
+    size_t i = 0;
+    materials.reserve(asset->materials.size());
+    for (const fastgltf::Material &m : asset->materials) {
+        i++;
+        std::shared_ptr<GLTFMaterial> matTmp = std::make_shared<GLTFMaterial>();
+
+        // Write material directly to buffer
+        pMatConstants[i].baseColorFactor.x = m.pbrData.baseColorFactor.x();
+        pMatConstants[i].baseColorFactor.y = m.pbrData.baseColorFactor.y();
+        pMatConstants[i].baseColorFactor.z = m.pbrData.baseColorFactor.z();
+        pMatConstants[i].baseColorFactor.w = m.pbrData.baseColorFactor.w();
+        pMatConstants[i].metallicFactor = m.pbrData.metallicFactor;
+        pMatConstants[i].roughnessFactor = m.pbrData.roughnessFactor;
+
+        // Material type
+        GLTFMaterial::MaterialPass matPass = (m.alphaMode == fastgltf::AlphaMode::Blend)
+                                                 ? GLTFMaterial::MaterialPass::Transparent
+                                                 : GLTFMaterial::MaterialPass::MainColor;
+    }
 
     return {};
 }

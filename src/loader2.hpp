@@ -14,8 +14,19 @@ struct DeviceMeshAsset2
 struct Node
 {};
 
-struct Material2
-{};
+
+struct GLTFMaterial
+{
+    struct MaterialConstants
+    {
+        glm::vec4 baseColorFactor;
+        float metallicFactor;
+        float roughnessFactor;
+    };
+    enum struct MaterialPass : uint8_t { MainColor, Transparent, Other };
+
+    MaterialConstants materialConstants;
+};
 
 struct GLTFObj
 {
@@ -23,14 +34,14 @@ struct GLTFObj
     std::unordered_map<std::string, std::shared_ptr<DeviceMeshAsset2>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
     std::unordered_map<std::string, ImageData> images;
-    std::unordered_map<std::string, std::shared_ptr<Material2>> materials;
+    std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
 
     // nodes that dont have a parent, for iterating through the file in tree order
     std::vector<std::shared_ptr<Node>> topNodes;
 
     std::vector<vk::Sampler> samplers;
 
-    Buffer materialDataBuffer;
+    Buffer materialConstantsBuffer;
 
     ~GLTFObj() = default;
 };
