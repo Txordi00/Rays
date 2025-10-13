@@ -157,7 +157,7 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
     objectStorage.material = material;
     // objectStorage.numVertices = numVertices;
     // objectStorage.numIndices = numIndices;
-    utils::map_to_buffer(storageBuffer, &objectStorage);
+    utils::map_to_buffer(storageBuffer, allocator, &objectStorage);
 }
 
 void Model::destroyBuffers()

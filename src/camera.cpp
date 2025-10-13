@@ -71,12 +71,13 @@ void Camera::update()
     if (cameraBuffer.buffer) {
         cameraData.origin = translation;
         cameraData.orientation = orientation;
-        utils::map_to_buffer(cameraBuffer, &cameraData);
+        utils::map_to_buffer(cameraBuffer, allocator, &cameraData);
     }
 }
 
-void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAllocator &allocator)
+void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAllocator &allocator_)
 {
+    allocator = allocator_;
     cameraBuffer = utils::create_buffer(device,
                                         allocator,
                                         sizeof(CameraData),
@@ -88,10 +89,10 @@ void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAll
     cameraData.origin = translation;
     cameraData.orientation = glm::normalize(orientation);
 
-    utils::map_to_buffer(cameraBuffer, &cameraData);
+    utils::map_to_buffer(cameraBuffer, allocator, &cameraData);
 }
 
-void Camera::destroy_camera_storage_buffer(const VmaAllocator &allocator)
+void Camera::destroy_camera_storage_buffer()
 {
     utils::destroy_buffer(allocator, cameraBuffer);
 }

@@ -66,7 +66,7 @@ void Init::clean()
         device.destroyDescriptorSetLayout(rtDescriptorSetLayout);
 
         // Destroy things created in this class from here:
-        camera.destroy_camera_storage_buffer(allocator);
+        camera.destroy_camera_storage_buffer();
 
         device.destroyCommandPool(transferCmdPool);
         device.destroyFence(transferFence);
@@ -530,7 +530,7 @@ void Init::load_meshes()
     models[2]->position = glm::vec3(-2.f, 0.f, 7.f);
 
     GLTFLoader2 loader2{device, allocator, transferQueueFamilyIndex};
-    // loader2.load_gltf_asset("../../assets/ABeautifulGame.glb");
+    loader2.load_gltf_asset("../../assets/ABeautifulGame.glb");
 }
 
 void Init::create_as()

@@ -55,7 +55,7 @@ void map_to_image(const vk::Device &device,
 
 void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
 
-void map_to_buffer(const Buffer &buffer, const void *data);
+void map_to_buffer(const Buffer &buffer, const VmaAllocator &allocator, const void *data);
 
 vk::ShaderModule load_shader(const vk::Device &device, const std::string filePath);
 

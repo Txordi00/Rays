@@ -23,9 +23,22 @@ struct GLTFMaterial
         float metallicFactor;
         float roughnessFactor;
     };
+
+    struct MaterialResources
+    {
+        ImageData colorImage;
+        vk::Sampler colorSampler;
+        ImageData metalRoughImage;
+        vk::Sampler metalRoughSampler;
+        Buffer dataBuffer;
+        // uint32_t dataBufferOffset; // I should not need offset if going bindless
+    };
+
     enum struct MaterialPass : uint8_t { MainColor, Transparent, Other };
 
     MaterialConstants materialConstants;
+    MaterialPass materialPass;
+    MaterialResources materialResources;
 };
 
 struct GLTFObj
@@ -68,6 +81,7 @@ private:
     vk::CommandPool gltfCmdPool;
     vk::CommandBuffer gltfCmd;
     vk::Fence gltfFence;
-    ImageData checkerboardImage;
+    ImageData checkerboardImage, whiteImage, blackImage, greyImage;
+    vk::Sampler samplerLinear, samplerNearest;
     fastgltf::Parser parser{};
 };

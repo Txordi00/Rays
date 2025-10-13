@@ -179,10 +179,11 @@ uint32_t align_up(uint32_t x, uint32_t a)
     return uint32_t((x + (uint32_t(a) - 1)) & ~uint32_t(a - 1));
 }
 
-void map_to_buffer(const Buffer &buffer, const void *data)
+void map_to_buffer(const Buffer &buffer, const VmaAllocator &allocator, const void *data)
 {
-    assert(buffer.allocationInfo.pMappedData && "Buffer must be mapped!");
-    memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
+    // assert(buffer.allocationInfo.pMappedData && "Buffer must be mapped!");
+    // memcpy(buffer.allocationInfo.pMappedData, data, buffer.allocationInfo.size);
+    vmaCopyMemoryToAllocation(allocator, data, buffer.allocation, 0, buffer.allocationInfo.size);
 }
 
 void normalize_material_factors(Material &m)

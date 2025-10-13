@@ -32,9 +32,12 @@ GLTFLoader2::GLTFLoader2(const vk::Device &device,
     fenceCreateInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
     gltfFence = device.createFence(fenceCreateInfo);
 
-    // Create checkerboard image as a default texture
+    // Create default images for default textures
     uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
     uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+    uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
+    uint32_t grey = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1));
+
     std::array<uint32_t, 16 * 16> pixels; // for 16x16 checkerboard texture
     for (int x = 0; x < 16; x++) {
         for (int y = 0; y < 16; y++) {
@@ -51,14 +54,65 @@ GLTFLoader2::GLTFLoader2(const vk::Device &device,
                                                 | vk::ImageUsageFlagBits::eTransferDst,
                                             vk::Extent3D{16, 16, 1},
                                             pixels.data());
+
+    whiteImage = utils::create_image(device,
+                                     allocator,
+                                     gltfCmd,
+                                     gltfFence,
+                                     queue,
+                                     vk::Format::eR8G8B8A8Unorm,
+                                     vk::ImageUsageFlagBits::eSampled
+                                         | vk::ImageUsageFlagBits::eTransferDst,
+                                     vk::Extent3D{1, 1, 1},
+                                     &white);
+
+    greyImage = utils::create_image(device,
+                                    allocator,
+                                    gltfCmd,
+                                    gltfFence,
+                                    queue,
+                                    vk::Format::eR8G8B8A8Unorm,
+                                    vk::ImageUsageFlagBits::eSampled
+                                        | vk::ImageUsageFlagBits::eTransferDst,
+                                    vk::Extent3D{1, 1, 1},
+                                    &grey);
+
+    blackImage = utils::create_image(device,
+                                     allocator,
+                                     gltfCmd,
+                                     gltfFence,
+                                     queue,
+                                     vk::Format::eR8G8B8A8Unorm,
+                                     vk::ImageUsageFlagBits::eSampled
+                                         | vk::ImageUsageFlagBits::eTransferDst,
+                                     vk::Extent3D{1, 1, 1},
+                                     &black);
+
+    // Default samplers
+    vk::SamplerCreateInfo samplerInfo{};
+    samplerInfo.setMagFilter(vk::Filter::eLinear);
+    samplerInfo.setMinFilter(vk::Filter::eLinear);
+    samplerLinear = device.createSampler(samplerInfo);
+
+    samplerInfo.setMagFilter(vk::Filter::eNearest);
+    samplerInfo.setMinFilter(vk::Filter::eNearest);
+    samplerNearest = device.createSampler(samplerInfo);
 }
 
 GLTFLoader2::~GLTFLoader2()
 {
     vmaDestroyImage(allocator, checkerboardImage.image, checkerboardImage.allocation);
+    vmaDestroyImage(allocator, whiteImage.image, whiteImage.allocation);
+    vmaDestroyImage(allocator, blackImage.image, blackImage.allocation);
+    vmaDestroyImage(allocator, greyImage.image, greyImage.allocation);
     device.destroyImageView(checkerboardImage.imageView);
+    device.destroyImageView(whiteImage.imageView);
+    device.destroyImageView(blackImage.imageView);
+    device.destroyImageView(greyImage.imageView);
     device.destroyFence(gltfFence);
     device.destroyCommandPool(gltfCmdPool);
+    device.destroySampler(samplerLinear);
+    device.destroySampler(samplerNearest);
 }
 
 std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
@@ -146,6 +200,23 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         GLTFMaterial::MaterialPass matPass = (m.alphaMode == fastgltf::AlphaMode::Blend)
                                                  ? GLTFMaterial::MaterialPass::Transparent
                                                  : GLTFMaterial::MaterialPass::MainColor;
+        // Fill materials[i]:
+        materials[i]->materialPass = matPass;
+        materials[i]->materialResources.colorImage = whiteImage;
+        materials[i]->materialResources.colorSampler = samplerLinear;
+        materials[i]->materialResources.metalRoughImage = whiteImage;
+        materials[i]->materialResources.metalRoughSampler = samplerLinear;
+        materials[i]->materialResources.dataBuffer = scene->materialConstantsBuffer;
+        // I don't know whether should I duplicate this data:
+        materials[i]->materialConstants = pMatConstants[i];
+        if (m.pbrData.baseColorTexture.has_value()) {
+            size_t imgIndex = asset->textures[m.pbrData.baseColorTexture->textureIndex]
+                                  .imageIndex.value();
+            size_t samplerIndex = asset->textures[m.pbrData.baseColorTexture->textureIndex]
+                                      .samplerIndex.value();
+            materials[i]->materialResources.colorImage = images[imgIndex];
+            materials[i]->materialResources.colorSampler = scene->samplers[samplerIndex];
+        }
     }
 
     return {};
