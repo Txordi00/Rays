@@ -57,10 +57,6 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
             | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         0);
-    // | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-    // vk::BufferDeviceAddressInfo vertexAddressInfo{};
-    // vertexAddressInfo.setBuffer(mesh.vertexBuffer.buffer);
-    // mesh.vertexBufferAddress = device.getBufferAddress(vertexAddressInfo);
 
     indexBuffer = utils::create_buffer(
         device,
@@ -71,9 +67,6 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
             | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         0);
-    // vk::BufferDeviceAddressInfo indexAddressInfo{};
-    // indexAddressInfo.setBuffer(mesh.indexBuffer.buffer);
-    // mesh.indexBufferAddress = device.getBufferAddress(indexAddressInfo);
 
     Buffer stagingBuffer = utils::create_buffer(device,
                                                 allocator,

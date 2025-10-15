@@ -8,9 +8,6 @@
 struct HostMeshAsset2
 {};
 
-struct DeviceMeshAsset2
-{};
-
 struct Node
 {};
 
@@ -41,10 +38,25 @@ struct GLTFMaterial
     MaterialResources materialResources;
 };
 
+struct GeoSurface2
+{
+    uint32_t startIndex;
+    uint32_t count;
+    std::shared_ptr<GLTFMaterial> material;
+};
+
+struct DeviceMesh
+{
+    std::string name;
+
+    std::vector<GeoSurface2> surfaces;
+    Buffer indexBuffer, vertexBuffer;
+};
+
 struct GLTFObj
 {
     // storage for all the data on a given gltf file
-    std::unordered_map<std::string, std::shared_ptr<DeviceMeshAsset2>> meshes;
+    std::unordered_map<std::string, std::shared_ptr<DeviceMesh>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
     std::unordered_map<std::string, ImageData> images;
     std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
@@ -73,6 +85,9 @@ public:
     ~GLTFLoader2();
 
     std::optional<std::shared_ptr<GLTFObj>> load_gltf_asset(const std::filesystem::path &path);
+    void create_mesh_buffers(const std::vector<uint32_t> &indices,
+                             const std::vector<Vertex> &vertices,
+                             std::shared_ptr<DeviceMesh> &mesh);
 
 private:
     const vk::Device &device;
