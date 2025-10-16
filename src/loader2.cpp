@@ -1,7 +1,9 @@
 #include "loader2.hpp"
 #include "utils.hpp"
 #include <fastgltf/glm_element_traits.hpp>
+#include <fastgltf/math.hpp>
 #include <fastgltf/tools.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <print>
 
 GLTFLoader2::GLTFLoader2(const vk::Device &device,
@@ -181,9 +183,6 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
                                VMA_MEMORY_USAGE_AUTO,
                                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                                    | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-    GLTFMaterial::MaterialConstants *pMatConstants = (GLTFMaterial::MaterialConstants *)
-                                                         scene->materialConstantsBuffer
-                                                             .allocationInfo.pMappedData;
 
     // Loop over the PBR materials
     materials.reserve(asset->materials.size());
@@ -232,6 +231,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
     meshes.reserve(asset->meshes.size());
     for (const fastgltf::Mesh &m : asset->meshes) {
         std::shared_ptr<DeviceMesh> meshTmp = std::make_shared<DeviceMesh>();
+        meshTmp->name = m.name.c_str();
 
         // Load primitives
         // Do a first pass over the primitives for efficiently reserve memory
@@ -263,7 +263,8 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
                 indices.emplace_back(index + initialVtx);
             });
 
-            // Load vertex positions
+            // Load vertex positions. No need to check since gltf 2 standard requires POSITION to be
+            // always present
             const fastgltf::Accessor &verticesAccessor
                 = asset->accessors[p.findAttribute("POSITION")->accessorIndex];
             fastgltf::iterateAccessorWithIndex<glm::vec3>(asset.get(),
@@ -273,9 +274,10 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
                                                           });
 
             // Load per-vertex normals
-            const fastgltf::Accessor &normalsAccessor
-                = asset->accessors[p.findAttribute("NORMAL")->accessorIndex];
-            if (normalsAccessor.bufferViewIndex.has_value()) {
+            const fastgltf::Attribute *normalAttrib = p.findAttribute("NORMAL");
+            if (normalAttrib != p.attributes.cend()) {
+                const fastgltf::Accessor &normalsAccessor
+                    = asset->accessors[normalAttrib->accessorIndex];
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(
                     asset.get(), normalsAccessor, [&](const glm::vec3 &n, const size_t idx) {
                         vertices[initialVtx + idx].normal = n;
@@ -283,9 +285,9 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
             }
 
             // Load per-vertex UVs
-            const fastgltf::Accessor &uvAccessor
-                = asset->accessors[p.findAttribute("TEXCOORD_0")->accessorIndex];
-            if (uvAccessor.bufferViewIndex.has_value()) {
+            const fastgltf::Attribute *uvAttrib = p.findAttribute("TEXCOORD_0");
+            if (uvAttrib != p.attributes.cend()) {
+                const fastgltf::Accessor &uvAccessor = asset->accessors[uvAttrib->accessorIndex];
                 fastgltf::iterateAccessorWithIndex<glm::vec2>(
                     asset.get(), uvAccessor, [&](const glm::vec2 &uv, const size_t idx) {
                         vertices[initialVtx + idx].uvX = uv.x;
@@ -294,9 +296,10 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
             }
 
             // Load vertex colors
-            const fastgltf::Accessor &colorAccessor
-                = asset->accessors[p.findAttribute("COLOR_0")->accessorIndex];
-            if (colorAccessor.bufferViewIndex.has_value()) {
+            const fastgltf::Attribute *colorAttrib = p.findAttribute("COLOR_0");
+            if (colorAttrib != p.attributes.cend()) {
+                const fastgltf::Accessor &colorAccessor
+                    = asset->accessors[colorAttrib->accessorIndex];
                 fastgltf::iterateAccessorWithIndex<glm::vec4>(
                     asset.get(), colorAccessor, [&](const glm::vec4 &c, const size_t idx) {
                         vertices[initialVtx + idx].color = c;
@@ -318,6 +321,29 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         meshes.emplace_back(std::move(meshTmp));
     }
 
+    // Load nodes and their meshes
+    nodes.reserve(asset->nodes.size());
+    for (size_t sceneId = 0; sceneId < asset->scenes.size(); sceneId++) {
+        // Define the lambda that will load the node and the local transform
+        auto f = [&](const fastgltf::Node &n, const fastgltf::math::fmat4x4 &m) {
+            std::shared_ptr<Node> nodeTmp;
+
+            // If has a mesh, make the Node a MeshNode and load the mesh
+            if (n.meshIndex.has_value()) {
+                nodeTmp = std::make_shared<MeshNode>();
+                static_cast<MeshNode>(*nodeTmp).mesh = meshes[n.meshIndex.value()];
+            } else
+                nodeTmp = std::make_shared<Node>();
+
+            // Load the local transform
+            nodeTmp->localTransform = glm::make_mat4(m.data());
+
+            // Add the node to our structures
+            nodes.emplace_back(std::move(nodeTmp));
+            scene->nodes[n.name.c_str()] = nodes.back();
+        };
+        fastgltf::iterateSceneNodes(asset.get(), sceneId, fastgltf::math::fmat4x4(), f);
+    }
     return {};
 }
 

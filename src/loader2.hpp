@@ -9,8 +9,21 @@ struct HostMeshAsset2
 {};
 
 struct Node
-{};
+{
+    // parent pointer must be a weak pointer to avoid circular dependencies
+    std::weak_ptr<Node> parent;
+    std::vector<std::shared_ptr<Node>> children;
 
+    glm::mat4 localTransform;
+    glm::mat4 worldTransform;
+
+    void refreshTransform(const glm::mat4 &parentMatrix)
+    {
+        worldTransform = parentMatrix * localTransform;
+        for (std::shared_ptr<Node> &c : children)
+            c->refreshTransform(worldTransform);
+    }
+};
 
 struct GLTFMaterial
 {
@@ -51,6 +64,11 @@ struct DeviceMesh
 
     std::vector<GeoSurface2> surfaces;
     Buffer indexBuffer, vertexBuffer;
+};
+
+struct MeshNode : public Node
+{
+    std::shared_ptr<DeviceMesh> mesh;
 };
 
 struct GLTFObj
