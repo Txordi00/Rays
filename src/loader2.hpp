@@ -46,6 +46,7 @@ struct GLTFMaterial
 
     enum struct MaterialPass : uint8_t { MainColor, Transparent, Other };
 
+    // Having the buffer in materialResources, the material constants are probably not needed here anymore
     MaterialConstants materialConstants;
     MaterialPass materialPass;
     MaterialResources materialResources;
@@ -84,7 +85,7 @@ struct GLTFObj
 
     std::vector<vk::Sampler> samplers;
 
-    Buffer materialConstantsBuffer;
+    // Buffer materialConstantsBuffer;
 
     ~GLTFObj() = default;
 };

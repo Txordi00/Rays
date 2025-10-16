@@ -133,10 +133,10 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
                              | fastgltf::Options::LoadExternalBuffers
                              | fastgltf::Options::LoadExternalImages;
     auto asset = parser.loadGltfBinary(data.get(), path.parent_path(), options);
-    auto val = fastgltf::validate(asset.get());
+    // auto val = fastgltf::validate(asset.get());
     if (asset.error() != fastgltf::Error::None /*|| val != fastgltf::Error::None*/) {
         std::println("Error in parsing GLTF asset: {}", fastgltf::getErrorMessage(asset.error()));
-        std::println("Error in parsing GLTF asset: {}", fastgltf::getErrorMessage(val));
+        // std::println("Error in parsing GLTF asset: {}", fastgltf::getErrorMessage(val));
         return {};
     }
 
@@ -164,26 +164,14 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
     std::vector<ImageData> images;
     std::vector<std::shared_ptr<GLTFMaterial>> materials;
 
-    // Load textures
+    // Load textures. NOT YET
     images.reserve(asset->images.size());
     for (const fastgltf::Image &im : asset->images) {
         images.emplace_back(checkerboardImage);
+        scene->images[im.name.c_str()] = images.back();
     }
 
     // MATERIALS
-    // create buffer to hold the material data
-    const vk::DeviceSize materialConstantsSize = sizeof(GLTFMaterial::MaterialConstants)
-                                                 * asset->materials.size();
-    scene->materialConstantsBuffer
-        = utils::create_buffer(device,
-                               allocator,
-                               materialConstantsSize,
-                               vk::BufferUsageFlagBits::eUniformBuffer
-                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                               VMA_MEMORY_USAGE_AUTO,
-                               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                                   | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
     // Loop over the PBR materials
     materials.reserve(asset->materials.size());
     for (size_t i = 0; i < asset->materials.size(); i++) {
@@ -197,11 +185,21 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         matTmp->materialConstants.baseColorFactor.w = m.pbrData.baseColorFactor.w();
         matTmp->materialConstants.metallicFactor = m.pbrData.metallicFactor;
         matTmp->materialConstants.roughnessFactor = m.pbrData.roughnessFactor;
+
         // Copy them to buffer
-        utils::map_to_buffer(scene->materialConstantsBuffer,
+        matTmp->materialResources.dataBuffer
+            = utils::create_buffer(device,
+                                   allocator,
+                                   sizeof(GLTFMaterial::MaterialConstants),
+                                   vk::BufferUsageFlagBits::eStorageBuffer
+                                       | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                                   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                   VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                       | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+        utils::map_to_buffer(matTmp->materialResources.dataBuffer,
                              allocator,
-                             &matTmp,
-                             i * sizeof(GLTFMaterial::MaterialConstants));
+                             &matTmp->materialConstants);
 
         // Material type
         matTmp->materialPass = (m.alphaMode == fastgltf::AlphaMode::Blend)
@@ -212,7 +210,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         matTmp->materialResources.colorSampler = samplerLinear;
         matTmp->materialResources.metalRoughImage = whiteImage;
         matTmp->materialResources.metalRoughSampler = samplerLinear;
-        matTmp->materialResources.dataBuffer = scene->materialConstantsBuffer;
+        // matTmp->materialResources.dataBuffer = scene->materialConstantsBuffer;
         if (m.pbrData.baseColorTexture.has_value()) {
             size_t imgIndex = asset->textures[m.pbrData.baseColorTexture->textureIndex]
                                   .imageIndex.value();
@@ -246,6 +244,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
             indexCount += indicesAccessor.count;
             vertexCount += verticesAccessor.count;
         }
+
         indices.reserve(indexCount);
         vertices.resize(vertexCount);
         // Access the data of each primitive
@@ -319,6 +318,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         // Fill meshTmp index and vertex buffers
         create_mesh_buffers(indices, vertices, meshTmp);
         meshes.emplace_back(std::move(meshTmp));
+        scene->meshes[m.name.c_str()] = meshes.back();
     }
 
     // Load nodes and their meshes
@@ -364,7 +364,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         }
     }
 
-    return {};
+    return scene;
 }
 
 void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
