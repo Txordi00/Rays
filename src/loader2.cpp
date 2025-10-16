@@ -323,27 +323,47 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
 
     // Load nodes and their meshes
     nodes.reserve(asset->nodes.size());
-    for (size_t sceneId = 0; sceneId < asset->scenes.size(); sceneId++) {
-        // Define the lambda that will load the node and the local transform
-        auto f = [&](const fastgltf::Node &n, const fastgltf::math::fmat4x4 &m) {
-            std::shared_ptr<Node> nodeTmp;
+    // Define the lambda that will load the node and the local transform
+    const auto create_nodes = [&](const fastgltf::Node &n, const fastgltf::math::fmat4x4 &m) {
+        std::shared_ptr<Node> nodeTmp;
 
-            // If has a mesh, make the Node a MeshNode and load the mesh
-            if (n.meshIndex.has_value()) {
-                nodeTmp = std::make_shared<MeshNode>();
-                static_cast<MeshNode>(*nodeTmp).mesh = meshes[n.meshIndex.value()];
-            } else
-                nodeTmp = std::make_shared<Node>();
+        // If has a mesh, make the Node a MeshNode and load the mesh
+        if (n.meshIndex.has_value()) {
+            nodeTmp = std::make_shared<MeshNode>();
+            static_cast<MeshNode>(*nodeTmp).mesh = meshes[n.meshIndex.value()];
+        } else
+            nodeTmp = std::make_shared<Node>();
 
-            // Load the local transform
-            nodeTmp->localTransform = glm::make_mat4(m.data());
+        // Load the local transform
+        nodeTmp->localTransform = glm::make_mat4(m.data());
 
-            // Add the node to our structures
-            nodes.emplace_back(std::move(nodeTmp));
-            scene->nodes[n.name.c_str()] = nodes.back();
-        };
-        fastgltf::iterateSceneNodes(asset.get(), sceneId, fastgltf::math::fmat4x4(), f);
+        // Add the node to our structures
+        nodes.emplace_back(std::move(nodeTmp));
+        scene->nodes[n.name.c_str()] = nodes.back();
+    };
+    // For now, consider all the scenes as a single one (it usually is the case)
+    for (size_t sceneId = 0; sceneId < asset->scenes.size(); sceneId++)
+        fastgltf::iterateSceneNodes(asset.get(), sceneId, fastgltf::math::fmat4x4(), create_nodes);
+
+    // Generate the node tree structure
+    for (size_t i = 0; i < nodes.size(); i++) {
+        const fastgltf::Node &fgltfNode = asset->nodes[i];
+        std::shared_ptr<Node> &node = nodes[i];
+        node->children.reserve(fgltfNode.children.size());
+        for (const size_t c : fgltfNode.children) {
+            nodes[c]->parent = node;
+            node->children.emplace_back(nodes[c]);
+        }
     }
+
+    // Find the top nodes and propagate/fill the worldTransform matrices to all nodes
+    for (const std::shared_ptr<Node> &n : nodes) {
+        if (n->parent.lock() == nullptr) {
+            scene->topNodes.push_back(n);
+            n->refreshTransform(glm::mat4(1.f));
+        }
+    }
+
     return {};
 }
 
