@@ -231,79 +231,35 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         std::shared_ptr<DeviceMesh> meshTmp = std::make_shared<DeviceMesh>();
         meshTmp->name = m.name.c_str();
 
+        // If we already filled the mesh buffers of a given object, do not do it again
+        const bool meshBuffersExist = scene->meshes.contains(meshTmp->name);
+
         // Load primitives
         // Do a first pass over the primitives for efficiently reserve memory
         indices.clear();
         vertices.clear();
         size_t indexCount = 0;
         size_t vertexCount = 0;
-        for (const fastgltf::Primitive &p : m.primitives) {
-            const fastgltf::Accessor &indicesAccessor = asset->accessors[p.indicesAccessor.value()];
-            const fastgltf::Accessor &verticesAccessor
-                = asset->accessors[p.findAttribute("POSITION")->accessorIndex];
-            indexCount += indicesAccessor.count;
-            vertexCount += verticesAccessor.count;
+        // Add indices and vertices only if we have not visited that mesh yet
+        if (!meshBuffersExist) {
+            for (const fastgltf::Primitive &p : m.primitives) {
+                const fastgltf::Accessor &indicesAccessor
+                    = asset->accessors[p.indicesAccessor.value()];
+                const fastgltf::Accessor &verticesAccessor
+                    = asset->accessors[p.findAttribute("POSITION")->accessorIndex];
+                indexCount += indicesAccessor.count;
+                vertexCount += verticesAccessor.count;
+            }
+            indices.reserve(indexCount);
+            vertices.resize(vertexCount);
         }
 
-        indices.reserve(indexCount);
-        vertices.resize(vertexCount);
         // Access the data of each primitive
         size_t initialVtx = 0;
         meshTmp->surfaces.reserve(m.primitives.size());
         for (const fastgltf::Primitive &p : m.primitives) {
-            // Load indices
-            const fastgltf::Accessor &indicesAccessor = asset->accessors[p.indicesAccessor.value()];
-
+            // We are going to fill the surface and the i&v buffers in this loop
             GeoSurface2 surface;
-            surface.startIndex = static_cast<uint32_t>(indices.size());
-            surface.count = indicesAccessor.count;
-
-            fastgltf::iterateAccessor<uint32_t>(asset.get(), indicesAccessor, [&](uint32_t index) {
-                indices.emplace_back(index + initialVtx);
-            });
-
-            // Load vertex positions. No need to check since gltf 2 standard requires POSITION to be
-            // always present
-            const fastgltf::Accessor &verticesAccessor
-                = asset->accessors[p.findAttribute("POSITION")->accessorIndex];
-            fastgltf::iterateAccessorWithIndex<glm::vec3>(asset.get(),
-                                                          verticesAccessor,
-                                                          [&](const glm::vec3 &v, const size_t idx) {
-                                                              vertices[initialVtx + idx].position = v;
-                                                          });
-
-            // Load per-vertex normals
-            const fastgltf::Attribute *normalAttrib = p.findAttribute("NORMAL");
-            if (normalAttrib != p.attributes.cend()) {
-                const fastgltf::Accessor &normalsAccessor
-                    = asset->accessors[normalAttrib->accessorIndex];
-                fastgltf::iterateAccessorWithIndex<glm::vec3>(
-                    asset.get(), normalsAccessor, [&](const glm::vec3 &n, const size_t idx) {
-                        vertices[initialVtx + idx].normal = n;
-                    });
-            }
-
-            // Load per-vertex UVs
-            const fastgltf::Attribute *uvAttrib = p.findAttribute("TEXCOORD_0");
-            if (uvAttrib != p.attributes.cend()) {
-                const fastgltf::Accessor &uvAccessor = asset->accessors[uvAttrib->accessorIndex];
-                fastgltf::iterateAccessorWithIndex<glm::vec2>(
-                    asset.get(), uvAccessor, [&](const glm::vec2 &uv, const size_t idx) {
-                        vertices[initialVtx + idx].uvX = uv.x;
-                        vertices[initialVtx + idx].uvY = uv.y;
-                    });
-            }
-
-            // Load vertex colors
-            const fastgltf::Attribute *colorAttrib = p.findAttribute("COLOR_0");
-            if (colorAttrib != p.attributes.cend()) {
-                const fastgltf::Accessor &colorAccessor
-                    = asset->accessors[colorAttrib->accessorIndex];
-                fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                    asset.get(), colorAccessor, [&](const glm::vec4 &c, const size_t idx) {
-                        vertices[initialVtx + idx].color = c;
-                    });
-            }
 
             // Load material by index
             if (p.materialIndex.has_value())
@@ -311,14 +267,80 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
             else
                 surface.material = materials[0];
 
-            meshTmp->surfaces.emplace_back(surface);
+            // Reuse the previous
+            if (meshBuffersExist) {
+                const auto &sameMesh = scene->meshes.find(meshTmp->name)->second;
+                surface.startIndex = sameMesh->surfaces[0].startIndex;
+                surface.count = sameMesh->surfaces[0].count;
+            } else { // If not visited this mesh earlier, add the indices & vertices
+                // Load indices
+                const fastgltf::Accessor &indicesAccessor
+                    = asset->accessors[p.indicesAccessor.value()];
 
-            initialVtx += verticesAccessor.count;
+                surface.startIndex = static_cast<uint32_t>(indices.size());
+                surface.count = static_cast<uint32_t>(indicesAccessor.count);
+
+                fastgltf::iterateAccessor<uint32_t>(asset.get(),
+                                                    indicesAccessor,
+                                                    [&](uint32_t index) {
+                                                        indices.emplace_back(index + initialVtx);
+                                                    });
+
+                // Load vertex positions. No need to check since gltf 2 standard requires POSITION to be
+                // always present
+                const fastgltf::Accessor &verticesAccessor
+                    = asset->accessors[p.findAttribute("POSITION")->accessorIndex];
+                fastgltf::iterateAccessorWithIndex<glm::vec3>(
+                    asset.get(), verticesAccessor, [&](const glm::vec3 &v, const size_t idx) {
+                        vertices[initialVtx + idx].position = v;
+                    });
+
+                // Load per-vertex normals
+                const fastgltf::Attribute *normalAttrib = p.findAttribute("NORMAL");
+                if (normalAttrib != p.attributes.cend()) {
+                    const fastgltf::Accessor &normalsAccessor
+                        = asset->accessors[normalAttrib->accessorIndex];
+                    fastgltf::iterateAccessorWithIndex<glm::vec3>(
+                        asset.get(), normalsAccessor, [&](const glm::vec3 &n, const size_t idx) {
+                            vertices[initialVtx + idx].normal = n;
+                        });
+                }
+
+                // Load per-vertex UVs
+                const fastgltf::Attribute *uvAttrib = p.findAttribute("TEXCOORD_0");
+                if (uvAttrib != p.attributes.cend()) {
+                    const fastgltf::Accessor &uvAccessor = asset->accessors[uvAttrib->accessorIndex];
+                    fastgltf::iterateAccessorWithIndex<glm::vec2>(
+                        asset.get(), uvAccessor, [&](const glm::vec2 &uv, const size_t idx) {
+                            vertices[initialVtx + idx].uvX = uv.x;
+                            vertices[initialVtx + idx].uvY = uv.y;
+                        });
+                }
+
+                // Load vertex colors
+                const fastgltf::Attribute *colorAttrib = p.findAttribute("COLOR_0");
+                if (colorAttrib != p.attributes.cend()) {
+                    const fastgltf::Accessor &colorAccessor
+                        = asset->accessors[colorAttrib->accessorIndex];
+                    fastgltf::iterateAccessorWithIndex<glm::vec4>(
+                        asset.get(), colorAccessor, [&](const glm::vec4 &c, const size_t idx) {
+                            vertices[initialVtx + idx].color = c;
+                        });
+                }
+                initialVtx += verticesAccessor.count;
+            }
+            meshTmp->surfaces.emplace_back(surface);
         }
         // Fill meshTmp index and vertex buffers
-        create_mesh_buffers(indices, vertices, meshTmp);
+        if (!meshBuffersExist)
+            create_mesh_buffers(indices, vertices, meshTmp);
+        else {
+            const auto &sameMesh = scene->meshes.find(meshTmp->name)->second;
+            meshTmp->indexBuffer = sameMesh->indexBuffer;
+            meshTmp->vertexBuffer = sameMesh->vertexBuffer;
+        }
         meshes.emplace_back(std::move(meshTmp));
-        scene->meshes[m.name.c_str()] = meshes.back();
+        scene->meshes.insert({m.name.c_str(), meshes.back()});
     }
 
     // Load nodes and their meshes
@@ -371,10 +393,13 @@ void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
                                       const std::vector<Vertex> &vertices,
                                       std::shared_ptr<DeviceMesh> &mesh)
 {
+    mesh->indexBuffer = std::make_shared<Buffer>();
+    mesh->vertexBuffer = std::make_shared<Buffer>();
+
     const vk::DeviceSize verticesSize = vertices.size() * sizeof(Vertex);
     const vk::DeviceSize indicesSize = indices.size() * sizeof(uint32_t);
 
-    mesh->vertexBuffer = utils::create_buffer(
+    *mesh->vertexBuffer = utils::create_buffer(
         device,
         allocator,
         verticesSize,
@@ -383,7 +408,7 @@ void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
             | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
         VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
 
-    mesh->indexBuffer = utils::create_buffer(
+    *mesh->indexBuffer = utils::create_buffer(
         device,
         allocator,
         indicesSize,
@@ -411,7 +436,7 @@ void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
         vertexCopy.setSize(verticesSize);
         vk::CopyBufferInfo2 vertexCopyInfo{};
         vertexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-        vertexCopyInfo.setDstBuffer(mesh->vertexBuffer.buffer);
+        vertexCopyInfo.setDstBuffer(mesh->vertexBuffer->buffer);
         vertexCopyInfo.setRegions(vertexCopy);
 
         vk::BufferCopy2 indexCopy{};
@@ -420,7 +445,7 @@ void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
         indexCopy.setSize(indicesSize);
         vk::CopyBufferInfo2 indexCopyInfo{};
         indexCopyInfo.setSrcBuffer(stagingBuffer.buffer);
-        indexCopyInfo.setDstBuffer(mesh->indexBuffer.buffer);
+        indexCopyInfo.setDstBuffer(mesh->indexBuffer->buffer);
         indexCopyInfo.setRegions(indexCopy);
 
         cmd.copyBuffer2(vertexCopyInfo);

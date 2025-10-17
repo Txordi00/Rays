@@ -5,26 +5,6 @@
 // #include <fastgltf/glm_element_traits.hpp>
 // #include <fastgltf/tools.hpp>
 
-struct HostMeshAsset2
-{};
-
-struct Node
-{
-    // parent pointer must be a weak pointer to avoid circular dependencies
-    std::weak_ptr<Node> parent;
-    std::vector<std::shared_ptr<Node>> children;
-
-    glm::mat4 localTransform;
-    glm::mat4 worldTransform;
-
-    void refreshTransform(const glm::mat4 &parentMatrix)
-    {
-        worldTransform = parentMatrix * localTransform;
-        for (std::shared_ptr<Node> &c : children)
-            c->refreshTransform(worldTransform);
-    }
-};
-
 struct GLTFMaterial
 {
     struct MaterialConstants
@@ -64,10 +44,27 @@ struct DeviceMesh
     std::string name;
 
     std::vector<GeoSurface2> surfaces;
-    Buffer indexBuffer, vertexBuffer;
+    std::shared_ptr<Buffer> indexBuffer, vertexBuffer;
 };
 
-struct MeshNode : public Node
+struct Node
+{
+    // parent pointer must be a weak pointer to avoid circular dependencies
+    std::weak_ptr<Node> parent;
+    std::vector<std::shared_ptr<Node>> children;
+
+    glm::mat4 localTransform;
+    glm::mat4 worldTransform;
+
+    void refreshTransform(const glm::mat4 &parentMatrix)
+    {
+        worldTransform = parentMatrix * localTransform;
+        for (std::shared_ptr<Node> &c : children)
+            c->refreshTransform(worldTransform);
+    }
+};
+
+struct MeshNode : Node
 {
     std::shared_ptr<DeviceMesh> mesh;
 };
@@ -75,7 +72,7 @@ struct MeshNode : public Node
 struct GLTFObj
 {
     // storage for all the data on a given gltf file
-    std::unordered_map<std::string, std::shared_ptr<DeviceMesh>> meshes;
+    std::unordered_multimap<std::string, std::shared_ptr<DeviceMesh>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
     std::unordered_map<std::string, ImageData> images;
     std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
