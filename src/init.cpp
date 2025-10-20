@@ -373,8 +373,8 @@ void Init::init_descriptors()
                              frameOverlap);
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
                                      frameOverlap);
-    descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1},
-                                     frameOverlap);
+    // descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1},
+    //                                  frameOverlap);
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
                                      frameOverlap); // camera
     descHelperRt->create_descriptor_pool();

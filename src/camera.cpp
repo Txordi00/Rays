@@ -71,7 +71,7 @@ void Camera::update()
     if (cameraBuffer.buffer) {
         cameraData.origin = translation;
         cameraData.orientation = orientation;
-        utils::map_to_buffer(cameraBuffer, allocator, &cameraData);
+        utils::copy_to_buffer(cameraBuffer, allocator, &cameraData);
     }
 }
 
@@ -89,7 +89,7 @@ void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAll
     cameraData.origin = translation;
     cameraData.orientation = glm::normalize(orientation);
 
-    utils::map_to_buffer(cameraBuffer, allocator, &cameraData);
+    utils::copy_to_buffer(cameraBuffer, allocator, &cameraData);
 }
 
 void Camera::destroy_camera_storage_buffer()

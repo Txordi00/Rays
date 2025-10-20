@@ -72,15 +72,12 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
                                                 allocator,
                                                 verticesSize + indicesSize,
                                                 vk::BufferUsageFlagBits::eTransferSrc,
-                                                VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+                                                VMA_MEMORY_USAGE_AUTO,
                                                 VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                                                     | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
-    void *stagingData = stagingBuffer.allocationInfo.pMappedData;
-    assert(stagingData && "Staging buffer must be mapped");
-
-    memcpy(stagingData, verticesData, verticesSize);
-    memcpy((char *) stagingData + verticesSize, indicesData, indicesSize);
+    utils::copy_to_buffer(stagingBuffer, allocator, verticesData, verticesSize);
+    utils::copy_to_buffer(stagingBuffer, allocator, indicesData, indicesSize, verticesSize);
 
     // Set info structures to copy from staging to vertex & index buffers
     vk::BufferCopy2 vertexCopy{};
@@ -150,7 +147,7 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
     objectStorage.material = material;
     // objectStorage.numVertices = numVertices;
     // objectStorage.numIndices = numIndices;
-    utils::map_to_buffer(storageBuffer, allocator, &objectStorage);
+    utils::copy_to_buffer(storageBuffer, allocator, &objectStorage);
 }
 
 void Model::destroyBuffers()

@@ -344,7 +344,7 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
             UniformData uboData;
             uboData.worldMatrix = mvpMatrix;
 
-            utils::map_to_buffer(I->models[objId]->uniformBuffer, I->allocator, &uboData);
+            utils::copy_to_buffer(I->models[objId]->uniformBuffer, I->allocator, &uboData);
         }
 
         for (int objId = 0; objId < I->models.size(); objId++) {
@@ -425,7 +425,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
         UniformData uboData;
         uboData.worldMatrix = mvpMatrix;
 
-        utils::map_to_buffer(uniformBuffers[objId], I->allocator, &uboData);
+        utils::copy_to_buffer(uniformBuffers[objId], I->allocator, &uboData);
     }
 
     cmd.traceRaysKHR(I->sbtHelper->rgenRegion,

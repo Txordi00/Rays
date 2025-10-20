@@ -20,7 +20,7 @@ struct GLTFMaterial
         vk::Sampler colorSampler;
         ImageData metalRoughImage;
         vk::Sampler metalRoughSampler;
-        Buffer dataBuffer;
+        std::shared_ptr<Buffer> dataBuffer;
         // uint32_t dataBufferOffset; // I should not need offset if going bindless
     };
 
@@ -101,9 +101,6 @@ public:
     ~GLTFLoader2();
 
     std::optional<std::shared_ptr<GLTFObj>> load_gltf_asset(const std::filesystem::path &path);
-    void create_mesh_buffers(const std::vector<uint32_t> &indices,
-                             const std::vector<Vertex> &vertices,
-                             std::shared_ptr<DeviceMesh> &mesh);
 
 private:
     const vk::Device &device;
@@ -115,4 +112,12 @@ private:
     ImageData checkerboardImage, whiteImage, blackImage, greyImage;
     vk::Sampler samplerLinear, samplerNearest;
     fastgltf::Parser parser{};
+
+    std::vector<std::shared_ptr<Buffer>> bufferQueue;
+    std::vector<vk::Sampler> samplerQueue;
+
+    void create_mesh_buffers(const std::vector<uint32_t> &indices,
+                             const std::vector<Vertex> &vertices,
+                             std::shared_ptr<DeviceMesh> &mesh);
+    void destroy_buffers();
 };
