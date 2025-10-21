@@ -138,7 +138,7 @@ void Model::create_mesh(const vk::CommandBuffer &cmdTransfer,
                                          vk::BufferUsageFlagBits::eStorageBuffer,
                                          VMA_MEMORY_USAGE_AUTO,
                                          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                                             | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+                                         /*| VMA_ALLOCATION_CREATE_MAPPED_BIT*/);
 
     // Pass the buffer addresses to the storage buffer from the get-go
     ObjectStorageData objectStorage;

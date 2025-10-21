@@ -1,4 +1,5 @@
 #pragma once
+#include "descriptors.hpp"
 #include "types.hpp"
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
@@ -20,14 +21,14 @@ struct GLTFMaterial
         vk::Sampler colorSampler;
         ImageData metalRoughImage;
         vk::Sampler metalRoughSampler;
-        std::shared_ptr<Buffer> dataBuffer;
+        Buffer dataBuffer;
         // uint32_t dataBufferOffset; // I should not need offset if going bindless
     };
 
     enum struct MaterialPass : uint8_t { MainColor, Transparent, Other };
 
     // Having the buffer in materialResources, the material constants are probably not needed here anymore
-    MaterialConstants materialConstants;
+    // MaterialConstants materialConstants;
     MaterialPass materialPass;
     MaterialResources materialResources;
 };
@@ -64,9 +65,19 @@ struct Node
     }
 };
 
+struct SurfaceStorage
+{
+    vk::DeviceAddress indexBufferAddress;
+    vk::DeviceAddress vertexBufferAddress;
+    vk::DeviceAddress materialConstantsBufferAddress;
+    uint32_t startIndex;
+    uint32_t count;
+};
+
 struct MeshNode : Node
 {
     std::shared_ptr<DeviceMesh> mesh;
+    std::vector<Buffer> surfaceStorageBuffers;
 };
 
 struct GLTFObj
@@ -81,8 +92,6 @@ struct GLTFObj
     std::vector<std::shared_ptr<Node>> topNodes;
 
     std::vector<vk::Sampler> samplers;
-
-    // Buffer materialConstantsBuffer;
 
     ~GLTFObj() = default;
 };
@@ -115,6 +124,27 @@ private:
 
     std::vector<std::shared_ptr<Buffer>> bufferQueue;
     std::vector<vk::Sampler> samplerQueue;
+
+    void load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene);
+
+    void load_images(const fastgltf::Asset &asset,
+                     std::shared_ptr<GLTFObj> &scene,
+                     std::vector<ImageData> &vImages);
+
+    void load_materials(const fastgltf::Asset &asset,
+                        const std::vector<ImageData> &images,
+                        std::shared_ptr<GLTFObj> &scene,
+                        std::vector<std::shared_ptr<GLTFMaterial>> &vMaterials);
+
+    void load_meshes(const fastgltf::Asset &asset,
+                     const std::vector<std::shared_ptr<GLTFMaterial>> &materials,
+                     std::shared_ptr<GLTFObj> &scene,
+                     std::vector<std::shared_ptr<DeviceMesh>> &meshes);
+
+    void load_nodes(const fastgltf::Asset &asset,
+                    std::shared_ptr<GLTFObj> &scene,
+                    const std::vector<std::shared_ptr<DeviceMesh>> &meshes,
+                    std::vector<std::shared_ptr<Node>> &nodes);
 
     void create_mesh_buffers(const std::vector<uint32_t> &indices,
                              const std::vector<Vertex> &vertices,

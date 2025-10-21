@@ -530,7 +530,7 @@ void Init::load_meshes()
     models[2]->position = glm::vec3(-2.f, 0.f, 7.f);
 
     GLTFLoader2 loader2{device, allocator, transferQueueFamilyIndex};
-    loader2.load_gltf_asset("../../assets/ABeautifulGame.glb");
+    const auto a = loader2.load_gltf_asset("../../assets/ABeautifulGame.glb");
 }
 
 void Init::create_as()

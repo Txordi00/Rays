@@ -147,10 +147,36 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
     // Create the main object which will hold all the gltf data
     std::shared_ptr<GLTFObj> scene = std::make_shared<GLTFObj>();
 
+    // Temporal arrays for all the objects to use while creating the GLTF data
+    std::vector<std::shared_ptr<DeviceMesh>> meshes;
+    std::vector<std::shared_ptr<Node>> nodes;
+    std::vector<ImageData> images;
+    std::vector<std::shared_ptr<GLTFMaterial>> materials;
+
     // Load samplers
-    scene->samplers.reserve(asset->samplers.size());
-    samplerQueue.reserve(samplerQueue.size() + asset->samplers.size());
-    for (const fastgltf::Sampler &s : asset->samplers) {
+    load_samplers(asset.get(), scene);
+
+    // Load textures. NOT YET
+    load_images(asset.get(), scene, images);
+
+    // MATERIALS
+    // Loop over the PBR materials
+    load_materials(asset.get(), images, scene, materials);
+
+    // MESHES
+    load_meshes(asset.get(), materials, scene, meshes);
+
+    // Load nodes and their meshes
+    load_nodes(asset.get(), scene, meshes, nodes);
+
+    return scene;
+}
+
+void GLTFLoader2::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene)
+{
+    scene->samplers.reserve(asset.samplers.size());
+    samplerQueue.reserve(samplerQueue.size() + asset.samplers.size());
+    for (const fastgltf::Sampler &s : asset.samplers) {
         vk::SamplerCreateInfo samplerCreate{};
         samplerCreate.setMaxLod(vk::LodClampNone);
         samplerCreate.setMinLod(0.f);
@@ -163,54 +189,51 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         scene->samplers.emplace_back(sampler);
         samplerQueue.emplace_back(sampler);
     }
+}
 
-    // Temporal arrays for all the objects to use while creating the GLTF data
-    std::vector<std::shared_ptr<DeviceMesh>> meshes;
-    std::vector<std::shared_ptr<Node>> nodes;
-    std::vector<ImageData> images;
-    std::vector<std::shared_ptr<GLTFMaterial>> materials;
-
-    // Load textures. NOT YET
-    images.reserve(asset->images.size());
-    for (const fastgltf::Image &im : asset->images) {
-        images.emplace_back(checkerboardImage);
-        scene->images[im.name.c_str()] = images.back();
+void GLTFLoader2::load_images(const fastgltf::Asset &asset,
+                              std::shared_ptr<GLTFObj> &scene,
+                              std::vector<ImageData> &vImages)
+{
+    vImages.reserve(asset.images.size());
+    for (const fastgltf::Image &im : asset.images) {
+        vImages.emplace_back(checkerboardImage);
+        scene->images[im.name.c_str()] = vImages.back();
     }
+}
 
-    // MATERIALS
-    // Loop over the PBR materials
-    materials.reserve(asset->materials.size());
-    bufferQueue.reserve(bufferQueue.size() + asset->materials.size());
-    for (size_t i = 0; i < asset->materials.size(); i++) {
-        const fastgltf::Material &m = asset->materials[i];
+void GLTFLoader2::load_materials(const fastgltf::Asset &asset,
+                                 const std::vector<ImageData> &images,
+                                 std::shared_ptr<GLTFObj> &scene,
+                                 std::vector<std::shared_ptr<GLTFMaterial>> &vMaterials)
+{
+    vMaterials.reserve(asset.materials.size());
+    bufferQueue.reserve(bufferQueue.size() + asset.materials.size());
+    for (size_t i = 0; i < asset.materials.size(); i++) {
+        const fastgltf::Material &m = asset.materials[i];
         std::shared_ptr<GLTFMaterial> matTmp = std::make_shared<GLTFMaterial>();
 
-        // Write constants to temporal material
-        matTmp->materialConstants.baseColorFactor.x = m.pbrData.baseColorFactor.x();
-        matTmp->materialConstants.baseColorFactor.y = m.pbrData.baseColorFactor.y();
-        matTmp->materialConstants.baseColorFactor.z = m.pbrData.baseColorFactor.z();
-        matTmp->materialConstants.baseColorFactor.w = m.pbrData.baseColorFactor.w();
-        matTmp->materialConstants.metallicFactor = m.pbrData.metallicFactor;
-        matTmp->materialConstants.roughnessFactor = m.pbrData.roughnessFactor;
+        // Write constants to material buffer
+        GLTFMaterial::MaterialConstants materialConstants;
+        materialConstants.baseColorFactor.x = m.pbrData.baseColorFactor.x();
+        materialConstants.baseColorFactor.y = m.pbrData.baseColorFactor.y();
+        materialConstants.baseColorFactor.z = m.pbrData.baseColorFactor.z();
+        materialConstants.baseColorFactor.w = m.pbrData.baseColorFactor.w();
+        materialConstants.metallicFactor = m.pbrData.metallicFactor;
+        materialConstants.roughnessFactor = m.pbrData.roughnessFactor;
 
-        // Copy them to buffer
-        matTmp->materialResources.dataBuffer = std::make_shared<Buffer>();
-
-        *matTmp->materialResources.dataBuffer
+        std::shared_ptr<Buffer> materialConstantsBuffer = std::make_shared<Buffer>();
+        *materialConstantsBuffer
             = utils::create_buffer(device,
                                    allocator,
                                    sizeof(GLTFMaterial::MaterialConstants),
                                    vk::BufferUsageFlagBits::eStorageBuffer
                                        | vk::BufferUsageFlagBits::eShaderDeviceAddress,
                                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                   VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                                       | VMA_ALLOCATION_CREATE_MAPPED_BIT);
-
-        bufferQueue.emplace_back(matTmp->materialResources.dataBuffer);
-
-        utils::copy_to_buffer(*matTmp->materialResources.dataBuffer,
-                              allocator,
-                              &matTmp->materialConstants);
+                                   VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+        matTmp->materialResources.dataBuffer = *materialConstantsBuffer;
+        bufferQueue.emplace_back(materialConstantsBuffer);
+        utils::copy_to_buffer(matTmp->materialResources.dataBuffer, allocator, &materialConstants);
 
         // Material type
         matTmp->materialPass = (m.alphaMode == fastgltf::AlphaMode::Blend)
@@ -223,22 +246,28 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         matTmp->materialResources.metalRoughSampler = samplerLinear;
         // matTmp->materialResources.dataBuffer = scene->materialConstantsBuffer;
         if (m.pbrData.baseColorTexture.has_value()) {
-            size_t imgIndex = asset->textures[m.pbrData.baseColorTexture->textureIndex]
+            size_t imgIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
                                   .imageIndex.value();
-            size_t samplerIndex = asset->textures[m.pbrData.baseColorTexture->textureIndex]
+            size_t samplerIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
                                       .samplerIndex.value();
             matTmp->materialResources.colorImage = images[imgIndex];
             matTmp->materialResources.colorSampler = scene->samplers[samplerIndex];
         }
-        materials.emplace_back(std::move(matTmp));
-        scene->materials[m.name.c_str()] = materials.back();
+        vMaterials.emplace_back(std::move(matTmp));
+        scene->materials[m.name.c_str()] = vMaterials.back();
         // WORK OUT THE DESCRIPTORS HERE?
     }
-    // MESHES
+}
+
+void GLTFLoader2::load_meshes(const fastgltf::Asset &asset,
+                              const std::vector<std::shared_ptr<GLTFMaterial>> &materials,
+                              std::shared_ptr<GLTFObj> &scene,
+                              std::vector<std::shared_ptr<DeviceMesh>> &meshes)
+{
     std::vector<uint32_t> indices;
     std::vector<Vertex> vertices;
-    meshes.reserve(asset->meshes.size());
-    for (const fastgltf::Mesh &m : asset->meshes) {
+    meshes.reserve(asset.meshes.size());
+    for (const fastgltf::Mesh &m : asset.meshes) {
         std::shared_ptr<DeviceMesh> meshTmp = std::make_shared<DeviceMesh>();
         meshTmp->name = m.name.c_str();
 
@@ -255,9 +284,9 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         if (!meshBuffersExist) {
             for (const fastgltf::Primitive &p : m.primitives) {
                 const fastgltf::Accessor &indicesAccessor
-                    = asset->accessors[p.indicesAccessor.value()];
+                    = asset.accessors[p.indicesAccessor.value()];
                 const fastgltf::Accessor &verticesAccessor
-                    = asset->accessors[p.findAttribute("POSITION")->accessorIndex];
+                    = asset.accessors[p.findAttribute("POSITION")->accessorIndex];
                 indexCount += indicesAccessor.count;
                 vertexCount += verticesAccessor.count;
             }
@@ -286,23 +315,21 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
             } else { // If not visited this mesh earlier, add the indices & vertices
                 // Load indices
                 const fastgltf::Accessor &indicesAccessor
-                    = asset->accessors[p.indicesAccessor.value()];
+                    = asset.accessors[p.indicesAccessor.value()];
 
                 surface.startIndex = static_cast<uint32_t>(indices.size());
                 surface.count = static_cast<uint32_t>(indicesAccessor.count);
 
-                fastgltf::iterateAccessor<uint32_t>(asset.get(),
-                                                    indicesAccessor,
-                                                    [&](uint32_t index) {
-                                                        indices.emplace_back(index + initialVtx);
-                                                    });
+                fastgltf::iterateAccessor<uint32_t>(asset, indicesAccessor, [&](uint32_t index) {
+                    indices.emplace_back(index + initialVtx);
+                });
 
                 // Load vertex positions. No need to check since gltf 2 standard requires POSITION to be
                 // always present
                 const fastgltf::Accessor &verticesAccessor
-                    = asset->accessors[p.findAttribute("POSITION")->accessorIndex];
+                    = asset.accessors[p.findAttribute("POSITION")->accessorIndex];
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(
-                    asset.get(), verticesAccessor, [&](const glm::vec3 &v, const size_t idx) {
+                    asset, verticesAccessor, [&](const glm::vec3 &v, const size_t idx) {
                         vertices[initialVtx + idx].position = v;
                     });
 
@@ -310,9 +337,9 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
                 const fastgltf::Attribute *normalAttrib = p.findAttribute("NORMAL");
                 if (normalAttrib != p.attributes.cend()) {
                     const fastgltf::Accessor &normalsAccessor
-                        = asset->accessors[normalAttrib->accessorIndex];
+                        = asset.accessors[normalAttrib->accessorIndex];
                     fastgltf::iterateAccessorWithIndex<glm::vec3>(
-                        asset.get(), normalsAccessor, [&](const glm::vec3 &n, const size_t idx) {
+                        asset, normalsAccessor, [&](const glm::vec3 &n, const size_t idx) {
                             vertices[initialVtx + idx].normal = n;
                         });
                 }
@@ -320,9 +347,9 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
                 // Load per-vertex UVs
                 const fastgltf::Attribute *uvAttrib = p.findAttribute("TEXCOORD_0");
                 if (uvAttrib != p.attributes.cend()) {
-                    const fastgltf::Accessor &uvAccessor = asset->accessors[uvAttrib->accessorIndex];
+                    const fastgltf::Accessor &uvAccessor = asset.accessors[uvAttrib->accessorIndex];
                     fastgltf::iterateAccessorWithIndex<glm::vec2>(
-                        asset.get(), uvAccessor, [&](const glm::vec2 &uv, const size_t idx) {
+                        asset, uvAccessor, [&](const glm::vec2 &uv, const size_t idx) {
                             vertices[initialVtx + idx].uvX = uv.x;
                             vertices[initialVtx + idx].uvY = uv.y;
                         });
@@ -332,9 +359,9 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
                 const fastgltf::Attribute *colorAttrib = p.findAttribute("COLOR_0");
                 if (colorAttrib != p.attributes.cend()) {
                     const fastgltf::Accessor &colorAccessor
-                        = asset->accessors[colorAttrib->accessorIndex];
+                        = asset.accessors[colorAttrib->accessorIndex];
                     fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                        asset.get(), colorAccessor, [&](const glm::vec4 &c, const size_t idx) {
+                        asset, colorAccessor, [&](const glm::vec4 &c, const size_t idx) {
                             vertices[initialVtx + idx].color = c;
                         });
                 }
@@ -353,9 +380,14 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         meshes.emplace_back(std::move(meshTmp));
         scene->meshes.insert({m.name.c_str(), meshes.back()});
     }
+}
 
-    // Load nodes and their meshes
-    nodes.reserve(asset->nodes.size());
+void GLTFLoader2::load_nodes(const fastgltf::Asset &asset,
+                             std::shared_ptr<GLTFObj> &scene,
+                             const std::vector<std::shared_ptr<DeviceMesh>> &meshes,
+                             std::vector<std::shared_ptr<Node>> &nodes)
+{
+    nodes.reserve(asset.nodes.size());
     // Define the lambda that will load the node and the local transform
     const auto create_nodes = [&](const fastgltf::Node &n, const fastgltf::math::fmat4x4 &m) {
         std::shared_ptr<Node> nodeTmp;
@@ -363,7 +395,33 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         // If has a mesh, make the Node a MeshNode and load the mesh
         if (n.meshIndex.has_value()) {
             nodeTmp = std::make_shared<MeshNode>();
-            static_cast<MeshNode>(*nodeTmp).mesh = meshes[n.meshIndex.value()];
+            const std::shared_ptr<DeviceMesh> &mesh = meshes[n.meshIndex.value()];
+            static_cast<MeshNode>(*nodeTmp).mesh = mesh;
+            static_cast<MeshNode>(*nodeTmp).surfaceStorageBuffers.reserve(mesh->surfaces.size());
+            bufferQueue.reserve(mesh->surfaces.size());
+            // Create a bound storage buffer for every surface with the device addresses
+            // that will allow us access all the data from the shaders
+            for (const auto &s : mesh->surfaces) {
+                SurfaceStorage surfaceStorage;
+                surfaceStorage.indexBufferAddress = mesh->indexBuffer->bufferAddress;
+                surfaceStorage.vertexBufferAddress = mesh->vertexBuffer->bufferAddress;
+                surfaceStorage.materialConstantsBufferAddress = s.material->materialResources
+                                                                    .dataBuffer.bufferAddress;
+                surfaceStorage.startIndex = s.startIndex;
+                surfaceStorage.count = s.count;
+                std::shared_ptr<Buffer> surfaceStorageBuffer = std::make_shared<Buffer>();
+                *surfaceStorageBuffer
+                    = utils::create_buffer(device,
+                                           allocator,
+                                           sizeof(SurfaceStorage),
+                                           vk::BufferUsageFlagBits::eStorageBuffer,
+                                           VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                           VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+                utils::copy_to_buffer(*surfaceStorageBuffer, allocator, &surfaceStorage);
+                static_cast<MeshNode>(*nodeTmp).surfaceStorageBuffers.emplace_back(
+                    *surfaceStorageBuffer);
+                bufferQueue.emplace_back(surfaceStorageBuffer);
+            }
         } else
             nodeTmp = std::make_shared<Node>();
 
@@ -375,12 +433,12 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
         scene->nodes[n.name.c_str()] = nodes.back();
     };
     // For now, consider all the scenes as a single one (it usually is the case)
-    for (size_t sceneId = 0; sceneId < asset->scenes.size(); sceneId++)
-        fastgltf::iterateSceneNodes(asset.get(), sceneId, fastgltf::math::fmat4x4(), create_nodes);
+    for (size_t sceneId = 0; sceneId < asset.scenes.size(); sceneId++)
+        fastgltf::iterateSceneNodes(asset, sceneId, fastgltf::math::fmat4x4(), create_nodes);
 
     // Generate the node tree structure
     for (size_t i = 0; i < nodes.size(); i++) {
-        const fastgltf::Node &fgltfNode = asset->nodes[i];
+        const fastgltf::Node &fgltfNode = asset.nodes[i];
         std::shared_ptr<Node> &node = nodes[i];
         node->children.reserve(fgltfNode.children.size());
         for (const size_t c : fgltfNode.children) {
@@ -396,8 +454,6 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
             n->refreshTransform(glm::mat4(1.f));
         }
     }
-
-    return scene;
 }
 
 void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
@@ -466,7 +522,7 @@ void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
         cmd.copyBuffer2(indexCopyInfo);
     });
 
-    vmaDestroyBuffer(allocator, stagingBuffer.buffer, stagingBuffer.allocation);
+    utils::destroy_buffer(allocator, stagingBuffer);
 }
 
 void GLTFLoader2::destroy_buffers()
