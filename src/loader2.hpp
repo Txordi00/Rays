@@ -35,12 +35,13 @@ struct GLTFMaterial
 
 struct GeoSurface2
 {
+    uint32_t surfaceId;
     uint32_t startIndex;
     uint32_t count;
     std::shared_ptr<GLTFMaterial> material;
 };
 
-struct DeviceMesh
+struct Mesh
 {
     std::string name;
 
@@ -63,6 +64,7 @@ struct Node
         for (std::shared_ptr<Node> &c : children)
             c->refreshTransform(worldTransform);
     }
+    virtual ~Node() = default;
 };
 
 struct SurfaceStorage
@@ -76,20 +78,21 @@ struct SurfaceStorage
 
 struct MeshNode : Node
 {
-    std::shared_ptr<DeviceMesh> mesh;
+    std::shared_ptr<Mesh> mesh;
     std::vector<Buffer> surfaceStorageBuffers;
 };
 
 struct GLTFObj
 {
     // storage for all the data on a given gltf file
-    std::unordered_multimap<std::string, std::shared_ptr<DeviceMesh>> meshes;
+    std::unordered_multimap<std::string, std::shared_ptr<Mesh>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
     std::unordered_map<std::string, ImageData> images;
     std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
 
     // nodes that dont have a parent, for iterating through the file in tree order
     std::vector<std::shared_ptr<Node>> topNodes;
+    std::vector<std::shared_ptr<MeshNode>> meshNodes;
 
     std::vector<vk::Sampler> samplers;
 
@@ -139,15 +142,16 @@ private:
     void load_meshes(const fastgltf::Asset &asset,
                      const std::vector<std::shared_ptr<GLTFMaterial>> &materials,
                      std::shared_ptr<GLTFObj> &scene,
-                     std::vector<std::shared_ptr<DeviceMesh>> &meshes);
+                     std::vector<std::shared_ptr<Mesh>> &meshes);
 
+    // We will need to modify the meshes in order to accomodate each surface id.
     void load_nodes(const fastgltf::Asset &asset,
                     std::shared_ptr<GLTFObj> &scene,
-                    const std::vector<std::shared_ptr<DeviceMesh>> &meshes,
+                    std::vector<std::shared_ptr<Mesh>> &meshes,
                     std::vector<std::shared_ptr<Node>> &nodes);
 
     void create_mesh_buffers(const std::vector<uint32_t> &indices,
                              const std::vector<Vertex> &vertices,
-                             std::shared_ptr<DeviceMesh> &mesh);
+                             std::shared_ptr<Mesh> &mesh);
     void destroy_buffers();
 };

@@ -148,7 +148,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader2::load_gltf_asset(
     std::shared_ptr<GLTFObj> scene = std::make_shared<GLTFObj>();
 
     // Temporal arrays for all the objects to use while creating the GLTF data
-    std::vector<std::shared_ptr<DeviceMesh>> meshes;
+    std::vector<std::shared_ptr<Mesh>> meshes;
     std::vector<std::shared_ptr<Node>> nodes;
     std::vector<ImageData> images;
     std::vector<std::shared_ptr<GLTFMaterial>> materials;
@@ -262,13 +262,13 @@ void GLTFLoader2::load_materials(const fastgltf::Asset &asset,
 void GLTFLoader2::load_meshes(const fastgltf::Asset &asset,
                               const std::vector<std::shared_ptr<GLTFMaterial>> &materials,
                               std::shared_ptr<GLTFObj> &scene,
-                              std::vector<std::shared_ptr<DeviceMesh>> &meshes)
+                              std::vector<std::shared_ptr<Mesh>> &meshes)
 {
     std::vector<uint32_t> indices;
     std::vector<Vertex> vertices;
     meshes.reserve(asset.meshes.size());
     for (const fastgltf::Mesh &m : asset.meshes) {
-        std::shared_ptr<DeviceMesh> meshTmp = std::make_shared<DeviceMesh>();
+        std::shared_ptr<Mesh> meshTmp = std::make_shared<Mesh>();
         meshTmp->name = m.name.c_str();
 
         // If we already filled the mesh buffers of a given object, do not do it again
@@ -384,24 +384,30 @@ void GLTFLoader2::load_meshes(const fastgltf::Asset &asset,
 
 void GLTFLoader2::load_nodes(const fastgltf::Asset &asset,
                              std::shared_ptr<GLTFObj> &scene,
-                             const std::vector<std::shared_ptr<DeviceMesh>> &meshes,
+                             std::vector<std::shared_ptr<Mesh>> &meshes,
                              std::vector<std::shared_ptr<Node>> &nodes)
 {
     nodes.reserve(asset.nodes.size());
     // Define the lambda that will load the node and the local transform
+    uint32_t surfaceId = 0;
+    scene->meshNodes.reserve(asset.nodes.size());
     const auto create_nodes = [&](const fastgltf::Node &n, const fastgltf::math::fmat4x4 &m) {
         std::shared_ptr<Node> nodeTmp;
 
         // If has a mesh, make the Node a MeshNode and load the mesh
         if (n.meshIndex.has_value()) {
             nodeTmp = std::make_shared<MeshNode>();
-            const std::shared_ptr<DeviceMesh> &mesh = meshes[n.meshIndex.value()];
-            static_cast<MeshNode>(*nodeTmp).mesh = mesh;
-            static_cast<MeshNode>(*nodeTmp).surfaceStorageBuffers.reserve(mesh->surfaces.size());
-            bufferQueue.reserve(mesh->surfaces.size());
+            std::shared_ptr<MeshNode> meshNodeTmp = std::dynamic_pointer_cast<MeshNode>(nodeTmp);
+            const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
+            meshNodeTmp->mesh = mesh;
+            meshNodeTmp->surfaceStorageBuffers.reserve(mesh->surfaces.size());
+            // dynamic_cast<MeshNode *>(nodeTmp.get())->mesh = mesh;
+            // dynamic_cast<MeshNode *>(nodeTmp.get())
+            //     ->surfaceStorageBuffers.reserve(mesh->surfaces.size());
+            // bufferQueue.reserve(mesh->surfaces.size());
             // Create a bound storage buffer for every surface with the device addresses
             // that will allow us access all the data from the shaders
-            for (const auto &s : mesh->surfaces) {
+            for (auto &s : mesh->surfaces) {
                 SurfaceStorage surfaceStorage;
                 surfaceStorage.indexBufferAddress = mesh->indexBuffer->bufferAddress;
                 surfaceStorage.vertexBufferAddress = mesh->vertexBuffer->bufferAddress;
@@ -418,9 +424,13 @@ void GLTFLoader2::load_nodes(const fastgltf::Asset &asset,
                                            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                                            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
                 utils::copy_to_buffer(*surfaceStorageBuffer, allocator, &surfaceStorage);
-                static_cast<MeshNode>(*nodeTmp).surfaceStorageBuffers.emplace_back(
-                    *surfaceStorageBuffer);
+                meshNodeTmp->surfaceStorageBuffers.emplace_back(*surfaceStorageBuffer);
                 bufferQueue.emplace_back(surfaceStorageBuffer);
+                scene->meshNodes.emplace_back(meshNodeTmp);
+                // Store a unique surface Id for each surface. This will be used as the customInstanceID
+                // when building the BLASes
+                s.surfaceId = surfaceId;
+                surfaceId++;
             }
         } else
             nodeTmp = std::make_shared<Node>();
@@ -458,7 +468,7 @@ void GLTFLoader2::load_nodes(const fastgltf::Asset &asset,
 
 void GLTFLoader2::create_mesh_buffers(const std::vector<uint32_t> &indices,
                                       const std::vector<Vertex> &vertices,
-                                      std::shared_ptr<DeviceMesh> &mesh)
+                                      std::shared_ptr<Mesh> &mesh)
 {
     mesh->indexBuffer = std::make_shared<Buffer>();
     mesh->vertexBuffer = std::make_shared<Buffer>();

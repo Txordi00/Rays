@@ -19,19 +19,19 @@ Engine::Engine()
     I = std::make_unique<Init>();
 
     // Create vector of buffers in an efficient way
-    uniformBuffers.reserve(I->models.size());
-    std::ranges::transform(I->models,
-                           std::back_inserter(uniformBuffers),
-                           [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
+    // uniformBuffers.reserve(I->models.size());
+    // std::ranges::transform(I->models,
+    //                        std::back_inserter(uniformBuffers),
+    //                        [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
 
-    storageBuffers.reserve(I->models.size());
-    std::ranges::transform(I->models,
-                           std::back_inserter(storageBuffers),
-                           [](const std::shared_ptr<Model> &m) { return m->storageBuffer; });
+    // storageBuffers.reserve(I->models.size());
+    // std::ranges::transform(I->models,
+    //                        std::back_inserter(storageBuffers),
+    //                        [](const std::shared_ptr<Model> &m) { return m->storageBuffer; });
 
     // Init push constants
     rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
-    rayPush.numObjects = I->models.size();
+    // rayPush.numObjects = I->models.size();
     rayPush.lightIntensity = 50.f;
     rayPush.lightType = 0;
     rayPush.lightPosition = glm::vec3(0.f, -5.f, 7.f);
@@ -67,8 +67,8 @@ void Engine::run()
 
     const float dx = 0.5f;
     const float dt = glm::radians(2.f);
-    for (const auto &m : I->models)
-        m->updateModelMatrix();
+    // for (const auto &m : I->models)
+    //     m->updateModelMatrix();
 
     int numKeys;
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);
@@ -337,43 +337,43 @@ void Engine::draw_meshes(const vk::CommandBuffer &cmd)
 
         I->camera.update();
 
-        for (int objId = 0; objId < I->models.size(); objId++) {
-            glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
-                                  * I->models[objId]->modelMatrix;
+        // for (int objId = 0; objId < I->models.size(); objId++) {
+        //     glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
+        //                           * I->models[objId]->modelMatrix;
 
-            UniformData uboData;
-            uboData.worldMatrix = mvpMatrix;
+        //     UniformData uboData;
+        //     uboData.worldMatrix = mvpMatrix;
 
-            utils::copy_to_buffer(I->models[objId]->uniformBuffer, I->allocator, &uboData);
-        }
+        //     utils::copy_to_buffer(I->models[objId]->uniformBuffer, I->allocator, &uboData);
+        // }
 
-        for (int objId = 0; objId < I->models.size(); objId++) {
-            MeshPush pushConstants;
-            pushConstants.objId = objId;
-            cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
-                              vk::ShaderStageFlagBits::eVertex,
-                              0,
-                              sizeof(MeshPush),
-                              &pushConstants);
+        // for (int objId = 0; objId < I->models.size(); objId++) {
+        //     MeshPush pushConstants;
+        //     pushConstants.objId = objId;
+        //     cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
+        //                       vk::ShaderStageFlagBits::eVertex,
+        //                       0,
+        //                       sizeof(MeshPush),
+        //                       &pushConstants);
 
-            cmd.draw(I->models[objId]->surfaces[0].count,
-                     1,
-                     I->models[objId]->surfaces[0].startIndex,
-                     0);
+        //     cmd.draw(I->models[objId]->surfaces[0].count,
+        //              1,
+        //              I->models[objId]->surfaces[0].startIndex,
+        //              0);
 
-            // USING THE INDEX BUFFER PROPERLY REQUIRES THE FOLLOWING DRAW CALL:
-            // cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
-            //                      0,
-            //                      I->models[objId]->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
-            //                      vk::IndexType::eUint32);
+        // USING THE INDEX BUFFER PROPERLY REQUIRES THE FOLLOWING DRAW CALL:
+        // cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
+        //                      0,
+        //                      I->models[objId]->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
+        //                      vk::IndexType::eUint32);
 
-            // cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
-            //                 1,
-            //                 I->models[objId]->gpuMesh.surfaces[0].startIndex,
-            //                 0,
-            //                 0);
-        }
-        cmd.endRendering();
+        // cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
+        //                 1,
+        //                 I->models[objId]->gpuMesh.surfaces[0].startIndex,
+        //                 0,
+        //                 0);
+        //     }
+        //     cmd.endRendering();
     } catch (const std::exception &e) {
         VK_CHECK_EXC(e);
     }
@@ -418,15 +418,15 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
 
     I->camera.update();
 
-    for (int objId = 0; objId < I->models.size(); objId++) {
-        glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
-                              * I->models[objId]->modelMatrix;
+    // for (int objId = 0; objId < I->models.size(); objId++) {
+    //     glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
+    //                           * I->models[objId]->modelMatrix;
 
-        UniformData uboData;
-        uboData.worldMatrix = mvpMatrix;
+    //     UniformData uboData;
+    //     uboData.worldMatrix = mvpMatrix;
 
-        utils::copy_to_buffer(uniformBuffers[objId], I->allocator, &uboData);
-    }
+    //     utils::copy_to_buffer(uniformBuffers[objId], I->allocator, &uboData);
+    // }
 
     cmd.traceRaysKHR(I->sbtHelper->rgenRegion,
                      I->sbtHelper->missRegion,

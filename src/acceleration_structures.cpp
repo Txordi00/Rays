@@ -126,6 +126,107 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<Model> &model)
     return blas;
 }
 
+AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<MeshNode> &meshNode)
+{
+    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
+    device.resetFences(asFence);
+    // Geometry description (single triangle array)
+    const uint32_t numIndices = meshNode->mesh->indexBuffer->allocationInfo.size / sizeof(uint32_t);
+    const uint32_t numVertices = meshNode->mesh->vertexBuffer->allocationInfo.size / sizeof(Vertex);
+    vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
+    triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
+    triData.setVertexData(
+        vk::DeviceOrHostAddressConstKHR{meshNode->mesh->vertexBuffer->bufferAddress});
+    triData.setVertexStride(sizeof(Vertex));
+    triData.setMaxVertex(numVertices - 1);
+    triData.setIndexType(vk::IndexType::eUint32);
+    triData.setIndexData(
+        vk::DeviceOrHostAddressConstKHR{meshNode->mesh->indexBuffer->bufferAddress});
+
+    vk::AccelerationStructureGeometryKHR geom{};
+    geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
+    // geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
+    geom.setGeometry(triData);
+
+    // The entire array will be used to build the BLAS.
+    vk::AccelerationStructureBuildRangeInfoKHR offsets{};
+    offsets.setFirstVertex(0);
+    offsets.setPrimitiveCount(numIndices / 3);
+    offsets.setPrimitiveOffset(0);
+    offsets.setTransformOffset(0);
+
+    // Info necessary to get the vk::AccelerationStructureBuildSizesInfoKHR struct
+    vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
+    buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
+    buildInfo.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
+    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+    buildInfo.setGeometries(geom);
+
+    vk::AccelerationStructureBuildSizesInfoKHR buildSizes
+        = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
+                                                       buildInfo,
+                                                       offsets.primitiveCount);
+
+    // Allocate scratch buffer
+    Buffer scratchBuffer
+        = utils::create_buffer(device,
+                               allocator,
+                               buildSizes.buildScratchSize,
+                               vk::BufferUsageFlagBits::eStorageBuffer
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               0,
+                               asProperties.minAccelerationStructureScratchOffsetAlignment);
+
+    AccelerationStructure blas;
+    blas.buffer = utils::create_buffer(device,
+                                       allocator,
+                                       buildSizes.accelerationStructureSize,
+                                       vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR
+                                           | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                                       VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                       0,
+                                       asProperties.minAccelerationStructureScratchOffsetAlignment);
+
+    // Actual allocation of buffer and acceleration structure.
+    vk::AccelerationStructureCreateInfoKHR blasCreate{};
+    blasCreate.setSize(buildSizes.accelerationStructureSize);
+    blasCreate.setOffset(0);
+    blasCreate.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
+    // blasCreate.setCreateFlags();
+    blasCreate.setBuffer(blas.buffer.buffer);
+    // blasCreate.setDeviceAddress(); // BLAS address is not the same as blas-buffer address!
+
+    blas.AS = device.createAccelerationStructureKHR(blasCreate);
+
+    vk::AccelerationStructureDeviceAddressInfoKHR blasAddressInfo{};
+    blasAddressInfo.setAccelerationStructure(blas.AS);
+    blas.addr = device.getAccelerationStructureAddressKHR(blasAddressInfo);
+
+    buildInfo.setSrcAccelerationStructure(nullptr);
+    buildInfo.setDstAccelerationStructure(blas.AS);
+    buildInfo.setScratchData(vk::DeviceOrHostAddressKHR{scratchBuffer.bufferAddress});
+
+    // Record and submit the command buffer
+    utils::cmd_submit(device, queue, asFence, asCmd, [&](const vk::CommandBuffer &cmd) {
+        cmd.buildAccelerationStructuresKHR(buildInfo, &offsets);
+        // Barrier: BLAS build writes → TLAS read later
+        vk::MemoryBarrier2 barrier{};
+        barrier.setSrcAccessMask(vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
+        barrier.setDstAccessMask(vk::AccessFlagBits2::eAccelerationStructureReadKHR);
+        barrier.setSrcStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
+        barrier.setDstStageMask(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
+        vk::DependencyInfo barrierInfo{};
+        barrierInfo.setMemoryBarriers(barrier);
+        cmd.pipelineBarrier2(barrierInfo);
+    });
+
+    // Scratch buffer can be destroyed after queue finishes
+    utils::destroy_buffer(allocator, scratchBuffer);
+
+    return blas;
+}
+
 // NEED TO OPTIMIZE: Do instances of a single model.
 AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructure> &blases,
                                            const std::vector<glm::mat3x4> &transforms)
@@ -250,13 +351,27 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<AccelerationStructu
     return tlas;
 }
 
-AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Model> > &models,
+AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Model>> &models,
                                            const std::vector<glm::mat3x4> &transforms)
 {
     blases.clear();
     blases.reserve(models.size());
     for (const auto &m : models)
         blases.emplace_back(buildBLAS(m));
+
+    return buildTLAS(blases, transforms);
+}
+
+AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<MeshNode>> &meshNodes)
+{
+    blases.clear();
+    blases.reserve(meshNodes.size());
+    std::vector<glm::mat3x4> transforms;
+    transforms.reserve(meshNodes.size());
+    for (const auto &m : meshNodes) {
+        blases.emplace_back(buildBLAS(m));
+        transforms.emplace_back(glm::mat3x4(m->worldTransform));
+    }
 
     return buildTLAS(blases, transforms);
 }

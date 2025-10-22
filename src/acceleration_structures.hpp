@@ -1,4 +1,5 @@
 #pragma once
+#include "loader2.hpp"
 #include "model.hpp"
 
 struct AccelerationStructure
@@ -18,10 +19,13 @@ public:
               const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
     ~ASBuilder();
     AccelerationStructure buildBLAS(const std::shared_ptr<Model> &model);
-    AccelerationStructure buildTLAS(const std::vector<AccelerationStructure> &blases,
-                                    const std::vector<glm::mat3x4> &transforms);
+    AccelerationStructure buildBLAS(const std::shared_ptr<MeshNode> &meshNode);
 
     AccelerationStructure buildTLAS(const std::vector<std::shared_ptr<Model>> &models,
+                                    const std::vector<glm::mat3x4> &transforms);
+    AccelerationStructure buildTLAS(const std::vector<std::shared_ptr<MeshNode>> &meshNodes);
+
+    AccelerationStructure buildTLAS(const std::vector<AccelerationStructure> &blases,
                                     const std::vector<glm::mat3x4> &transforms);
 
 private:

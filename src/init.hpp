@@ -2,6 +2,7 @@
 #include "acceleration_structures.hpp"
 #include "camera.hpp"
 #include "descriptors.hpp"
+#include "loader2.hpp"
 #include "model.hpp"
 #include "raster_pipelines.hpp"
 #include "shader_binding_tables.hpp"
@@ -51,17 +52,12 @@ public:
     std::vector<ImageData> swapchainImages;
     std::vector<vk::Semaphore> swapchainSemaphores;
 
-    // Draw date
-    // ImageData imageDraw;
-    // ImageData imageDepth;
-    // vk::Extent2D imageDrawExtent;
-
     // Camera
     Camera camera;
 
     // Вescriptors
     std::unique_ptr<DescHelper> descHelperUAB, descHelperRt;
-    vk::DescriptorSetLayout uboDescriptorSetLayout;
+    vk::DescriptorSetLayout descriptorSetLayoutUAB;
     vk::DescriptorSetLayout rtDescriptorSetLayout;
 
     // Pipelines
@@ -79,7 +75,9 @@ public:
     std::unique_ptr<SbtHelper> sbtHelper;
 
     // Meshes
-    std::vector<std::shared_ptr<Model>> models;
+    // std::vector<std::shared_ptr<Model>> models;
+    std::unique_ptr<GLTFLoader2> gltfLoader;
+    std::shared_ptr<GLTFObj> scene;
 
     bool isInitialized{false};
 
