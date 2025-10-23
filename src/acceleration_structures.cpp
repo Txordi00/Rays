@@ -1,6 +1,7 @@
 #include "acceleration_structures.hpp"
 #include "utils.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include <unordered_set>
 
 ASBuilder::ASBuilder(const vk::Device &device,
                      const VmaAllocator &allocator,
@@ -362,18 +363,148 @@ AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<Mod
     return buildTLAS(blases, transforms);
 }
 
-AccelerationStructure ASBuilder::buildTLAS(const std::vector<std::shared_ptr<MeshNode>> &meshNodes)
+AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene)
 {
-    blases.clear();
-    blases.reserve(meshNodes.size());
-    std::vector<glm::mat3x4> transforms;
-    transforms.reserve(meshNodes.size());
-    for (const auto &m : meshNodes) {
-        blases.emplace_back(buildBLAS(m));
-        transforms.emplace_back(glm::mat3x4(m->worldTransform));
+    // Classify all MeshNodes by uniqueness of their device address
+    std::unordered_multimap<vk::DeviceAddress, std::shared_ptr<MeshNode>> meshNodes;
+    for (const auto &mn : scene->meshNodes)
+        meshNodes.insert({mn->mesh->indexBuffer->bufferAddress, mn});
+
+    // The uint32 key is going to be the instanceCustomIndex, blases are
+    // going to be repeated: one per Mesh.
+    std::vector<std::tuple<uint32_t, AccelerationStructure, glm::mat4>> blases;
+    blases.reserve(meshNodes.size()); // It can grow bigger than that
+    for (auto it = meshNodes.begin(); it != meshNodes.end();) {
+        AccelerationStructure blas = buildBLAS(it->second);
+        // Get all the MeshNodes associated with a single mesh
+        const auto &[rangeFirst, rangeEnd] = meshNodes.equal_range(it->first);
+        for (auto r = rangeFirst; r != rangeEnd; ++r) {
+            for (const auto &[key, buffer] : r->second->surfaceStorageBuffers) {
+                blases.push_back({key, blas, r->second->worldTransform});
+            }
+        }
+        it = rangeEnd;
     }
 
-    return buildTLAS(blases, transforms);
+    // Here starts the vulkan stuff for building the tlas
+    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
+    device.resetFences(asFence);
+
+    std::vector<vk::AccelerationStructureInstanceKHR> instances;
+    instances.reserve(blases.size());
+    for (const auto &b : blases) {
+        const glm::mat3x4 transformGlm = glm::mat3x4(std::get<2>(b));
+        const AccelerationStructure blas = std::get<1>(b);
+        const uint32_t customIndex = std::get<0>(b);
+        vk::AccelerationStructureInstanceKHR instance{};
+        vk::TransformMatrixKHR transformVk;
+        memcpy(&transformVk, glm::value_ptr(transformGlm), sizeof(vk::TransformMatrixKHR));
+        instance.setTransform(transformVk);
+        instance.setInstanceCustomIndex(customIndex); // gl_InstanceCustomIndexEXT
+        instance.setAccelerationStructureReference(blas.addr);
+        // instance.setFlags(vk::GeometryInstanceFlagBitsKHR::eForceOpaque);
+        instance.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0
+        instance.setInstanceShaderBindingTableRecordOffset(
+            0); // We will use the same hit group for all objects
+        instances.emplace_back(instance);
+    }
+
+    asCmd.reset();
+
+    // Create a buffer holding the actual instance data (matrices++) for use by the AS builder
+    vk::DeviceSize instancesSize = static_cast<vk::DeviceSize>(
+        sizeof(vk::AccelerationStructureInstanceKHR) * instances.size());
+    // Buffer of instances containing the matrices and BLAS ids
+    Buffer instancesBuffer
+        = utils::create_buffer(device,
+                               allocator,
+                               instancesSize,
+                               vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                   | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    // Fill the buffer
+    memcpy(instancesBuffer.allocationInfo.pMappedData, instances.data(), instancesSize);
+
+    // Wraps a device pointer to the above uploaded instances.
+    vk::AccelerationStructureGeometryInstancesDataKHR instancesData{};
+    instancesData.setData(vk::DeviceOrHostAddressConstKHR{instancesBuffer.bufferAddress});
+
+    // Put the above into a VkAccelerationStructureGeometryKHR. We need to put the instances struct in a union and label it as instance data.
+    vk::AccelerationStructureGeometryKHR topASGeometry{};
+    topASGeometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
+    topASGeometry.setGeometry(instancesData);
+    topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+
+    // Find sizes
+    vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
+    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+    buildInfo.setGeometries(topASGeometry);
+    buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
+    buildInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);
+    buildInfo.setSrcAccelerationStructure(nullptr);
+
+    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo
+        = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
+                                                       buildInfo,
+                                                       instances.size());
+
+    // Create acceleration structure, not building it yet
+    // NOT GETTING THE SHADER ADDRESS AT THE MOMENT
+    AccelerationStructure tlas;
+    tlas.buffer = utils::create_buffer(device,
+                                       allocator,
+                                       sizeInfo.accelerationStructureSize,
+                                       vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR,
+                                       VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                       0);
+
+    // 4. Create the acceleration structure object
+    vk::AccelerationStructureCreateInfoKHR asInfo{};
+    asInfo.setBuffer(tlas.buffer.buffer);
+    asInfo.setSize(sizeInfo.accelerationStructureSize);
+    asInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);
+
+    tlas.AS = device.createAccelerationStructureKHR(asInfo);
+
+    // For now we do not need its device address
+    // vk::AccelerationStructureDeviceAddressInfoKHR tlasAddressInfo{};
+    // tlasAddressInfo.setAccelerationStructure(tlas.AS);
+    // tlas.addr = device.getAccelerationStructureAddressKHR(tlasAddressInfo);
+
+    // Allocate scratch buffer
+    Buffer scratchBuffer
+        = utils::create_buffer(device,
+                               allocator,
+                               sizeInfo.buildScratchSize,
+                               vk::BufferUsageFlagBits::eStorageBuffer
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               0,
+                               asProperties.minAccelerationStructureScratchOffsetAlignment);
+
+    // Update build information
+    buildInfo.setSrcAccelerationStructure(nullptr);
+    buildInfo.setDstAccelerationStructure(tlas.AS);
+    buildInfo.setScratchData(scratchBuffer.bufferAddress);
+
+    // Build Offsets info: n instances
+    vk::AccelerationStructureBuildRangeInfoKHR buildRangeInfo{};
+    buildRangeInfo.setPrimitiveCount(instances.size());
+
+    // Build the TLAS
+    // Record the next set of commands
+    utils::cmd_submit(device, queue, asFence, asCmd, [&](const vk::CommandBuffer &cmd) {
+        cmd.buildAccelerationStructuresKHR(buildInfo, &buildRangeInfo);
+    });
+
+    // Scratch buffer can be destroyed after queue finishes
+    utils::destroy_buffer(allocator, scratchBuffer);
+    utils::destroy_buffer(allocator, instancesBuffer);
+
+    return tlas;
 }
 
 void ASBuilder::init()

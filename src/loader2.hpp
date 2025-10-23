@@ -35,7 +35,6 @@ struct GLTFMaterial
 
 struct GeoSurface2
 {
-    uint32_t surfaceId;
     uint32_t startIndex;
     uint32_t count;
     std::shared_ptr<GLTFMaterial> material;
@@ -79,7 +78,8 @@ struct SurfaceStorage
 struct MeshNode : Node
 {
     std::shared_ptr<Mesh> mesh;
-    std::vector<Buffer> surfaceStorageBuffers;
+    // The key is going to be used as the customInstanceIndex when building the TLAS
+    std::unordered_map<uint32_t, Buffer> surfaceStorageBuffers;
 };
 
 struct GLTFObj
@@ -93,6 +93,8 @@ struct GLTFObj
     // nodes that dont have a parent, for iterating through the file in tree order
     std::vector<std::shared_ptr<Node>> topNodes;
     std::vector<std::shared_ptr<MeshNode>> meshNodes;
+
+    uint32_t surfaceStorageBuffersCount{0};
 
     std::vector<vk::Sampler> samplers;
 

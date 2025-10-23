@@ -371,7 +371,7 @@ void Init::init_descriptors()
                                                  true);
     descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer,
                                                              static_cast<uint32_t>(
-                                                                 scene->meshNodes.size())},
+                                                                 scene->surfaceStorageBuffersCount)},
                                       frameOverlap); // per-surface storage
     descHelperUAB->create_descriptor_pool();
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eStorageBuffer,
@@ -555,12 +555,6 @@ void Init::load_meshes()
 
 void Init::create_as()
 {
-    std::vector<std::shared_ptr<MeshNode>> meshNodes;
-    meshNodes.reserve(scene->nodes.size());
-    for (const auto &n : scene->nodes)
-        if (const std::shared_ptr<MeshNode> meshNode = std::dynamic_pointer_cast<MeshNode>(n.second))
-            meshNodes.emplace_back(meshNode);
-
     // std::unordered_set<vk::DeviceAddress> uniqueMeshes;
     // uniqueMeshes.reserve(meshNodes.size());
     // size_t count = 0;
@@ -574,7 +568,7 @@ void Init::create_as()
                                                                        graphicsQueueFamilyIndex,
                                                                        asProperties);
 
-    tlas = asBuilder->buildTLAS(meshNodes);
+    tlas = asBuilder->buildTLAS(scene);
 
     // std::shared_ptr<Node> n = std::make_shared<Node>();
     // std::shared_ptr<MeshNode> m = std::make_shared<MeshNode>();

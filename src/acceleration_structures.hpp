@@ -23,7 +23,8 @@ public:
 
     AccelerationStructure buildTLAS(const std::vector<std::shared_ptr<Model>> &models,
                                     const std::vector<glm::mat3x4> &transforms);
-    AccelerationStructure buildTLAS(const std::vector<std::shared_ptr<MeshNode>> &meshNodes);
+
+    AccelerationStructure buildTLAS(const std::shared_ptr<GLTFObj> &scene);
 
     AccelerationStructure buildTLAS(const std::vector<AccelerationStructure> &blases,
                                     const std::vector<glm::mat3x4> &transforms);

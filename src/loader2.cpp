@@ -391,14 +391,14 @@ void GLTFLoader2::load_nodes(const fastgltf::Asset &asset,
     // Define the lambda that will load the node and the local transform
     uint32_t surfaceId = 0;
     scene->meshNodes.reserve(asset.nodes.size());
-    const auto create_nodes = [&](const fastgltf::Node &n, const fastgltf::math::fmat4x4 &m) {
+    for (const auto &n : asset.nodes) {
         std::shared_ptr<Node> nodeTmp;
 
         // If has a mesh, make the Node a MeshNode and load the mesh
         if (n.meshIndex.has_value()) {
             nodeTmp = std::make_shared<MeshNode>();
             std::shared_ptr<MeshNode> meshNodeTmp = std::dynamic_pointer_cast<MeshNode>(nodeTmp);
-            const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
+            std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
             meshNodeTmp->mesh = mesh;
             meshNodeTmp->surfaceStorageBuffers.reserve(mesh->surfaces.size());
             // dynamic_cast<MeshNode *>(nodeTmp.get())->mesh = mesh;
@@ -424,27 +424,79 @@ void GLTFLoader2::load_nodes(const fastgltf::Asset &asset,
                                            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                                            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
                 utils::copy_to_buffer(*surfaceStorageBuffer, allocator, &surfaceStorage);
-                meshNodeTmp->surfaceStorageBuffers.emplace_back(*surfaceStorageBuffer);
-                bufferQueue.emplace_back(surfaceStorageBuffer);
-                scene->meshNodes.emplace_back(meshNodeTmp);
                 // Store a unique surface Id for each surface. This will be used as the customInstanceID
                 // when building the BLASes
-                s.surfaceId = surfaceId;
+                meshNodeTmp->surfaceStorageBuffers[surfaceId] = *surfaceStorageBuffer;
                 surfaceId++;
+                bufferQueue.emplace_back(surfaceStorageBuffer);
+                scene->meshNodes.emplace_back(std::move(meshNodeTmp));
             }
         } else
             nodeTmp = std::make_shared<Node>();
 
         // Load the local transform
+        const auto m = fastgltf::getTransformMatrix(n);
         nodeTmp->localTransform = glm::make_mat4(m.data());
 
         // Add the node to our structures
         nodes.emplace_back(std::move(nodeTmp));
         scene->nodes[n.name.c_str()] = nodes.back();
-    };
-    // For now, consider all the scenes as a single one (it usually is the case)
-    for (size_t sceneId = 0; sceneId < asset.scenes.size(); sceneId++)
-        fastgltf::iterateSceneNodes(asset, sceneId, fastgltf::math::fmat4x4(), create_nodes);
+    }
+    scene->surfaceStorageBuffersCount = surfaceId;
+    //     const auto create_nodes = [&](const fastgltf::Node &n, const fastgltf::math::fmat4x4 &m) {
+    //         std::shared_ptr<Node> nodeTmp;
+
+    //         // If has a mesh, make the Node a MeshNode and load the mesh
+    //         if (n.meshIndex.has_value()) {
+    //             nodeTmp = std::make_shared<MeshNode>();
+    //             std::shared_ptr<MeshNode> meshNodeTmp = std::dynamic_pointer_cast<MeshNode>(nodeTmp);
+    //             const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
+    //             meshNodeTmp->mesh = mesh;
+    //             meshNodeTmp->surfaceStorageBuffers.reserve(mesh->surfaces.size());
+    //             // dynamic_cast<MeshNode *>(nodeTmp.get())->mesh = mesh;
+    //             // dynamic_cast<MeshNode *>(nodeTmp.get())
+    //             //     ->surfaceStorageBuffers.reserve(mesh->surfaces.size());
+    //             // bufferQueue.reserve(mesh->surfaces.size());
+    //             // Create a bound storage buffer for every surface with the device addresses
+    //             // that will allow us access all the data from the shaders
+    //             for (auto &s : mesh->surfaces) {
+    //                 SurfaceStorage surfaceStorage;
+    //                 surfaceStorage.indexBufferAddress = mesh->indexBuffer->bufferAddress;
+    //                 surfaceStorage.vertexBufferAddress = mesh->vertexBuffer->bufferAddress;
+    //                 surfaceStorage.materialConstantsBufferAddress = s.material->materialResources
+    //                                                                     .dataBuffer.bufferAddress;
+    //                 surfaceStorage.startIndex = s.startIndex;
+    //                 surfaceStorage.count = s.count;
+    //                 std::shared_ptr<Buffer> surfaceStorageBuffer = std::make_shared<Buffer>();
+    //                 *surfaceStorageBuffer = utils::create_buffer(
+    //                     device,
+    //                     allocator,
+    //                     sizeof(SurfaceStorage),
+    //                     vk::BufferUsageFlagBits::eStorageBuffer,
+    //                     VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+    //                     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+    //                 utils::copy_to_buffer(*surfaceStorageBuffer, allocator, &surfaceStorage);
+    //                 meshNodeTmp->surfaceStorageBuffers.emplace_back(*surfaceStorageBuffer);
+    //                 bufferQueue.emplace_back(surfaceStorageBuffer);
+    //                 scene->meshNodes.emplace_back(meshNodeTmp);
+    //                 // Store a unique surface Id for each surface. This will be used as the customInstanceID
+    //                 // when building the BLASes
+    //                 s.surfaceId = surfaceId;
+    //                 surfaceId++;
+    //             }
+    //         } else
+    //             nodeTmp = std::make_shared<Node>();
+
+    //         // Load the local transform
+    //         nodeTmp->localTransform = glm::make_mat4(m.data());
+
+    //         // Add the node to our structures
+    //         nodes.emplace_back(std::move(nodeTmp));
+    //         scene->nodes[n.name.c_str()] = nodes.back();
+    //     };
+    // // For now, consider all the scenes as a single one (it usually is the case)
+    // for (size_t sceneId = 0; sceneId < asset.scenes.size(); sceneId++)
+    //     fastgltf::iterateSceneNodes(asset, sceneId, fastgltf::math::fmat4x4(), create_nodes);
 
     // Generate the node tree structure
     for (size_t i = 0; i < nodes.size(); i++) {
