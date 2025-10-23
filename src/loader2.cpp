@@ -105,7 +105,7 @@ GLTFLoader2::GLTFLoader2(const vk::Device &device,
     samplerQueue.push_back(samplerNearest);
 }
 
-GLTFLoader2::~GLTFLoader2()
+void GLTFLoader2::destroy()
 {
     vmaDestroyImage(allocator, checkerboardImage.image, checkerboardImage.allocation);
     vmaDestroyImage(allocator, whiteImage.image, whiteImage.allocation);
@@ -429,7 +429,7 @@ void GLTFLoader2::load_nodes(const fastgltf::Asset &asset,
                 meshNodeTmp->surfaceStorageBuffers[surfaceId] = *surfaceStorageBuffer;
                 surfaceId++;
                 bufferQueue.emplace_back(surfaceStorageBuffer);
-                scene->meshNodes.emplace_back(std::move(meshNodeTmp));
+                scene->meshNodes.emplace_back(meshNodeTmp);
             }
         } else
             nodeTmp = std::make_shared<Node>();

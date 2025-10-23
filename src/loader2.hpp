@@ -112,7 +112,9 @@ public:
                 const VmaAllocator &allocator,
                 const uint32_t queueFamilyIndex);
 
-    ~GLTFLoader2();
+    ~GLTFLoader2() = default;
+
+    void destroy();
 
     std::optional<std::shared_ptr<GLTFObj>> load_gltf_asset(const std::filesystem::path &path);
 

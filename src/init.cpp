@@ -55,9 +55,12 @@ void Init::clean()
         utils::destroy_buffer(allocator, rtSBTBuffer);
         utils::destroy_buffer(allocator, tlas.buffer);
         device.destroyAccelerationStructureKHR(tlas.AS);
+        asBuilder->destroy();
 
-        device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
-        device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
+        gltfLoader->destroy();
+
+        // device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
+        // device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
         device.destroyPipelineLayout(simpleRtPipeline.pipelineLayout);
         device.destroyPipeline(simpleRtPipeline.pipeline);
 
@@ -415,10 +418,10 @@ void Init::init_descriptors()
 
 void Init::init_pipelines()
 {
-    simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
-                                                          frames[0].imageDraw.format,
-                                                          frames[0].imageDepth.format,
-                                                          {descriptorSetLayoutUAB});
+    // simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
+    //                                                       frames[0].imageDraw.format,
+    //                                                       frames[0].imageDepth.format,
+    //                                                       {descriptorSetLayoutUAB});
 
     RtPipelineBuilder rtPipelineBuilder{device};
     rtPipelineBuilder.create_shader_stages();
@@ -563,11 +566,10 @@ void Init::create_as()
     //         count++;
     // }
 
-    std::unique_ptr<ASBuilder> asBuilder = std::make_unique<ASBuilder>(device,
-                                                                       allocator,
-                                                                       graphicsQueueFamilyIndex,
-                                                                       asProperties);
-
+    asBuilder = std::make_unique<ASBuilder>(device,
+                                            allocator,
+                                            graphicsQueueFamilyIndex,
+                                            asProperties);
     tlas = asBuilder->buildTLAS(scene);
 
     // std::shared_ptr<Node> n = std::make_shared<Node>();

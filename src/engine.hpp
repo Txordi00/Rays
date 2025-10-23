@@ -57,7 +57,7 @@ private:
     // Frame data
     // Efficiently create a vector of all the uniform buffers
     std::vector<Buffer> uniformBuffers;
-    std::vector<Buffer> storageBuffers;
+    std::vector<Buffer> surfaceStorageBuffers;
 
     // RT push constants
     RayPush rayPush{};

@@ -61,7 +61,7 @@ public:
     vk::DescriptorSetLayout rtDescriptorSetLayout;
 
     // Pipelines
-    SimplePipelineData simpleMeshGraphicsPipeline;
+    // SimplePipelineData simpleMeshGraphicsPipeline;
     SimplePipelineData simpleRtPipeline;
 
     // Imgui
@@ -73,6 +73,7 @@ public:
     AccelerationStructure tlas;
     Buffer rtSBTBuffer;
     std::unique_ptr<SbtHelper> sbtHelper;
+    std::unique_ptr<ASBuilder> asBuilder;
 
     // Meshes
     // std::vector<std::shared_ptr<Model>> models;

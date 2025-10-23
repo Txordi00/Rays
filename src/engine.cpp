@@ -24,10 +24,10 @@ Engine::Engine()
     //                        std::back_inserter(uniformBuffers),
     //                        [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
 
-    // storageBuffers.reserve(I->models.size());
-    // std::ranges::transform(I->models,
-    //                        std::back_inserter(storageBuffers),
-    //                        [](const std::shared_ptr<Model> &m) { return m->storageBuffer; });
+    surfaceStorageBuffers.reserve(I->scene->surfaceStorageBuffersCount);
+    for (const auto &m : I->scene->meshNodes)
+        for (const auto &b : m->surfaceStorageBuffers)
+            surfaceStorageBuffers.emplace_back(b.second);
 
     // Init push constants
     rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
@@ -54,11 +54,10 @@ void Engine::run()
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
     for (const auto &frame : I->frames) {
         // Inform the shaders about all the different descriptors
-        vk::DescriptorSet descriptorSetUniform = frame.descriptorSetUAB;
+        vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
         vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
-        descUpdater.add_uniform(descriptorSetUniform, 0, uniformBuffers);
-        descUpdater.add_storage(descriptorSetUniform, 1, storageBuffers);
+        descUpdater.add_storage(descriptorSetUAB, 0, surfaceStorageBuffers);
         descUpdater.add_as(descriptorSetRt, 0, tlas);
         descUpdater.add_image(descriptorSetRt, 1, frame.imageDraw.imageView);
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
@@ -283,101 +282,102 @@ void Engine::draw()
     frameNumber = (frameNumber + 1) % I->frameOverlap;
 }
 
-void Engine::draw_meshes(const vk::CommandBuffer &cmd)
-{
-    ImageData imageDraw = get_current_frame().imageDraw;
-    ImageData imageDepth = get_current_frame().imageDepth;
+// void Engine::draw_meshes(const vk::CommandBuffer &cmd)
+// {
+//     ImageData imageDraw = get_current_frame().imageDraw;
+//     ImageData imageDepth = get_current_frame().imageDepth;
 
-    vk::RenderingAttachmentInfo colorAttachmentInfo{};
-    colorAttachmentInfo.setImageView(imageDraw.imageView);
-    colorAttachmentInfo.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-    colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
-    colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
+//     vk::RenderingAttachmentInfo colorAttachmentInfo{};
+//     colorAttachmentInfo.setImageView(imageDraw.imageView);
+//     colorAttachmentInfo.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
+//     colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
+//     colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
 
-    vk::RenderingAttachmentInfo depthAttachmentInfo{};
-    depthAttachmentInfo.setImageView(imageDepth.imageView);
-    depthAttachmentInfo.setImageLayout(vk::ImageLayout::eDepthAttachmentOptimal);
-    depthAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eClear);
-    depthAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
-    depthAttachmentInfo.setClearValue(vk::ClearValue{vk::ClearDepthStencilValue{1.f}});
+//     vk::RenderingAttachmentInfo depthAttachmentInfo{};
+//     depthAttachmentInfo.setImageView(imageDepth.imageView);
+//     depthAttachmentInfo.setImageLayout(vk::ImageLayout::eDepthAttachmentOptimal);
+//     depthAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eClear);
+//     depthAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
+//     depthAttachmentInfo.setClearValue(vk::ClearValue{vk::ClearDepthStencilValue{1.f}});
 
-    vk::RenderingInfo renderInfo{};
-    renderInfo.setColorAttachments(colorAttachmentInfo);
-    renderInfo.setPDepthAttachment(&depthAttachmentInfo);
-    renderInfo.setLayerCount(1);
-    renderInfo.setRenderArea(vk::Rect2D{vk::Offset2D{0, 0}, I->swapchainExtent});
+//     vk::RenderingInfo renderInfo{};
+//     renderInfo.setColorAttachments(colorAttachmentInfo);
+//     renderInfo.setPDepthAttachment(&depthAttachmentInfo);
+//     renderInfo.setLayerCount(1);
+//     renderInfo.setRenderArea(vk::Rect2D{vk::Offset2D{0, 0}, I->swapchainExtent});
 
-    //set dynamic viewport and scissor
-    vk::Viewport viewport{};
-    viewport.setX(0.f);
-    viewport.setY(0.f);
-    viewport.setWidth(I->swapchainExtent.width);
-    viewport.setHeight(I->swapchainExtent.height);
-    viewport.setMinDepth(0.f);
-    viewport.setMaxDepth(1.f);
+//     //set dynamic viewport and scissor
+//     vk::Viewport viewport{};
+//     viewport.setX(0.f);
+//     viewport.setY(0.f);
+//     viewport.setWidth(I->swapchainExtent.width);
+//     viewport.setHeight(I->swapchainExtent.height);
+//     viewport.setMinDepth(0.f);
+//     viewport.setMaxDepth(1.f);
 
-    vk::Rect2D scissor{};
-    scissor.setExtent(vk::Extent2D{I->swapchainExtent.width, I->swapchainExtent.height});
-    scissor.setOffset(vk::Offset2D{0, 0});
+//     vk::Rect2D scissor{};
+//     scissor.setExtent(vk::Extent2D{I->swapchainExtent.width, I->swapchainExtent.height});
+//     scissor.setOffset(vk::Offset2D{0, 0});
 
-    try {
-        cmd.beginRendering(renderInfo);
-        cmd.setViewport(0, viewport);
-        cmd.setScissor(0, scissor);
+//     try {
+//         cmd.beginRendering(renderInfo);
+//         cmd.setViewport(0, viewport);
+//         cmd.setScissor(0, scissor);
 
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, I->simpleMeshGraphicsPipeline.pipeline);
+//         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, I->simpleMeshGraphicsPipeline.pipeline);
 
-        vk::DescriptorSet descriptorSet = get_current_frame().descriptorSetUAB;
+//         vk::DescriptorSet descriptorSet = get_current_frame().descriptorSetUAB;
 
-        vk::BindDescriptorSetsInfo descSetsInfo{};
-        descSetsInfo.setDescriptorSets(descriptorSet);
-        descSetsInfo.setStageFlags(vk::ShaderStageFlagBits::eVertex);
-        descSetsInfo.setLayout(I->simpleMeshGraphicsPipeline.pipelineLayout);
-        cmd.bindDescriptorSets2(descSetsInfo);
+//         vk::BindDescriptorSetsInfo descSetsInfo{};
+//         descSetsInfo.setDescriptorSets(descriptorSet);
+//         descSetsInfo.setStageFlags(vk::ShaderStageFlagBits::eVertex);
+//         descSetsInfo.setLayout(I->simpleMeshGraphicsPipeline.pipelineLayout);
+//         cmd.bindDescriptorSets2(descSetsInfo);
 
-        I->camera.update();
+//         I->camera.update();
 
-        // for (int objId = 0; objId < I->models.size(); objId++) {
-        //     glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
-        //                           * I->models[objId]->modelMatrix;
+//         for (int objId = 0; objId < I->models.size(); objId++) {
+//             glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
+//                                   * I->models[objId]->modelMatrix;
 
-        //     UniformData uboData;
-        //     uboData.worldMatrix = mvpMatrix;
+//             UniformData uboData;
+//             uboData.worldMatrix = mvpMatrix;
 
-        //     utils::copy_to_buffer(I->models[objId]->uniformBuffer, I->allocator, &uboData);
-        // }
+//             utils::copy_to_buffer(I->models[objId]->uniformBuffer, I->allocator, &uboData);
+//         }
 
-        // for (int objId = 0; objId < I->models.size(); objId++) {
-        //     MeshPush pushConstants;
-        //     pushConstants.objId = objId;
-        //     cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
-        //                       vk::ShaderStageFlagBits::eVertex,
-        //                       0,
-        //                       sizeof(MeshPush),
-        //                       &pushConstants);
+//         for (int objId = 0; objId < I->models.size(); objId++) {
+//             MeshPush pushConstants;
+//             pushConstants.objId = objId;
+//             cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
+//                               vk::ShaderStageFlagBits::eVertex,
+//                               0,
+//                               sizeof(MeshPush),
+//                               &pushConstants);
 
-        //     cmd.draw(I->models[objId]->surfaces[0].count,
-        //              1,
-        //              I->models[objId]->surfaces[0].startIndex,
-        //              0);
+//             cmd.draw(I->models[objId]->surfaces[0].count,
+//                      1,
+//                      I->models[objId]->surfaces[0].startIndex,
+//                      0);
 
-        // USING THE INDEX BUFFER PROPERLY REQUIRES THE FOLLOWING DRAW CALL:
-        // cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
-        //                      0,
-        //                      I->models[objId]->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
-        //                      vk::IndexType::eUint32);
+//             USING THE INDEX BUFFER PROPERLY REQUIRES THE FOLLOWING DRAW CALL
+//                 : cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
+//                                        0,
+//                                        I->models[objId]
+//                                            ->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
+//                                        vk::IndexType::eUint32);
 
-        // cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
-        //                 1,
-        //                 I->models[objId]->gpuMesh.surfaces[0].startIndex,
-        //                 0,
-        //                 0);
-        //     }
-        //     cmd.endRendering();
-    } catch (const std::exception &e) {
-        VK_CHECK_EXC(e);
-    }
-}
+//             cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
+//                             1,
+//                             I->models[objId]->gpuMesh.surfaces[0].startIndex,
+//                             0,
+//                             0);
+//         }
+//         cmd.endRendering();
+//     } catch (const std::exception &e) {
+//         VK_CHECK_EXC(e);
+//     }
+// }
 
 void Engine::raytrace(const vk::CommandBuffer &cmd)
 {
