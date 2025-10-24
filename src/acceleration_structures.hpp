@@ -1,6 +1,5 @@
 #pragma once
-#include "loader2.hpp"
-#include "model.hpp"
+#include "loader.hpp"
 
 struct AccelerationStructure
 {

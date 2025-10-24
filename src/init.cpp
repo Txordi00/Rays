@@ -1,14 +1,12 @@
 #include "init.hpp"
 #include "acceleration_structures.hpp"
 #include "loader.hpp"
-#include "loader2.hpp"
 #include "rt_pipelines.hpp"
 #include "utils.hpp"
 
 #include <SDL3/SDL_vulkan.h>
 #include <VkBootstrap.h>
 #include <glm/ext/matrix_transform.hpp>
-#include <unordered_set>
 #define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
@@ -17,7 +15,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
-#include <print>
 
 Init::Init()
 {
@@ -49,9 +46,6 @@ void Init::clean()
         device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
-        // for (auto &m : models) {
-        //     m->destroyBuffers();
-        // }
         utils::destroy_buffer(allocator, rtSBTBuffer);
         utils::destroy_buffer(allocator, tlas.buffer);
         device.destroyAccelerationStructureKHR(tlas.AS);
@@ -345,29 +339,6 @@ void Init::init_sync_structures()
 
 void Init::init_descriptors()
 {
-    // descHelperUAB = std::make_unique<DescHelper>(device,
-    //                                              physicalDeviceProperties,
-    //                                              asProperties,
-    //                                              true);
-    // descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
-    //                                                          static_cast<uint32_t>(models.size())},
-    //                                   frameOverlap);
-    // descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer,
-    //                                                          static_cast<uint32_t>(models.size())},
-    //                                   frameOverlap);
-    // descHelperUAB->create_descriptor_pool();
-    // descHelperUAB->add_binding(
-    //     Binding{vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, 0}); // ubo
-    // descHelperUAB->add_binding(
-    //     Binding{vk::DescriptorType::eStorageBuffer,
-    //             vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eClosestHitKHR,
-    //             1});
-    // uboDescriptorSetLayout = descHelperUAB->create_descriptor_set_layout();
-    // std::vector<vk::DescriptorSet> setsUAB
-    //     = descHelperUAB->allocate_descriptor_sets(uboDescriptorSetLayout, frameOverlap);
-    // for (int i = 0; i < setsUAB.size(); i++)
-    //     frames[i].descriptorSetUAB = setsUAB[i];
-
     descHelperUAB = std::make_unique<DescHelper>(device,
                                                  physicalDeviceProperties,
                                                  asProperties,
@@ -396,8 +367,6 @@ void Init::init_descriptors()
                              frameOverlap);
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
                                      frameOverlap);
-    // descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1},
-    //                                  frameOverlap);
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
                                      frameOverlap); // camera
     descHelperRt->create_descriptor_pool();
@@ -504,97 +473,17 @@ void Init::init_rt()
 
 void Init::load_meshes()
 {
-    // std::vector<Material> materials;
-    // Material m1{};
-    // m1.color = glm::vec3{1.f, 0.f, 0.f};
-    // m1.diffuseR = 1.f;
-    // m1.specularR = 1.f;
-    // m1.shininessN = 4;
-    // m1.ambientR = 1.f;
-    // m1.reflectiveness = 1.f;
-    // m1.refractiveness = 0.f;
-    // m1.refractiveIndex = 1.f;
-    // utils::normalize_material_factors(m1);
-    // materials.push_back(m1);
-    // Material m2{};
-    // m2.color = glm::vec3{1.f, 1.f, 1.f};
-    // m2.diffuseR = 0.2f;
-    // m2.specularR = 0.6f;
-    // m2.ambientR = 1.f;
-    // m2.reflectiveness = 0.1f;
-    // m2.refractiveness = 1.f;
-    // m2.shininessN = 1;
-    // m2.refractiveIndex = 0.9f;
-    // utils::normalize_material_factors(m2);
-    // materials.push_back(m2);
-    // Material m3{};
-    // m3.color = glm::vec3{0.f, 1.f, 1.f};
-    // m3.diffuseR = 0.8f;
-    // m3.specularR = 0.2f;
-    // m3.shininessN = 1;
-    // m3.ambientR = 1.f;
-    // m3.reflectiveness = 0.f;
-    // m3.refractiveness = 0.f;
-    // m3.refractiveIndex = 1.f;
-    // utils::normalize_material_factors(m3);
-    // materials.push_back(m3);
-
-    // GLTFLoader gltfLoader{};
-    // gltfLoader.overrideColorsWithNormals = false;
-    // std::vector<std::shared_ptr<HostMeshAsset>> cpuMeshes = gltfLoader.loadGLTFMeshes(
-    //     "../../assets/basicmesh.glb");
-    // models.resize(cpuMeshes.size());
-    // for (int i = 0; i < cpuMeshes.size(); i++) {
-    //     models[i] = std::make_shared<Model>(device, *cpuMeshes[i], allocator, materials[i]);
-    //     models[i]->create_mesh(cmdTransfer, transferFence, transferQueue);
-    // }
-    // models[0]->position = glm::vec3(0.f, 2.f, 7.f);
-    // models[1]->position = glm::vec3(2.f, 0.f, 7.f);
-    // models[2]->position = glm::vec3(-2.f, 0.f, 7.f);
-
-    gltfLoader = std::make_unique<GLTFLoader2>(device, allocator, transferQueueFamilyIndex);
+    gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
     scene = gltfLoader->load_gltf_asset("../../assets/ABeautifulGame.glb").value();
 }
 
 void Init::create_as()
 {
-    // std::unordered_set<vk::DeviceAddress> uniqueMeshes;
-    // uniqueMeshes.reserve(meshNodes.size());
-    // size_t count = 0;
-    // for (const auto &mn : meshNodes) {
-    //     if (uniqueMeshes.insert(mn->mesh->indexBuffer->bufferAddress).second)
-    //         count++;
-    // }
-
     asBuilder = std::make_unique<ASBuilder>(device,
                                             allocator,
                                             graphicsQueueFamilyIndex,
                                             asProperties);
     tlas = asBuilder->buildTLAS(scene);
-
-    // std::shared_ptr<Node> n = std::make_shared<Node>();
-    // std::shared_ptr<MeshNode> m = std::make_shared<MeshNode>();
-    // std::vector<std::shared_ptr<Node>> v;
-    // v.push_back(n);
-    // v.push_back(m);
-    // std::vector<std::shared_ptr<MeshNode>> vm;
-    // vm.reserve(v.size());
-    // for (const auto &x : v) {
-    //     if (const std::shared_ptr<MeshNode> m = std::dynamic_pointer_cast<MeshNode>(x)) {
-    //         vm.push_back(m);
-    //     }
-    // }
-
-    // std::unique_ptr<ASBuilder> asBuilder = std::make_unique<ASBuilder>(device,
-    //                                                                    allocator,
-    //                                                                    graphicsQueueFamilyIndex,
-    //                                                                    asProperties);
-    // std::vector<glm::mat3x4> transforms(models.size());
-    // for (int i = 0; i < models.size(); i++)
-    //     transforms[i] = glm::mat3x4(
-    //         glm::transpose(glm::translate(glm::mat4(1.f), models[i]->position)));
-
-    // tlas = asBuilder->buildTLAS(models, transforms);
 }
 
 void Init::destroy_swapchain()

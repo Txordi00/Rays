@@ -2,8 +2,7 @@
 #include "acceleration_structures.hpp"
 #include "camera.hpp"
 #include "descriptors.hpp"
-#include "loader2.hpp"
-#include "model.hpp"
+#include "loader.hpp"
 #include "raster_pipelines.hpp"
 #include "shader_binding_tables.hpp"
 #include "types.hpp"
@@ -77,7 +76,7 @@ public:
 
     // Meshes
     // std::vector<std::shared_ptr<Model>> models;
-    std::unique_ptr<GLTFLoader2> gltfLoader;
+    std::unique_ptr<GLTFLoader> gltfLoader;
     std::shared_ptr<GLTFObj> scene;
 
     bool isInitialized{false};

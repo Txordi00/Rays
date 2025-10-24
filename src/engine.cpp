@@ -8,7 +8,6 @@ import vulkan_hpp;
 #include "engine.hpp"
 #include "types.hpp"
 #include "utils.hpp"
-#include <algorithm>
 #include <glm/ext.hpp>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
@@ -31,7 +30,6 @@ Engine::Engine()
 
     // Init push constants
     rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
-    // rayPush.numObjects = I->models.size();
     rayPush.lightIntensity = 50.f;
     rayPush.lightType = 0;
     rayPush.lightPosition = glm::vec3(0.f, -5.f, 7.f);
@@ -282,7 +280,7 @@ void Engine::draw()
     frameNumber = (frameNumber + 1) % I->frameOverlap;
 }
 
-// void Engine::draw_meshes(const vk::CommandBuffer &cmd)
+// void Engine::raster(const vk::CommandBuffer &cmd)
 // {
 //     ImageData imageDraw = get_current_frame().imageDraw;
 //     ImageData imageDepth = get_current_frame().imageDepth;
@@ -359,19 +357,6 @@ void Engine::draw()
 //                      1,
 //                      I->models[objId]->surfaces[0].startIndex,
 //                      0);
-
-//             USING THE INDEX BUFFER PROPERLY REQUIRES THE FOLLOWING DRAW CALL
-//                 : cmd.bindIndexBuffer2(I->models[objId]->gpuMesh.meshBuffer.indexBuffer.buffer,
-//                                        0,
-//                                        I->models[objId]
-//                                            ->gpuMesh.meshBuffer.indexBuffer.allocationInfo.size,
-//                                        vk::IndexType::eUint32);
-
-//             cmd.drawIndexed(I->models[objId]->gpuMesh.surfaces[0].count,
-//                             1,
-//                             I->models[objId]->gpuMesh.surfaces[0].startIndex,
-//                             0,
-//                             0);
 //         }
 //         cmd.endRendering();
 //     } catch (const std::exception &e) {

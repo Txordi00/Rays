@@ -16,7 +16,6 @@ struct HitPayload
 #define RayPushConstants RayPushConstants \
     { \
         vec4 clearColor; \
-        uint numObjects; \
         vec3 lightPosition; \
         float lightIntensity; \
         uint lightType; \
