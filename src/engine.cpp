@@ -23,11 +23,6 @@ Engine::Engine()
     //                        std::back_inserter(uniformBuffers),
     //                        [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
 
-    surfaceStorageBuffers.reserve(I->scene->surfaceStorageBuffersCount);
-    for (const auto &m : I->scene->meshNodes)
-        for (const auto &b : m->surfaceStorageBuffers)
-            surfaceStorageBuffers.emplace_back(b.second);
-
     // Init push constants
     rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
     rayPush.lightIntensity = 50.f;
@@ -42,34 +37,17 @@ Engine::~Engine()
 
 void Engine::run()
 {
+    // Inform the shaders about the resources that we are going to use
+    update_descriptors();
+
     SDL_Event e;
     bool quit = false;
 
-    // Set all the resource descriptors at once. We don't need more if we don't change any
-    // resources
-    vk::AccelerationStructureKHR tlas = I->tlas.AS;
-    DescriptorUpdater descUpdater{I->device};
-    std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
-    for (const auto &frame : I->frames) {
-        // Inform the shaders about all the different descriptors
-        vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
-        vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
-
-        descUpdater.add_storage(descriptorSetUAB, 0, surfaceStorageBuffers);
-        descUpdater.add_as(descriptorSetRt, 0, tlas);
-        descUpdater.add_image(descriptorSetRt, 1, frame.imageDraw.imageView);
-        descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
-        descUpdater.update();
-    }
-
     const float dx = 0.5f;
     const float dt = glm::radians(2.f);
-    // for (const auto &m : I->models)
-    //     m->updateModelMatrix();
 
     int numKeys;
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);
-
 
     // Main loop
     while (!quit) {
@@ -146,6 +124,31 @@ void Engine::run()
         ImGui::Render();
         // Draw if not minimized
         draw();
+    }
+}
+
+void Engine::update_descriptors()
+{
+    // Set all the resource descriptors at once. We don't need to update again if we don't change any
+    // resources
+    vk::AccelerationStructureKHR tlas = I->tlas.AS;
+    DescriptorUpdater descUpdater{I->device};
+    std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
+    std::vector<Buffer> surfaceStorageBuffers;
+    surfaceStorageBuffers.reserve(I->scene->surfaceStorageBuffersCount);
+    for (const auto &m : I->scene->meshNodes)
+        for (const auto &b : m->surfaceStorageBuffers)
+            surfaceStorageBuffers.emplace_back(b.second);
+    for (const auto &frame : I->frames) {
+        // Inform the shaders about all the different descriptors
+        vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
+        vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
+
+        descUpdater.add_storage(descriptorSetUAB, 0, surfaceStorageBuffers);
+        descUpdater.add_as(descriptorSetRt, 0, tlas);
+        descUpdater.add_image(descriptorSetRt, 1, frame.imageDraw.imageView);
+        descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
+        descUpdater.update();
     }
 }
 
@@ -402,16 +405,6 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     cmd.pushConstants2(pushInfo);
 
     I->camera.update();
-
-    // for (int objId = 0; objId < I->models.size(); objId++) {
-    //     glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
-    //                           * I->models[objId]->modelMatrix;
-
-    //     UniformData uboData;
-    //     uboData.worldMatrix = mvpMatrix;
-
-    //     utils::copy_to_buffer(uniformBuffers[objId], I->allocator, &uboData);
-    // }
 
     cmd.traceRaysKHR(I->sbtHelper->rgenRegion,
                      I->sbtHelper->missRegion,

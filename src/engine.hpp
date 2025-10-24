@@ -24,8 +24,8 @@ private:
     // Return frame
     FrameData &get_current_frame() { return I->frames[frameNumber]; }
 
-    // Camera
-    // Camera camera{};
+    // Inform to the shaders about the resources
+    void update_descriptors();
 
     // draw loop
     void draw();
@@ -46,11 +46,6 @@ private:
     uint64_t frameNumber{0};
     uint32_t swapchainImageIndex{0};
     bool stopRendering{false};
-
-    // Frame data
-    // Efficiently create a vector of all the uniform buffers
-    // std::vector<Buffer> uniformBuffers;
-    std::vector<Buffer> surfaceStorageBuffers;
 
     // RT push constants
     RayPush rayPush{};

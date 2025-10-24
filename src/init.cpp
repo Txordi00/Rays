@@ -364,20 +364,22 @@ void Init::init_descriptors()
     descHelperRt
         ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eAccelerationStructureKHR,
                                                     1},
-                             frameOverlap);
+                             frameOverlap); // tlas
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1},
-                                     frameOverlap);
+                                     frameOverlap); // drawImage
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
                                      frameOverlap); // camera
     descHelperRt->create_descriptor_pool();
     descHelperRt->add_binding(
         Binding{vk::DescriptorType::eAccelerationStructureKHR,
                 vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
-                0});
-    descHelperRt->add_binding(
-        Binding{vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eRaygenKHR, 1});
-    descHelperRt->add_binding(
-        Binding{vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eRaygenKHR, 2});
+                0}); // tlas
+    descHelperRt->add_binding(Binding{vk::DescriptorType::eStorageImage,
+                                      vk::ShaderStageFlagBits::eRaygenKHR,
+                                      1}); // drawImage
+    descHelperRt->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
+                                      vk::ShaderStageFlagBits::eRaygenKHR,
+                                      2}); // camera
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt
         = descHelperRt->allocate_descriptor_sets(rtDescriptorSetLayout, frameOverlap);

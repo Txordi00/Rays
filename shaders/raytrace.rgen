@@ -18,17 +18,6 @@ layout(scalar, binding = 2, set = 0) uniform CameraData{
   vec3 orientation;
 } camera;
 
-//layout(buffer_reference, std430) readonly buffer VertexBuffer
-//{
-//    Vertex vertices[];
-//};
-
-//layout(buffer_reference, std430) readonly buffer IndexBuffer
-//{
-//    uint indices[];
-//};
-
-
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants push;
 
