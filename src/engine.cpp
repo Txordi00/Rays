@@ -17,12 +17,6 @@ Engine::Engine()
 {
     I = std::make_unique<Init>();
 
-    // Create vector of buffers in an efficient way
-    // uniformBuffers.reserve(I->models.size());
-    // std::ranges::transform(I->models,
-    //                        std::back_inserter(uniformBuffers),
-    //                        [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
-
     // Init push constants
     rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
     rayPush.lightIntensity = 50.f;
@@ -129,6 +123,12 @@ void Engine::run()
 
 void Engine::update_descriptors()
 {
+    // Create vector of buffers in an efficient way
+    // uniformBuffers.reserve(I->models.size());
+    // std::ranges::transform(I->models,
+    //                        std::back_inserter(uniformBuffers),
+    //                        [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
+
     // Set all the resource descriptors at once. We don't need to update again if we don't change any
     // resources
     vk::AccelerationStructureKHR tlas = I->tlas.AS;

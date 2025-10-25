@@ -215,14 +215,11 @@ ImageData create_image(const vk::Device &device,
     image.format = format;
     image.extent = extent;
 
-    // We should be able to erase Storage if we get rid of the background compute pipeline
-    constexpr vk::ImageUsageFlags drawUsageFlags = vk::ImageUsageFlagBits::eTransferDst
-                                                   | vk::ImageUsageFlagBits::eTransferSrc
-                                                   | vk::ImageUsageFlagBits::eStorage
-                                                   | vk::ImageUsageFlagBits::eColorAttachment;
+    const vk::ImageUsageFlags usageFlags = (data) ? flags | vk::ImageUsageFlagBits::eTransferDst
+                                                  : flags;
 
     const vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(format,
-                                                                               flags,
+                                                                               usageFlags,
                                                                                extent);
 
     VmaAllocationCreateInfo allocationCreateInfo{};
@@ -234,7 +231,7 @@ ImageData create_image(const vk::Device &device,
                    &allocationCreateInfo,
                    (VkImage *) &image.image,
                    &image.allocation,
-                   nullptr);
+                   &image.allocationInfo);
 
     // Only 2 options: Color or depth. Decide depending on the format
     const vk::ImageAspectFlags aspectFlags = (format == vk::Format::eD32Sfloat)
@@ -260,19 +257,19 @@ ImageData create_image(const vk::Device &device,
 
     // Map data if requested so
     if (data != nullptr)
-        utils::map_to_image(device, allocator, cmd, fence, queue, image.image, extent, data);
+        utils::copy_to_image(device, allocator, cmd, fence, queue, image.image, extent, data);
 
     return image;
 }
 
-void map_to_image(const vk::Device &device,
-                  const VmaAllocator &allocator,
-                  const vk::CommandBuffer &cmd,
-                  const vk::Fence &fence,
-                  const vk::Queue &queue,
-                  const vk::Image &image,
-                  const vk::Extent3D &extent,
-                  const void *data)
+void copy_to_image(const vk::Device &device,
+                   const VmaAllocator &allocator,
+                   const vk::CommandBuffer &cmd,
+                   const vk::Fence &fence,
+                   const vk::Queue &queue,
+                   const vk::Image &image,
+                   const vk::Extent3D &extent,
+                   const void *data)
 {
     // We need to move the data into the image
     assert(data != nullptr && "Data to map must be non-null");
@@ -285,10 +282,9 @@ void map_to_image(const vk::Device &device,
                                      VMA_ALLOCATION_CREATE_MAPPED_BIT
                                          | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
-    memcpy(tmpBuffer.allocationInfo.pMappedData, data, dataSize);
+    utils::copy_to_buffer(tmpBuffer, allocator, data);
 
     utils::cmd_submit(device, queue, fence, cmd, [&](const vk::CommandBuffer &cmd) {
-        //
         vk::ImageSubresourceLayers subResource{};
         subResource.setAspectMask(vk::ImageAspectFlagBits::eColor);
         subResource.setLayerCount(1);

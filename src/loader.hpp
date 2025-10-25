@@ -128,12 +128,16 @@ private:
 
     std::vector<std::shared_ptr<Buffer>> bufferQueue;
     std::vector<vk::Sampler> samplerQueue;
+    std::vector<ImageData> imageQueue;
 
     void load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene);
 
     void load_images(const fastgltf::Asset &asset,
                      std::shared_ptr<GLTFObj> &scene,
-                     std::vector<ImageData> &vImages);
+                     std::vector<ImageData> &images);
+
+    std::optional<ImageData> load_image(const fastgltf::Asset &asset,
+                                        const fastgltf::Image &fgltfImage);
 
     void load_materials(const fastgltf::Asset &asset,
                         const std::vector<ImageData> &images,

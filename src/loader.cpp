@@ -5,6 +5,8 @@
 #include <fastgltf/tools.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <print>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 GLTFLoader::GLTFLoader(const vk::Device &device,
                        const VmaAllocator &allocator,
@@ -119,6 +121,10 @@ void GLTFLoader::destroy()
     device.destroyCommandPool(gltfCmdPool);
     for (const vk::Sampler &s : samplerQueue)
         device.destroySampler(s);
+    for (const ImageData &im : imageQueue) {
+        vmaDestroyImage(allocator, im.image, im.allocation);
+        device.destroyImageView(im.imageView);
+    }
 
     destroy_buffers();
 }
@@ -192,13 +198,138 @@ void GLTFLoader::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLT
 
 void GLTFLoader::load_images(const fastgltf::Asset &asset,
                              std::shared_ptr<GLTFObj> &scene,
-                             std::vector<ImageData> &vImages)
+                             std::vector<ImageData> &images)
 {
-    vImages.reserve(asset.images.size());
+    images.reserve(asset.images.size());
+    imageQueue.reserve(imageQueue.size() + asset.images.size());
     for (const fastgltf::Image &im : asset.images) {
-        vImages.emplace_back(checkerboardImage);
-        scene->images[im.name.c_str()] = vImages.back();
+        const auto image = load_image(asset, im);
+        if (image.has_value()) {
+            images.emplace_back(image.value());
+            imageQueue.emplace_back(image.value());
+        } else {
+            std::println("Load image error. Emplacing default image.");
+            images.emplace_back(checkerboardImage);
+        }
+        scene->images[im.name.c_str()] = images.back();
     }
+}
+
+std::optional<ImageData> GLTFLoader::load_image(const fastgltf::Asset &asset,
+                                                const fastgltf::Image &fgltfImage)
+{
+    ImageData image{};
+    int w, h, nChannels;
+
+    const auto create_image_from_data = [&](unsigned char *imData) {
+        // std::println("image creation");
+        if (imData) {
+            vk::Extent3D imSize{};
+            imSize.setWidth(w);
+            imSize.setHeight(h);
+            imSize.setDepth(1);
+
+            image = utils::create_image(device,
+                                        allocator,
+                                        gltfCmd,
+                                        gltfFence,
+                                        queue,
+                                        vk::Format::eR8G8B8A8Unorm,
+                                        vk::ImageUsageFlagBits::eSampled,
+                                        imSize,
+                                        imData);
+            std::println("Image created.");
+
+            stbi_image_free(imData);
+        }
+    };
+
+    const auto read_from_uri = [&](const fastgltf::sources::URI &filePath) {
+        assert(filePath.fileByteOffset == 0); // Stbi doesn't support files with offset.
+        assert(filePath.uri.isLocalPath());   // We're only capable of loading local files.
+        // std::println("uri");
+
+        const std::filesystem::path fsPath = filePath.uri.fspath();
+        unsigned char *imData = stbi_load(fsPath.c_str(), &w, &h, &nChannels, 4);
+        create_image_from_data(imData);
+    };
+    const auto read_from_vector = [&](const fastgltf::sources::Vector &vector,
+                                      const size_t bufferViewOffset = 0) {
+        unsigned char *imData = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(
+                                                          vector.bytes.data() + bufferViewOffset),
+                                                      static_cast<int>(vector.bytes.size()),
+                                                      &w,
+                                                      &h,
+                                                      &nChannels,
+                                                      4);
+        // std::println("vector");
+        create_image_from_data(imData);
+    };
+    const auto read_from_array = [&](const fastgltf::sources::Array &array,
+                                     const size_t bufferViewOffset = 0) {
+        unsigned char *imData = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(
+                                                          array.bytes.data() + bufferViewOffset),
+                                                      static_cast<int>(array.bytes.size()),
+                                                      &w,
+                                                      &h,
+                                                      &nChannels,
+                                                      4);
+        // std::println("array");
+
+        create_image_from_data(imData);
+    };
+    const auto read_from_buffer_view = [&](const fastgltf::sources::BufferView &view) {
+        const auto &bufferView = asset.bufferViews[view.bufferViewIndex];
+        const auto &buffer = asset.buffers[bufferView.bufferIndex];
+        const size_t offset = bufferView.byteOffset;
+        // std::println("bufferview");
+
+        // Nested visit
+        std::visit(fastgltf::visitor{// We only care about VectorWithMime here, because we
+                                     // specify LoadExternalBuffers, meaning all buffers
+                                     // are already loaded into a vector.
+                                     [](auto &arg) {
+                                         std::println("Image read error: Unknown source");
+                                     },
+                                     [&](const fastgltf::sources::Vector &vector) {
+                                         read_from_vector(vector, offset);
+                                     },
+                                     [&](const fastgltf::sources::Array &array) {
+                                         read_from_array(array, offset);
+                                     }},
+                   buffer.data);
+    };
+    const auto read_from_byte_view = [&](const fastgltf::sources::ByteView &byteView) {
+        unsigned char *imData = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(
+                                                          byteView.bytes.data()),
+                                                      static_cast<int>(byteView.bytes.size()),
+                                                      &w,
+                                                      &h,
+                                                      &nChannels,
+                                                      4);
+        // std::println("byteview");
+        create_image_from_data(imData);
+    };
+
+    fastgltf::visitor visitor{[](const auto &arg) {
+                                  std::println("Image Read error: Image in unknown mode.");
+                              },
+                              [&](const fastgltf::sources::CustomBuffer &cBuffer) {
+                                  std::println("Image Read error: Image in custom Buffer mode.");
+                              },
+                              [&](const fastgltf::sources::Fallback &fallback) {
+                                  std::println("Image Read error: Image in fallback mode.");
+                              },
+                              read_from_uri,
+                              read_from_vector,
+                              read_from_array,
+                              read_from_buffer_view,
+                              read_from_byte_view};
+    std::visit(visitor, fgltfImage.data);
+    if (image.image)
+        return image;
+    else
+        return {};
 }
 
 void GLTFLoader::load_materials(const fastgltf::Asset &asset,
@@ -453,9 +584,10 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
     }
 
     // Find the top nodes and propagate/fill the worldTransform matrices to all nodes
+    scene->topNodes.reserve(nodes.size());
     for (const std::shared_ptr<Node> &n : nodes) {
         if (n->parent.lock() == nullptr) {
-            scene->topNodes.push_back(n);
+            scene->topNodes.emplace_back(n);
             n->refreshTransform(glm::mat4(1.f));
         }
     }

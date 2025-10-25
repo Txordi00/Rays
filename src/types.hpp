@@ -66,6 +66,7 @@ struct ImageData
     vk::Image image;
     vk::ImageView imageView;
     VmaAllocation allocation;
+    VmaAllocationInfo allocationInfo;
     vk::Extent3D extent;
     vk::Format format;
 };
