@@ -7,6 +7,7 @@
 #include <print>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include <chrono>
 
 GLTFLoader::GLTFLoader(const vk::Device &device,
                        const VmaAllocator &allocator,
@@ -196,12 +197,14 @@ void GLTFLoader::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLT
     }
 }
 
+// VERY SLOW
 void GLTFLoader::load_images(const fastgltf::Asset &asset,
                              std::shared_ptr<GLTFObj> &scene,
                              std::vector<ImageData> &images)
 {
     images.reserve(asset.images.size());
     imageQueue.reserve(imageQueue.size() + asset.images.size());
+    // const auto start = std::chrono::system_clock::now();
     for (const fastgltf::Image &im : asset.images) {
         const auto image = load_image(asset, im);
         if (image.has_value()) {
@@ -213,8 +216,12 @@ void GLTFLoader::load_images(const fastgltf::Asset &asset,
         }
         scene->images[im.name.c_str()] = images.back();
     }
+    // const auto end = std::chrono::system_clock::now();
+    // std::println("Duration: {}",
+    //              std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
 }
 
+// stbi_load_from_memory IS VERY SLOW
 std::optional<ImageData> GLTFLoader::load_image(const fastgltf::Asset &asset,
                                                 const fastgltf::Image &fgltfImage)
 {
