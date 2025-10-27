@@ -124,7 +124,12 @@ void Init::init_vulkan()
     features12.descriptorIndexing = vk::True;
     features12.descriptorBindingUniformBufferUpdateAfterBind = vk::True;
     features12.descriptorBindingStorageBufferUpdateAfterBind = vk::True;
+    features12.descriptorBindingStorageImageUpdateAfterBind = vk::True;
+    features12.descriptorBindingSampledImageUpdateAfterBind = vk::True;
+    features12.shaderSampledImageArrayNonUniformIndexing = vk::True;
+    features12.shaderUniformBufferArrayNonUniformIndexing = vk::True;
     features12.shaderStorageBufferArrayNonUniformIndexing = vk::True;
+    features12.shaderStorageImageArrayNonUniformIndexing = vk::True;
     features12.descriptorBindingPartiallyBound = vk::True;
     features12.runtimeDescriptorArray = vk::True;
     features12.scalarBlockLayout = vk::True;
@@ -347,10 +352,24 @@ void Init::init_descriptors()
                                                              static_cast<uint32_t>(
                                                                  scene->surfaceStorageBuffersCount)},
                                       frameOverlap); // per-surface storage
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampler,
+                                                             static_cast<uint32_t>(
+                                                                 scene->samplers.size())},
+                                      frameOverlap); // samplers (usually only one)
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage,
+                                                             static_cast<uint32_t>(
+                                                                 scene->images.size())},
+                                      frameOverlap); // images to sample
     descHelperUAB->create_descriptor_pool();
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eStorageBuffer,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        0}); // per-surface storage
+    descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
+                                       vk::ShaderStageFlagBits::eClosestHitKHR,
+                                       1}); // samplers
+    descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampledImage,
+                                       vk::ShaderStageFlagBits::eClosestHitKHR,
+                                       2}); // sampled images
     descriptorSetLayoutUAB = descHelperUAB->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(descriptorSetLayoutUAB, frameOverlap);

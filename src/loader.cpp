@@ -162,12 +162,12 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader::load_gltf_asset(const std::f
     // Load samplers
     load_samplers(asset.get(), scene);
 
-    // Load textures. NOT YET
-    load_images(asset.get(), scene, images);
+    // Load textures.
+    load_images(asset.get(), scene);
 
     // MATERIALS
     // Loop over the PBR materials
-    load_materials(asset.get(), images, scene, materials);
+    load_materials(asset.get(), scene, materials);
 
     // MESHES
     load_meshes(asset.get(), materials, scene, meshes);
@@ -198,23 +198,20 @@ void GLTFLoader::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLT
 }
 
 // VERY SLOW
-void GLTFLoader::load_images(const fastgltf::Asset &asset,
-                             std::shared_ptr<GLTFObj> &scene,
-                             std::vector<ImageData> &images)
+void GLTFLoader::load_images(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene)
 {
-    images.reserve(asset.images.size());
+    scene->images.reserve(asset.images.size());
     imageQueue.reserve(imageQueue.size() + asset.images.size());
     // const auto start = std::chrono::system_clock::now();
     for (const fastgltf::Image &im : asset.images) {
         const auto image = load_image(asset, im);
         if (image.has_value()) {
-            images.emplace_back(image.value());
+            scene->images.emplace_back(image.value());
             imageQueue.emplace_back(image.value());
         } else {
             std::println("Load image error. Emplacing default image.");
-            images.emplace_back(checkerboardImage);
+            scene->images.emplace_back(checkerboardImage);
         }
-        scene->images[im.name.c_str()] = images.back();
     }
     // const auto end = std::chrono::system_clock::now();
     // std::println("Duration: {}",
@@ -340,7 +337,6 @@ std::optional<ImageData> GLTFLoader::load_image(const fastgltf::Asset &asset,
 }
 
 void GLTFLoader::load_materials(const fastgltf::Asset &asset,
-                                const std::vector<ImageData> &images,
                                 std::shared_ptr<GLTFObj> &scene,
                                 std::vector<std::shared_ptr<GLTFMaterial>> &vMaterials)
 {
@@ -377,18 +373,31 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
                                    ? GLTFMaterial::MaterialPass::Transparent
                                    : GLTFMaterial::MaterialPass::MainColor;
         // Fill materials[i]:
-        matTmp->materialResources.colorImage = whiteImage;
-        matTmp->materialResources.colorSampler = samplerLinear;
-        matTmp->materialResources.metalRoughImage = whiteImage;
-        matTmp->materialResources.metalRoughSampler = samplerLinear;
+        // matTmp->materialResources.colorImage = whiteImage;
+        // matTmp->materialResources.colorSampler = samplerLinear;
+        // matTmp->materialResources.metalRoughImage = whiteImage;
+        // matTmp->materialResources.metalRoughSampler = samplerLinear;
         // matTmp->materialResources.dataBuffer = scene->materialConstantsBuffer;
         if (m.pbrData.baseColorTexture.has_value()) {
             size_t imgIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
                                   .imageIndex.value();
             size_t samplerIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
                                       .samplerIndex.value();
-            matTmp->materialResources.colorImage = images[imgIndex];
-            matTmp->materialResources.colorSampler = scene->samplers[samplerIndex];
+            matTmp->materialResources.colorImageIndex = imgIndex;
+            // matTmp->materialResources.colorImage = scene->images[imgIndex];
+            matTmp->materialResources.colorSamplerIndex = samplerIndex;
+            // matTmp->materialResources.colorSampler = scene->samplers[samplerIndex];
+        }
+        if (m.pbrData.metallicRoughnessTexture.has_value()) {
+            size_t matIndex = asset.textures[m.pbrData.metallicRoughnessTexture->textureIndex]
+                                  .imageIndex.value();
+            size_t matSamplerIndex = asset
+                                         .textures[m.pbrData.metallicRoughnessTexture->textureIndex]
+                                         .samplerIndex.value();
+            matTmp->materialResources.materialImageIndex = matIndex;
+            // matTmp->materialResources.metalRoughImage = scene->images[matIndex];
+            matTmp->materialResources.materialSamplerIndex = matSamplerIndex;
+            // matTmp->materialResources.metalRoughSampler = scene->samplers[matSamplerIndex];
         }
         vMaterials.emplace_back(std::move(matTmp));
         scene->materials[m.name.c_str()] = vMaterials.back();
@@ -548,6 +557,11 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
                 surfaceStorage.vertexBufferAddress = mesh->vertexBuffer->bufferAddress;
                 surfaceStorage.materialConstantsBufferAddress = s.material->materialResources
                                                                     .dataBuffer.bufferAddress;
+                surfaceStorage.colorImageIndex = s.material->materialResources.colorImageIndex;
+                surfaceStorage.colorSamplerIndex = s.material->materialResources.colorSamplerIndex;
+                surfaceStorage.materialImageIndex = s.material->materialResources.materialImageIndex;
+                surfaceStorage.materialSamplerIndex = s.material->materialResources
+                                                          .materialSamplerIndex;
                 surfaceStorage.startIndex = s.startIndex;
                 surfaceStorage.count = s.count;
                 std::shared_ptr<Buffer> surfaceStorageBuffer = std::make_shared<Buffer>();

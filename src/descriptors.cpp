@@ -103,8 +103,9 @@ void DescriptorUpdater::add_uniform(const vk::DescriptorSet &descSet,
         bufferInfo.setRange(vk::WholeSize);
         bufferInfosTmp.emplace_back(bufferInfo);
     }
-    auto bufferInfosTupleTmp = std::make_tuple(descSet, binding, bufferInfosTmp);
+    const auto bufferInfosTupleTmp = std::make_tuple(descSet, binding, bufferInfosTmp);
     uniformInfos.push_back(bufferInfosTupleTmp);
+    descriptorCount += uniformBuffers.size();
 }
 
 void DescriptorUpdater::add_storage(const vk::DescriptorSet &descSet,
@@ -121,8 +122,9 @@ void DescriptorUpdater::add_storage(const vk::DescriptorSet &descSet,
         bufferInfo.setRange(vk::WholeSize);
         bufferInfosTmp.emplace_back(bufferInfo);
     }
-    auto bufferInfosTupleTmp = std::make_tuple(descSet, binding, bufferInfosTmp);
+    const auto bufferInfosTupleTmp = std::make_tuple(descSet, binding, bufferInfosTmp);
     storageInfos.push_back(bufferInfosTupleTmp);
+    descriptorCount += storageBuffers.size();
 }
 
 void DescriptorUpdater::add_as(const vk::DescriptorSet &descSet,
@@ -131,26 +133,69 @@ void DescriptorUpdater::add_as(const vk::DescriptorSet &descSet,
 {
     // Update TLAS
     vk::WriteDescriptorSetAccelerationStructureKHR tlasWriteKHR{as};
-    auto tlasWriteKHRTupleTmp = std::make_tuple(descSet, binding, tlasWriteKHR);
+    const auto tlasWriteKHRTupleTmp = std::make_tuple(descSet, binding, tlasWriteKHR);
     tlasWritesKHR.push_back(tlasWriteKHRTupleTmp);
+    descriptorCount += 1;
 }
 
-void DescriptorUpdater::add_image(const vk::DescriptorSet &descSet,
-                                  const uint32_t binding,
-                                  const vk::ImageView &imageView)
+void DescriptorUpdater::add_storage_image(const vk::DescriptorSet &descSet,
+                                          const uint32_t binding,
+                                          const std::vector<ImageData> &images)
 {
-    vk::DescriptorImageInfo imageInfo{};
-    imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
-    imageInfo.setImageView(imageView);
-    auto imageInfoTumpleTmp = std::make_tuple(descSet, binding, imageInfo);
-    imageInfos.push_back(imageInfoTumpleTmp);
+    std::vector<vk::DescriptorImageInfo> imageInfosTmp;
+    imageInfosTmp.reserve(images.size());
+    for (const auto &im : images) {
+        vk::DescriptorImageInfo imageInfo{};
+        imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
+        imageInfo.setImageView(im.imageView);
+        imageInfo.setSampler(nullptr);
+        imageInfosTmp.emplace_back(imageInfo);
+    }
+    const auto imageInfoTumpleTmp = std::make_tuple(descSet, binding, imageInfosTmp);
+    imageStorageInfos.push_back(imageInfoTumpleTmp);
+    descriptorCount += images.size();
+}
+
+void DescriptorUpdater::add_sampled_image(const vk::DescriptorSet &descSet,
+                                          const uint32_t binding,
+                                          const std::vector<ImageData> &images)
+{
+    std::vector<vk::DescriptorImageInfo> imageInfosTmp;
+    imageInfosTmp.reserve(images.size());
+    for (const auto &im : images) {
+        vk::DescriptorImageInfo imageInfo{};
+        imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
+        imageInfo.setImageView(im.imageView);
+        imageInfo.setSampler(nullptr);
+        imageInfosTmp.emplace_back(imageInfo);
+    }
+    const auto imageInfoTumpleTmp = std::make_tuple(descSet, binding, imageInfosTmp);
+    imageSampledInfos.push_back(imageInfoTumpleTmp);
+    descriptorCount += images.size();
+}
+
+void DescriptorUpdater::add_sampler(const vk::DescriptorSet &descSet,
+                                    const uint32_t binding,
+                                    const std::vector<vk::Sampler> &samplers)
+{
+    std::vector<vk::DescriptorImageInfo> samplerInfosTmp;
+    samplerInfosTmp.reserve(samplers.size());
+    for (const auto &s : samplers) {
+        vk::DescriptorImageInfo samplerInfo{};
+        samplerInfo.setImageLayout(vk::ImageLayout::eUndefined);
+        samplerInfo.setImageView(nullptr);
+        samplerInfo.setSampler(s);
+        samplerInfosTmp.emplace_back(samplerInfo);
+    }
+    const auto samplerInfoTumpleTmp = std::make_tuple(descSet, binding, samplerInfosTmp);
+    samplerInfos.push_back(samplerInfoTumpleTmp);
+    descriptorCount += samplers.size();
 }
 
 void DescriptorUpdater::update()
 {
     std::vector<vk::WriteDescriptorSet> descriptorWrites;
-    descriptorWrites.reserve(uniformInfos.size() + storageInfos.size() + imageInfos.size()
-                             + tlasWritesKHR.size());
+    descriptorWrites.reserve(descriptorCount);
     for (const auto &bi : uniformInfos) {
         vk::WriteDescriptorSet uniformWrite{};
         uniformWrite.setDescriptorType(vk::DescriptorType::eUniformBuffer);
@@ -169,13 +214,29 @@ void DescriptorUpdater::update()
         storageWrite.setDstArrayElement(0);
         descriptorWrites.emplace_back(storageWrite);
     }
-    for (const auto &ii : imageInfos) {
+    for (const auto &ii : imageStorageInfos) {
         vk::WriteDescriptorSet imageWrite{};
         imageWrite.setDstSet(std::get<0>(ii));
         imageWrite.setDstBinding(std::get<1>(ii));
         imageWrite.setImageInfo(std::get<2>(ii));
         imageWrite.setDescriptorType(vk::DescriptorType::eStorageImage);
         descriptorWrites.emplace_back(imageWrite);
+    }
+    for (const auto &ii : imageSampledInfos) {
+        vk::WriteDescriptorSet imageWrite{};
+        imageWrite.setDstSet(std::get<0>(ii));
+        imageWrite.setDstBinding(std::get<1>(ii));
+        imageWrite.setImageInfo(std::get<2>(ii));
+        imageWrite.setDescriptorType(vk::DescriptorType::eSampledImage);
+        descriptorWrites.emplace_back(imageWrite);
+    }
+    for (const auto &ii : samplerInfos) {
+        vk::WriteDescriptorSet samplerWrite{};
+        samplerWrite.setDstSet(std::get<0>(ii));
+        samplerWrite.setDstBinding(std::get<1>(ii));
+        samplerWrite.setImageInfo(std::get<2>(ii));
+        samplerWrite.setDescriptorType(vk::DescriptorType::eSampler);
+        descriptorWrites.emplace_back(samplerWrite);
     }
     for (const auto &tw : tlasWritesKHR) {
         vk::WriteDescriptorSet tlasWrite{};
@@ -187,8 +248,16 @@ void DescriptorUpdater::update()
         descriptorWrites.emplace_back(tlasWrite);
     }
     device.updateDescriptorSets(descriptorWrites, nullptr);
+    clean();
+}
+
+void DescriptorUpdater::clean()
+{
     uniformInfos = {};
     storageInfos = {};
-    imageInfos = {};
+    imageStorageInfos = {};
+    imageSampledInfos = {};
+    samplerInfos = {};
     tlasWritesKHR = {};
+    descriptorCount = 0;
 }

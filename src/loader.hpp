@@ -14,10 +14,14 @@ struct GLTFMaterial
 
     struct MaterialResources
     {
-        ImageData colorImage;
-        vk::Sampler colorSampler;
-        ImageData metalRoughImage;
-        vk::Sampler metalRoughSampler;
+        // ImageData colorImage;
+        size_t colorImageIndex;
+        // vk::Sampler colorSampler;
+        size_t colorSamplerIndex;
+        // ImageData metalRoughImage;
+        size_t materialImageIndex;
+        // vk::Sampler metalRoughSampler;
+        size_t materialSamplerIndex;
         Buffer dataBuffer;
         // uint32_t dataBufferOffset; // I should not need offset if going bindless
     };
@@ -68,6 +72,10 @@ struct SurfaceStorage
     vk::DeviceAddress indexBufferAddress;
     vk::DeviceAddress vertexBufferAddress;
     vk::DeviceAddress materialConstantsBufferAddress;
+    uint32_t colorSamplerIndex;
+    uint32_t colorImageIndex;
+    uint32_t materialSamplerIndex;
+    uint32_t materialImageIndex;
     uint32_t startIndex;
     uint32_t count;
 };
@@ -84,7 +92,6 @@ struct GLTFObj
     // storage for all the data on a given gltf file
     std::unordered_multimap<std::string, std::shared_ptr<Mesh>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
-    std::unordered_map<std::string, ImageData> images;
     std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
 
     // nodes that dont have a parent, for iterating through the file in tree order
@@ -94,6 +101,7 @@ struct GLTFObj
     uint32_t surfaceStorageBuffersCount{0};
 
     std::vector<vk::Sampler> samplers;
+    std::vector<ImageData> images;
 
     ~GLTFObj() = default;
 };
@@ -132,15 +140,12 @@ private:
 
     void load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene);
 
-    void load_images(const fastgltf::Asset &asset,
-                     std::shared_ptr<GLTFObj> &scene,
-                     std::vector<ImageData> &images);
+    void load_images(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene);
 
     std::optional<ImageData> load_image(const fastgltf::Asset &asset,
                                         const fastgltf::Image &fgltfImage);
 
     void load_materials(const fastgltf::Asset &asset,
-                        const std::vector<ImageData> &images,
                         std::shared_ptr<GLTFObj> &scene,
                         std::vector<std::shared_ptr<GLTFMaterial>> &vMaterials);
 

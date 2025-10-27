@@ -56,10 +56,17 @@ public:
     void add_as(const vk::DescriptorSet &descSet,
                 const uint32_t binding,
                 const vk::AccelerationStructureKHR &as);
-    void add_image(const vk::DescriptorSet &descSet,
-                   const uint32_t binding,
-                   const vk::ImageView &imageView);
+    void add_storage_image(const vk::DescriptorSet &descSet,
+                           const uint32_t binding,
+                           const std::vector<ImageData> &images);
+    void add_sampled_image(const vk::DescriptorSet &descSet,
+                           const uint32_t binding,
+                           const std::vector<ImageData> &images);
+    void add_sampler(const vk::DescriptorSet &descSet,
+                     const uint32_t binding,
+                     const std::vector<vk::Sampler> &samplers);
     void update();
+    void clean();
 
 private:
     const vk::Device &device;
@@ -70,8 +77,14 @@ private:
         uniformInfos{};
     std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorBufferInfo>>>
         storageInfos{};
-    std::vector<std::tuple<vk::DescriptorSet, uint32_t, vk::DescriptorImageInfo>> imageInfos{};
+    std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorImageInfo>>>
+        imageStorageInfos{};
+    std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorImageInfo>>>
+        imageSampledInfos{};
+    std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorImageInfo>>>
+        samplerInfos{};
     std::vector<
         std::tuple<vk::DescriptorSet, uint32_t, vk::WriteDescriptorSetAccelerationStructureKHR>>
         tlasWritesKHR{};
+    size_t descriptorCount{0};
 };

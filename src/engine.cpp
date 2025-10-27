@@ -136,9 +136,11 @@ void Engine::update_descriptors()
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
     std::vector<Buffer> surfaceStorageBuffers;
     surfaceStorageBuffers.reserve(I->scene->surfaceStorageBuffersCount);
-    for (const auto &m : I->scene->meshNodes)
+    for (const auto &m : I->scene->meshNodes) {
         for (const auto &b : m->surfaceStorageBuffers)
             surfaceStorageBuffers.emplace_back(b.second);
+    }
+
     for (const auto &frame : I->frames) {
         // Inform the shaders about all the different descriptors
         vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
@@ -146,7 +148,9 @@ void Engine::update_descriptors()
 
         descUpdater.add_storage(descriptorSetUAB, 0, surfaceStorageBuffers);
         descUpdater.add_as(descriptorSetRt, 0, tlas);
-        descUpdater.add_image(descriptorSetRt, 1, frame.imageDraw.imageView);
+        descUpdater.add_storage_image(descriptorSetRt, 1, {frame.imageDraw});
+        descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
+        descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
         descUpdater.update();
     }
