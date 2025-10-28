@@ -28,6 +28,19 @@ struct MaterialConstants
     float roughnessFactor;
 };
 
+// struct SurfaceStorage
+// {
+//     IndexBuffer indexBuffer;
+//     VertexBuffer vertexBuffer;
+//     MaterialConstantsBuffer materialConstantsBuffer;
+//     uint colorSamplerIndex;
+//     uint colorImageIndex;
+//     uint materialSamplerIndex;
+//     uint materialImageIndex;
+//     uint startIndex;
+//     uint count;
+// };
+
 
 // struct Material
 // {

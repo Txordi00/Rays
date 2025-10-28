@@ -11,7 +11,7 @@
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 layout(constant_id = 0) const uint MAX_RT_DEPTH = 3;
-hitAttributeEXT vec3 attribs;
+hitAttributeEXT vec2 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 
 layout(buffer_reference, std430) readonly buffer VertexBuffer
@@ -34,10 +34,21 @@ layout(set = 1, binding = 0, scalar) readonly buffer SurfaceStorage
     IndexBuffer indexBuffer;
     VertexBuffer vertexBuffer;
     MaterialConstantsBuffer materialConstantsBuffer;
+    uint colorSamplerIndex;
+    uint colorImageIndex;
+    uint materialSamplerIndex;
+    uint materialImageIndex;
+    uint normalMapIndex;
+    uint normalSamplerIndex;
     uint startIndex;
     uint count;
 }
-surfaceStorage[];
+surfaceStorages[];
+
+layout(set = 1, binding = 1) uniform sampler samplers[];
+
+layout(set = 1, binding = 2) uniform texture2D textures[];
+
 
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants push;
@@ -58,10 +69,17 @@ void main()
         const uint surfaceId = gl_InstanceCustomIndexEXT;
         const uint primitiveIndex = gl_PrimitiveID * 3;
 
-        IndexBuffer iBuffer = surfaceStorage[nonuniformEXT(surfaceId)].indexBuffer;
-        VertexBuffer vBuffer = surfaceStorage[nonuniformEXT(surfaceId)].vertexBuffer;
-        MaterialConstantsBuffer mBuffer = surfaceStorage[nonuniformEXT(surfaceId)].materialConstantsBuffer;
+        IndexBuffer iBuffer = surfaceStorages[nonuniformEXT(surfaceId)].indexBuffer;
+        VertexBuffer vBuffer = surfaceStorages[nonuniformEXT(surfaceId)].vertexBuffer;
+        MaterialConstantsBuffer mBuffer = surfaceStorages[nonuniformEXT(surfaceId)].materialConstantsBuffer;
         MaterialConstants mConstants = mBuffer.materialConstants;
+        const uint colorSamplerIndex = surfaceStorages[nonuniformEXT(surfaceId)].colorSamplerIndex;
+        const uint colorImageIndex = surfaceStorages[nonuniformEXT(surfaceId)].colorImageIndex;
+        const uint materialSamplerIndex = surfaceStorages[nonuniformEXT(surfaceId)].materialSamplerIndex;
+        const uint materialImageIndex = surfaceStorages[nonuniformEXT(surfaceId)].materialImageIndex;
+        const uint normalMapIndex = surfaceStorages[nonuniformEXT(surfaceId)].normalMapIndex;
+        const uint normalSamplerIndex = surfaceStorages[nonuniformEXT(surfaceId)].normalSamplerIndex;
+
 
         const uint i0 = iBuffer.indices[primitiveIndex];
         const uint i1 = iBuffer.indices[primitiveIndex + 1];
@@ -79,17 +97,38 @@ void main()
         const vec3 norm1 = v1.normal;
         const vec3 norm2 = v2.normal;
 
+        const vec2 uv0 = vec2(v0.uv_x, v0.uv_y);
+        const vec2 uv1 = vec2(v1.uv_x, v1.uv_y);
+        const vec2 uv2 = vec2(v2.uv_x, v2.uv_y);
+
         const vec3 barycentrics = vec3(1. - attribs.x - attribs.y, attribs.x, attribs.y);
 
         // Computing the coordinates of the hit position
         const vec3 pos = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y
                          + vertPos2 * barycentrics.z;
 
-        const vec3 normal = norm0 * barycentrics.x + norm1 * barycentrics.y
+        const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y
+        + uv2 * barycentrics.z;
+
+
+        const vec3 normalRaw = norm0 * barycentrics.x + norm1 * barycentrics.y
                             + norm2 * barycentrics.z; // already normalized
+//        const vec3 normal = normalize(vec3(normalRaw * gl_WorldToObjectEXT));
+//        printVal("%f ", length(normal), 1., 1.);
+        const vec3 normal = normalize(vec3(texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
+        samplers[nonuniformEXT(normalSamplerIndex)]), uv)));
+        printVal("%f ", length(normal), 0.9, 1.1);
+        //        samplers[nonuniformEXT(normalSamplerIndex)]), uv)
+
+
+//        const vec2 uv = uv0;
 
         // Transforming the position to world space
         const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
+
+//        const vec4 colorIn = texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
+//        samplers[nonuniformEXT(normalSamplerIndex)]), uv);
+        const vec4 colorIn = vec4(normal, 1.);
 
         //  const vec3 colorIn =
         //    vec3(v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
@@ -212,7 +251,8 @@ void main()
 //            outColor /= (outColor + 1.);
 //        }
         // Add this particular contribution to the total ray payload
-        const vec3 outColor = vec3(1.);
+        vec3 outColor = vec3(colorIn);
+//        outColor /= (outColor + 1.);
         rayPayload.hitValue += rayPayload.energyFactor * outColor;
         // After color transfer, lose energy
         rayPayload.energyFactor *= ENERGY_LOSS;

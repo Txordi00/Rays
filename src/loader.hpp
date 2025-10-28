@@ -22,6 +22,8 @@ struct GLTFMaterial
         size_t materialImageIndex;
         // vk::Sampler metalRoughSampler;
         size_t materialSamplerIndex;
+        size_t normalMapIndex;
+        size_t normalSamplerIndex;
         Buffer dataBuffer;
         // uint32_t dataBufferOffset; // I should not need offset if going bindless
     };
@@ -76,6 +78,8 @@ struct SurfaceStorage
     uint32_t colorImageIndex;
     uint32_t materialSamplerIndex;
     uint32_t materialImageIndex;
+    uint32_t normalMapIndex;
+    uint32_t normalSamplerIndex;
     uint32_t startIndex;
     uint32_t count;
 };

@@ -399,6 +399,14 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
             matTmp->materialResources.materialSamplerIndex = matSamplerIndex;
             // matTmp->materialResources.metalRoughSampler = scene->samplers[matSamplerIndex];
         }
+        if (m.normalTexture.has_value()) {
+            matTmp->materialResources.normalMapIndex = asset.textures[m.normalTexture->textureIndex]
+                                                           .imageIndex.value();
+            matTmp->materialResources.normalSamplerIndex
+                = asset.textures[m.normalTexture->textureIndex].samplerIndex.value();
+        }
+        if (!m.normalTexture.has_value())
+            std::println("No normal map.");
         vMaterials.emplace_back(std::move(matTmp));
         scene->materials[m.name.c_str()] = vMaterials.back();
         // WORK OUT THE DESCRIPTORS HERE?
@@ -562,6 +570,8 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
                 surfaceStorage.materialImageIndex = s.material->materialResources.materialImageIndex;
                 surfaceStorage.materialSamplerIndex = s.material->materialResources
                                                           .materialSamplerIndex;
+                surfaceStorage.normalMapIndex = s.material->materialResources.normalMapIndex;
+                surfaceStorage.normalSamplerIndex = s.material->materialResources.normalSamplerIndex;
                 surfaceStorage.startIndex = s.startIndex;
                 surfaceStorage.count = s.count;
                 std::shared_ptr<Buffer> surfaceStorageBuffer = std::make_shared<Buffer>();
