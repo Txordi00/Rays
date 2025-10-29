@@ -95,9 +95,9 @@ struct Buffer
 struct Vertex
 {
     glm::vec3 position;
-    float uvX;
     glm::vec3 normal;
-    float uvY;
+    glm::vec2 uv;
+    glm::vec4 tangent;
     glm::vec4 color;
 };
 

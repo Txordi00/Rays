@@ -14,7 +14,7 @@ layout(constant_id = 0) const uint MAX_RT_DEPTH = 3;
 hitAttributeEXT vec2 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 
-layout(buffer_reference, std430) readonly buffer VertexBuffer
+layout(buffer_reference, scalar) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
@@ -97,9 +97,9 @@ void main()
         const vec3 norm1 = v1.normal;
         const vec3 norm2 = v2.normal;
 
-        const vec2 uv0 = vec2(v0.uv_x, v0.uv_y);
-        const vec2 uv1 = vec2(v1.uv_x, v1.uv_y);
-        const vec2 uv2 = vec2(v2.uv_x, v2.uv_y);
+        const vec2 uv0 = v0.uv;
+        const vec2 uv1 = v1.uv;
+        const vec2 uv2 = v2.uv;
 
         const vec3 barycentrics = vec3(1. - attribs.x - attribs.y, attribs.x, attribs.y);
 
@@ -107,28 +107,39 @@ void main()
         const vec3 pos = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y
                          + vertPos2 * barycentrics.z;
 
+
+        const vec3 normalVtxRaw = norm0 * barycentrics.x + norm1 * barycentrics.y
+                            + norm2 * barycentrics.z; // already normalized
+        // Apply the transformation to the normals (not done in BLAS creation)
+        const vec3 normalVtx = normalize((gl_WorldToObjectEXT * vec4(normalVtxRaw, 0)).xyz);
+
+
         const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y
         + uv2 * barycentrics.z;
 
+        const vec4 tangentRaw = v0.tangent * barycentrics.x + v1.tangent * barycentrics.y +
+                                v2.tangent * barycentrics.z; // range [-1, 1]
+        const vec3 tangent = normalize((gl_WorldToObjectEXT * vec4(tangentRaw.xyz, 0)).xyz);
 
-        const vec3 normalRaw = norm0 * barycentrics.x + norm1 * barycentrics.y
-                            + norm2 * barycentrics.z; // already normalized
-//        const vec3 normal = normalize(vec3(normalRaw * gl_WorldToObjectEXT));
-//        printVal("%f ", length(normal), 1., 1.);
-        const vec3 normal = normalize(vec3(texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
-        samplers[nonuniformEXT(normalSamplerIndex)]), uv)));
-        printVal("%f ", length(normal), 0.9, 1.1);
-        //        samplers[nonuniformEXT(normalSamplerIndex)]), uv)
+        const vec3 bitangent = cross(normalVtx, tangent);
 
+        const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
-//        const vec2 uv = uv0;
+        const vec4 colorIn = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
+        samplers[nonuniformEXT(colorSamplerIndex)]), uv);
+
+        const vec4 pbr = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
+        samplers[nonuniformEXT(materialSamplerIndex)]), uv);
+
+        const vec4 normalTexRaw = 2. * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
+        samplers[nonuniformEXT(normalSamplerIndex)]), uv) - 1.; // range [0, 1] -> [-1, 1]
+        const vec3 normalTex = TBN * normalTexRaw.xyz;
 
         // Transforming the position to world space
         const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
 
 //        const vec4 colorIn = texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
 //        samplers[nonuniformEXT(normalSamplerIndex)]), uv);
-        const vec4 colorIn = vec4(normal, 1.);
 
         //  const vec3 colorIn =
         //    vec3(v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
@@ -251,7 +262,7 @@ void main()
 //            outColor /= (outColor + 1.);
 //        }
         // Add this particular contribution to the total ray payload
-        vec3 outColor = vec3(colorIn);
+        vec3 outColor = abs(normalVtx - normalTex);
 //        outColor /= (outColor + 1.);
         rayPayload.hitValue += rayPayload.energyFactor * outColor;
         // After color transfer, lose energy

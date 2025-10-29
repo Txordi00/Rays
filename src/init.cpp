@@ -138,7 +138,7 @@ void Init::init_vulkan()
     // NOT SUPPORTED YET! ENABLE AS IT GETS SUPPORTED
     vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR unifiedImageLayoutsFeatures{};
     unifiedImageLayoutsFeatures.setUnifiedImageLayouts(vk::True);
-    unifiedImageLayoutsFeatures.setUnifiedImageLayoutsVideo(vk::True);
+    // unifiedImageLayoutsFeatures.setUnifiedImageLayoutsVideo(vk::True);
 
     std::vector<const char *> rtExtensions = {VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
                                               VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,

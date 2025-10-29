@@ -242,7 +242,7 @@ std::optional<ImageData> GLTFLoader::load_image(const fastgltf::Asset &asset,
                                         vk::ImageUsageFlagBits::eSampled,
                                         imSize,
                                         imData);
-            std::println("Image created.");
+            // std::println("Image created.");
 
             stbi_image_free(imData);
         }
@@ -405,8 +405,6 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
             matTmp->materialResources.normalSamplerIndex
                 = asset.textures[m.normalTexture->textureIndex].samplerIndex.value();
         }
-        if (!m.normalTexture.has_value())
-            std::println("No normal map.");
         vMaterials.emplace_back(std::move(matTmp));
         scene->materials[m.name.c_str()] = vMaterials.back();
         // WORK OUT THE DESCRIPTORS HERE?
@@ -434,6 +432,7 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
         vertices.clear();
         size_t indexCount = 0;
         size_t vertexCount = 0;
+        size_t tangentCount = 0;
         // Add indices and vertices only if we have not visited that mesh yet
         if (!meshBuffersExist) {
             for (const fastgltf::Primitive &p : m.primitives) {
@@ -441,9 +440,13 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
                     = asset.accessors[p.indicesAccessor.value()];
                 const fastgltf::Accessor &verticesAccessor
                     = asset.accessors[p.findAttribute("POSITION")->accessorIndex];
+                const fastgltf::Accessor &tangentsAccessor
+                    = asset.accessors[p.findAttribute("TANGENT")->accessorIndex];
                 indexCount += indicesAccessor.count;
                 vertexCount += verticesAccessor.count;
+                tangentCount += tangentsAccessor.count;
             }
+            assert(vertexCount == tangentCount && "nTangents != nVertices");
             indices.reserve(indexCount);
             vertices.resize(vertexCount);
         }
@@ -489,7 +492,7 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
 
                 // Load per-vertex normals
                 const fastgltf::Attribute *normalAttrib = p.findAttribute("NORMAL");
-                if (normalAttrib != p.attributes.cend()) {
+                if (normalAttrib != p.attributes.end()) {
                     const fastgltf::Accessor &normalsAccessor
                         = asset.accessors[normalAttrib->accessorIndex];
                     fastgltf::iterateAccessorWithIndex<glm::vec3>(
@@ -500,23 +503,33 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
 
                 // Load per-vertex UVs
                 const fastgltf::Attribute *uvAttrib = p.findAttribute("TEXCOORD_0");
-                if (uvAttrib != p.attributes.cend()) {
+                if (uvAttrib != p.attributes.end()) {
                     const fastgltf::Accessor &uvAccessor = asset.accessors[uvAttrib->accessorIndex];
                     fastgltf::iterateAccessorWithIndex<glm::vec2>(
                         asset, uvAccessor, [&](const glm::vec2 &uv, const size_t idx) {
-                            vertices[initialVtx + idx].uvX = uv.x;
-                            vertices[initialVtx + idx].uvY = uv.y;
+                            vertices[initialVtx + idx].uv = uv;
                         });
                 }
 
                 // Load vertex colors
                 const fastgltf::Attribute *colorAttrib = p.findAttribute("COLOR_0");
-                if (colorAttrib != p.attributes.cend()) {
+                if (colorAttrib != p.attributes.end()) {
                     const fastgltf::Accessor &colorAccessor
                         = asset.accessors[colorAttrib->accessorIndex];
                     fastgltf::iterateAccessorWithIndex<glm::vec4>(
                         asset, colorAccessor, [&](const glm::vec4 &c, const size_t idx) {
                             vertices[initialVtx + idx].color = c;
+                        });
+                }
+                // Load tangents
+                // Load vertex colors
+                const fastgltf::Attribute *tangentAttrib = p.findAttribute("TANGENT");
+                if (tangentAttrib != p.attributes.end()) {
+                    const fastgltf::Accessor &tangentAccessor
+                        = asset.accessors[tangentAttrib->accessorIndex];
+                    fastgltf::iterateAccessorWithIndex<glm::vec4>(
+                        asset, tangentAccessor, [&](const glm::vec4 &t, const size_t idx) {
+                            vertices[initialVtx + idx].tangent = t;
                         });
                 }
                 initialVtx += verticesAccessor.count;
