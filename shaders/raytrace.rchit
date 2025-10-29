@@ -13,8 +13,10 @@ layout(location = 1) rayPayloadEXT bool isShadowed;
 layout(constant_id = 0) const uint MAX_RT_DEPTH = 3;
 hitAttributeEXT vec2 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
+layout(set = 1, binding = 1) uniform sampler samplers[];
+layout(set = 1, binding = 2) uniform texture2D textures[];
 
-layout(buffer_reference, scalar) readonly buffer VertexBuffer
+layout(buffer_reference, std430, scalar) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
@@ -24,12 +26,12 @@ layout(buffer_reference, std430) readonly buffer IndexBuffer
     uint indices[];
 };
 
-layout(buffer_reference, scalar) readonly buffer MaterialConstantsBuffer
+layout(buffer_reference, std430, scalar) readonly buffer MaterialConstantsBuffer
 {
     MaterialConstants materialConstants;
 };
 
-layout(set = 1, binding = 0, scalar) readonly buffer SurfaceStorage
+struct SurfaceStorage
 {
     IndexBuffer indexBuffer;
     VertexBuffer vertexBuffer;
@@ -42,13 +44,12 @@ layout(set = 1, binding = 0, scalar) readonly buffer SurfaceStorage
     uint normalSamplerIndex;
     uint startIndex;
     uint count;
-}
-surfaceStorages[];
+};
 
-layout(set = 1, binding = 1) uniform sampler samplers[];
-
-layout(set = 1, binding = 2) uniform texture2D textures[];
-
+layout(std430, set = 1, binding = 0, std430, scalar) readonly buffer SurfaceStorageBuffer
+{
+    SurfaceStorage surface;
+} surfaceStorages[];
 
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants push;
@@ -69,16 +70,18 @@ void main()
         const uint surfaceId = gl_InstanceCustomIndexEXT;
         const uint primitiveIndex = gl_PrimitiveID * 3;
 
-        IndexBuffer iBuffer = surfaceStorages[nonuniformEXT(surfaceId)].indexBuffer;
-        VertexBuffer vBuffer = surfaceStorages[nonuniformEXT(surfaceId)].vertexBuffer;
-        MaterialConstantsBuffer mBuffer = surfaceStorages[nonuniformEXT(surfaceId)].materialConstantsBuffer;
+        SurfaceStorage surface = surfaceStorages[nonuniformEXT(surfaceId)].surface;
+
+        IndexBuffer iBuffer = surface.indexBuffer;
+        VertexBuffer vBuffer = surface.vertexBuffer;
+        MaterialConstantsBuffer mBuffer = surface.materialConstantsBuffer;
         MaterialConstants mConstants = mBuffer.materialConstants;
-        const uint colorSamplerIndex = surfaceStorages[nonuniformEXT(surfaceId)].colorSamplerIndex;
-        const uint colorImageIndex = surfaceStorages[nonuniformEXT(surfaceId)].colorImageIndex;
-        const uint materialSamplerIndex = surfaceStorages[nonuniformEXT(surfaceId)].materialSamplerIndex;
-        const uint materialImageIndex = surfaceStorages[nonuniformEXT(surfaceId)].materialImageIndex;
-        const uint normalMapIndex = surfaceStorages[nonuniformEXT(surfaceId)].normalMapIndex;
-        const uint normalSamplerIndex = surfaceStorages[nonuniformEXT(surfaceId)].normalSamplerIndex;
+        const uint colorSamplerIndex = surface.colorSamplerIndex;
+        const uint colorImageIndex = surface.colorImageIndex;
+        const uint materialSamplerIndex = surface.materialSamplerIndex;
+        const uint materialImageIndex = surface.materialImageIndex;
+        const uint normalMapIndex = surface.normalMapIndex;
+        const uint normalSamplerIndex = surface.normalSamplerIndex;
 
 
         const uint i0 = iBuffer.indices[primitiveIndex];
@@ -117,11 +120,12 @@ void main()
         const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y
         + uv2 * barycentrics.z;
 
-        const vec4 tangentRaw = v0.tangent * barycentrics.x + v1.tangent * barycentrics.y +
-                                v2.tangent * barycentrics.z; // range [-1, 1]
-        const vec3 tangent = normalize((gl_WorldToObjectEXT * vec4(tangentRaw.xyz, 0)).xyz);
+        const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y +
+                                v2.tangent.xyz * barycentrics.z; // range [-1, 1]
+        const float handedness = v0.tangent.w; // All vi.tangent.w are the same
+        const vec3 tangent = normalize((gl_WorldToObjectEXT * vec4(tangentRaw, 0)).xyz);
 
-        const vec3 bitangent = cross(normalVtx, tangent);
+        const vec3 bitangent = cross(normalVtx, tangent) * handedness;
 
         const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
@@ -133,7 +137,7 @@ void main()
 
         const vec4 normalTexRaw = 2. * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
         samplers[nonuniformEXT(normalSamplerIndex)]), uv) - 1.; // range [0, 1] -> [-1, 1]
-        const vec3 normalTex = TBN * normalTexRaw.xyz;
+        const vec3 normal = TBN * normalTexRaw.xyz;
 
         // Transforming the position to world space
         const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
@@ -262,7 +266,7 @@ void main()
 //            outColor /= (outColor + 1.);
 //        }
         // Add this particular contribution to the total ray payload
-        vec3 outColor = abs(normalVtx - normalTex);
+        vec3 outColor = normal;
 //        outColor /= (outColor + 1.);
         rayPayload.hitValue += rayPayload.energyFactor * outColor;
         // After color transfer, lose energy

@@ -497,9 +497,9 @@ void Init::load_meshes()
     gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
     scene = gltfLoader->load_gltf_asset("../../assets/ABeautifulGame.glb").value();
 
-    glm::mat4 S = glm::scale(5.f * glm::vec3(1.f));
+    glm::mat4 S = glm::scale(20.f * glm::vec3(1.f));
     glm::mat4 R = glm::rotate(glm::pi<float>(), glm::vec3(0.f, 0.f, 1.f));
-    glm::mat4 T = glm::translate(glm::vec3(0.f, 0.5f, 5.f));
+    glm::mat4 T = glm::translate(glm::vec3(0.f, 2.f, 20.f));
     for (const auto &n : scene->topNodes)
         n->refreshTransform(T * R * S);
 }
