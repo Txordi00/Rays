@@ -19,9 +19,7 @@ Engine::Engine()
 
     // Init push constants
     rayPush.clearColor = glm::vec4(0.f, 0.0f, 0.2f, 1.f);
-    rayPush.lightIntensity = 50.f;
-    rayPush.lightType = 0;
-    rayPush.lightPosition = glm::vec3(0.f, -5.f, 7.f);
+    rayPush.nLights = I->lights.size();
 }
 
 Engine::~Engine()
@@ -140,6 +138,10 @@ void Engine::update_descriptors()
         for (const auto &b : m->surfaceStorageBuffers)
             surfaceStorageBuffers.emplace_back(b.second);
     }
+    std::vector<Buffer> lightBuffers;
+    lightBuffers.reserve(I->lights.size());
+    for (const auto &l : I->lights)
+        lightBuffers.emplace_back(l.ubo);
 
     for (const auto &frame : I->frames) {
         // Inform the shaders about all the different descriptors
@@ -152,6 +154,7 @@ void Engine::update_descriptors()
         descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
         descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
+        descUpdater.add_uniform(descriptorSetUAB, 3, lightBuffers);
         descUpdater.update();
     }
 }
@@ -395,10 +398,10 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     // rayPush.numObjects = I->models.size();
     // rayPush.lightIntensity = 10.f;
     // rayPush.lightType = 0;
-    static uint32_t t = 180;
-    const float tf = glm::radians(static_cast<float>(t));
-    rayPush.lightPosition = glm::vec3(5.f * std::cosf(tf), -5.f, 7.f + 5.f * std::sinf(tf));
-    t = (t + 1) % 360;
+    // static uint32_t t = 180;
+    // const float tf = glm::radians(static_cast<float>(t));
+    // rayPush.lightPosition = glm::vec3(5.f * std::cosf(tf), -5.f, 7.f + 5.f * std::sinf(tf));
+    // t = (t + 1) % 360;
     vk::PushConstantsInfo pushInfo{};
     pushInfo.setLayout(I->simpleRtPipeline.pipelineLayout);
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR

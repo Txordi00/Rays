@@ -31,6 +31,7 @@ Init::Init()
     init_sync_structures();
     create_draw_data();
     load_meshes();
+    create_lights();
     create_as();
     init_descriptors();
     init_pipelines();
@@ -52,6 +53,10 @@ void Init::clean()
         asBuilder->destroy();
 
         gltfLoader->destroy();
+
+        // Destroy lights
+        for (auto &l : lights)
+            l.destroy();
 
         // device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         // device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
@@ -360,6 +365,9 @@ void Init::init_descriptors()
                                                              static_cast<uint32_t>(
                                                                  scene->images.size())},
                                       frameOverlap); // images to sample
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
+                                                             static_cast<uint32_t>(lights.size())},
+                                      frameOverlap); // Lights
     descHelperUAB->create_descriptor_pool();
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eStorageBuffer,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
@@ -370,6 +378,9 @@ void Init::init_descriptors()
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampledImage,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        2}); // sampled images
+    descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
+                                       vk::ShaderStageFlagBits::eClosestHitKHR,
+                                       3}); // sampled images
     descriptorSetLayoutUAB = descHelperUAB->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(descriptorSetLayoutUAB, frameOverlap);
@@ -502,6 +513,28 @@ void Init::load_meshes()
     glm::mat4 T = glm::translate(glm::vec3(0.f, 2.f, 20.f));
     for (const auto &n : scene->topNodes)
         n->refreshTransform(T * R * S);
+}
+
+void Init::create_lights()
+{
+    Light directionalLight{device, allocator};
+    directionalLight.lightData.position = glm::vec3(-5.f, -10.f, -1.f);
+    directionalLight.lightData.intensity = 10.f;
+    directionalLight.upload();
+    const float r = 5.f;
+    const float y = -5.f;
+    const uint32_t n = 4;
+    lights.reserve(n + 1);
+    lights.emplace_back(directionalLight);
+    for (uint32_t i = 0; i < n; i++) {
+        const float in = static_cast<float>(i) / static_cast<float>(n);
+        const float x = r * cos(2.f * glm::pi<float>() * in);
+        const float z = r * sin(2.f * glm::pi<float>() * in);
+        Light pointLight{device, allocator};
+        pointLight.lightData.position = glm::vec3(x, y, z);
+        pointLight.lightData.type = LightType::ePoint;
+        pointLight.upload();
+    }
 }
 
 void Init::create_as()

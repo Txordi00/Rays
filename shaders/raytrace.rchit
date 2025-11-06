@@ -15,6 +15,13 @@ hitAttributeEXT vec2 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(set = 1, binding = 1) uniform sampler samplers[];
 layout(set = 1, binding = 2) uniform texture2D textures[];
+layout(set = 1, binding = 3, scalar) uniform Light
+{
+        vec3 position;
+        vec3 color;
+        float intensity;
+        uint type;
+} lights[];
 
 layout(buffer_reference, std430, scalar) readonly buffer VertexBuffer
 {
@@ -130,24 +137,18 @@ void main()
         const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
         const vec4 colorIn = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
-        samplers[nonuniformEXT(colorSamplerIndex)]), uv);
+        samplers[nonuniformEXT(colorSamplerIndex)]), uv) * mConstants.baseColorFactor;
 
         const vec4 pbr = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
-        samplers[nonuniformEXT(materialSamplerIndex)]), uv);
+        samplers[nonuniformEXT(materialSamplerIndex)]), uv)
+                * vec4(0, mConstants.roughnessFactor, mConstants.metallicFactor, 0);
 
         const vec4 normalTexRaw = 2. * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
         samplers[nonuniformEXT(normalSamplerIndex)]), uv) - 1.; // range [0, 1] -> [-1, 1]
-        const vec3 normal = TBN * normalTexRaw.xyz;
+        const vec3 normal = normalize(TBN * normalTexRaw.xyz);
 
         // Transforming the position to world space
         const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
-
-//        const vec4 colorIn = texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
-//        samplers[nonuniformEXT(normalSamplerIndex)]), uv);
-
-        //  const vec3 colorIn =
-        //    vec3(v0.color * barycentrics.x + v1.color * barycentrics.y + v2.color * barycentrics.z);
-//        const vec3 colorIn = material.color;
 
 //        // Check if in shadow
 //        // Vector towards the light
@@ -158,8 +159,6 @@ void main()
 //        const vec3 rayDir = gl_WorldRayDirectionEXT; // already normalized
 //        const bool facingToLight = (dot(l, normal) > 0.);
 
-//        vec3 outColor = vec3(0.);
-//        if (rayPayload.energyFactor > ENERGY_MIN) {
 //            // SHADOWS
 //            const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
 //                                     | gl_RayFlagsSkipClosestHitShaderEXT;
@@ -186,87 +185,10 @@ void main()
 //            const float cos1 = -dot(rayDir, normal); // If positive, we are outside the object
 //            const bool entering = cos1 > 0.;
 
-//            if (entering) {
-//                // Ambient lighting
-//                ambientC = material.ambientR * colorIn;
-
-//                // Lighting depending on the point light
-//                if (!isShadowed && facingToLight) {
-//                    // Point light diffuse lighting
-//                    diffuseC = attenuation * diffuse(material, l, normal) * colorIn;
-
-//                    // Point light specular lighting
-//                    specularC = attenuation * specular(material, rayDir, l, normal) * colorIn;
-//                }
-
-//                // Reflections. Avoid entering the final recursion because it's useless
-//                if (rayPayload.depth < MAX_RT_DEPTH && material.reflectiveness > 0.01) {
-//                    const vec3 reflectedDir = reflect(rayDir, normal);
-//                    traceRayEXT(topLevelAS,             // acceleration structure
-//                                gl_IncomingRayFlagsEXT, // rayFlags
-//                                0xFF,                   // cullMask
-//                                0,                      // sbtRecordOffset
-//                                0,                      // sbtRecordStride
-//                                0,                      // missIndex
-//                                worldPos,               // ray origin
-//                                tMin,                   // ray min range
-//                                reflectedDir,           // ray direction
-//                                tMax,                   // ray max range
-//                                0                       // payload
-//                    );
-//                    reflectedC = material.reflectiveness * rayPayload.hitValue;
-//                }
-//            }
-//                // Refractions. Avoid entering the final recursion because it's useless
-//                // REFRACTION. Snell's law: https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
-//                if (rayPayload.depth < MAX_RT_DEPTH && material.refractiveness > 0.01) {
-//                    // Flip n1 and n2 depending on whether we are inside or outside the object
-//                    const float n = (entering) ? 1. / material.refractiveIndex : material.refractiveIndex;
-//                    const vec3 normalTmp = (entering) ? normal : -normal;
-//                    const vec3 refractedDir = refract(rayDir, normalTmp, n);
-//                    if(dot(refractedDir, refractedDir) > 0.)
-//                    {
-//                        traceRayEXT(topLevelAS,             // acceleration structure
-//                                    gl_IncomingRayFlagsEXT, // rayFlags
-//                                    0xFF,                   // cullMask
-//                                    0,                      // sbtRecordOffset
-//                                    0,                      // sbtRecordStride
-//                                    0,                      // missIndex
-//                                    worldPos,               // ray origin
-//                                    tMin,                   // ray min range
-//                                    refractedDir,           // ray direction
-//                                    tMax,                   // ray max range
-//                                    0                       // payload
-//                        );
-//                    } // If Snell's refraction fails it means that the ray is reflected and not refracted.
-//                    // Since we took that case into consideration already, only do it if the reflection was skipped.
-//                    else if (material.reflectiveness < 0.01)
-//                    {
-//                        const vec3 reflectedDir = reflect(rayDir, normalTmp);
-//                        traceRayEXT(topLevelAS,             // acceleration structure
-//                                    gl_IncomingRayFlagsEXT, // rayFlags
-//                                    0xFF,                   // cullMask
-//                                    0,                      // sbtRecordOffset
-//                                    0,                      // sbtRecordStride
-//                                    0,                      // missIndex
-//                                    worldPos,               // ray origin
-//                                    tMin,                   // ray min range
-//                                    reflectedDir,           // ray direction
-//                                    tMax,                   // ray max range
-//                                    0                       // payload
-//                        );
-//                    }
-//                    if(entering)
-//                        refractedC = material.refractiveness * rayPayload.hitValue;
-//                    else // We add the energy loss back because we don't want to lose energy twice on enter and exit
-//                        rayPayload.energyFactor /= ENERGY_LOSS;
-//                }
-//            // Compute the color contribution of this hit
-//            outColor = reflectedC + diffuseC + specularC + refractedC + ambientC;
-//            outColor /= (outColor + 1.);
-//        }
         // Add this particular contribution to the total ray payload
-        vec3 outColor = normal;
+//        vec3 outColor = colorIn.xyz;
+//        vec3 outColor = abs(normal - normalVtx);
+        vec3 outColor = pbr.xyz;
 //        outColor /= (outColor + 1.);
         rayPayload.hitValue += rayPayload.energyFactor * outColor;
         // After color transfer, lose energy

@@ -13,10 +13,12 @@ layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 layout(location = 0) rayPayloadEXT HitPayload rayPayload;
 
-layout(scalar, binding = 2, set = 0) uniform CameraData{
-  vec3 origin;
-  vec3 orientation;
-} camera;
+layout(scalar, binding = 2, set = 0) uniform CameraData
+{
+    vec3 origin;
+    vec3 orientation;
+}
+camera;
 
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants push;

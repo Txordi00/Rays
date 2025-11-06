@@ -2,6 +2,7 @@
 #include "acceleration_structures.hpp"
 #include "camera.hpp"
 #include "descriptors.hpp"
+#include "lights.hpp"
 #include "loader.hpp"
 #include "raster_pipelines.hpp"
 #include "shader_binding_tables.hpp"
@@ -79,6 +80,9 @@ public:
     std::unique_ptr<GLTFLoader> gltfLoader;
     std::shared_ptr<GLTFObj> scene;
 
+    // Lights
+    std::vector<Light> lights;
+
     bool isInitialized{false};
 
 private:
@@ -94,6 +98,7 @@ private:
     void create_sbt();
     void init_imgui();
     void load_meshes();
+    void create_lights();
     void create_as();
 
     void destroy_swapchain();

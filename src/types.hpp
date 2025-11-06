@@ -119,9 +119,7 @@ struct MeshPush
 struct RayPush
 {
     glm::vec4 clearColor;
-    glm::vec3 lightPosition;
-    float lightIntensity;
-    uint32_t lightType;
+    uint32_t nLights;
 };
 
 // Per-object uniform buffer data
