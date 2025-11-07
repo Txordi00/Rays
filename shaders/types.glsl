@@ -10,16 +10,24 @@ struct Vertex {
 
 struct HitPayload
 {
-  vec3 hitValue;
-  uint depth;
-  float energyFactor;
+    vec3 hitValue;
+    uint depth;
+    float energyFactor;
 };
 
-#define RayPushConstants RayPushConstants \
-    { \
-        vec4 clearColor; \
-        uint numLights; \
-    }
+struct Light
+{
+    vec3 positionOrDirection;
+    vec3 color;
+    float intensity;
+    uint type; // 0 - point, 1 - directional
+};
+
+struct RayPush
+{
+    vec4 clearColor;
+    uint numLights;
+};
 
 struct MaterialConstants
 {

@@ -7,10 +7,12 @@
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
 
 //push constants block
-layout(scalar, push_constant) uniform RayPushConstants push;
-
+layout(scalar, push_constant) uniform RayPushConstants
+{
+    RayPush rayPush;
+} push;
 
 void main()
 {
-    rayPayload.hitValue = push.clearColor.xyz * rayPayload.energyFactor * 0.8;
+    rayPayload.hitValue = push.rayPush.clearColor.xyz * rayPayload.energyFactor * 0.8;
 }

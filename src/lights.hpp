@@ -10,7 +10,7 @@ class Light
 public:
     struct LightData
     {
-        glm::vec3 position{0.f};
+        glm::vec3 positionOrDirection{0.f};
         glm::vec3 color{1.f};
         float intensity{1.f};
         uint32_t type{LightType::ePoint};

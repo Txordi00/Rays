@@ -7,8 +7,10 @@
 layout(location = 1) rayPayloadInEXT bool isShadowed;
 
 //push constants block
-layout(scalar, push_constant) uniform RayPushConstants push;
-
+layout(scalar, push_constant) uniform RayPushConstants
+{
+    RayPush rayPush;
+} push;
 
 void main()
 {

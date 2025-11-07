@@ -16,14 +16,6 @@ layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(set = 1, binding = 1) uniform sampler samplers[];
 layout(set = 1, binding = 2) uniform texture2D textures[];
 
-struct Light
-{
-        vec3 position;
-        vec3 color;
-        float intensity;
-        uint type;
-};
-
 layout(set = 1, binding = 3, scalar) uniform LightsBuffer
 {
         Light light;
@@ -65,7 +57,10 @@ layout(std430, set = 1, binding = 0, std430, scalar) readonly buffer SurfaceStor
 } surfaceStorages[];
 
 //push constants block
-layout(scalar, push_constant) uniform RayPushConstants push;
+layout(scalar, push_constant) uniform RayPushConstants
+{
+        RayPush rayPush;
+} push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
@@ -170,9 +165,15 @@ void main()
         // BRDF
         // Ray directions
         Light light = lights[nonuniformEXT(0)].light;
-        vec3 l = light.position - worldPos;
-        const float lightDistance = length(l);
-        l /= lightDistance;
+        vec3 l;
+        if(light.type == 0) { // Point
+                l = light.positionOrDirection - worldPos;
+                const float lightDistance = length(l);
+                l /= lightDistance;
+        } else if (light.type == 1) // Directional
+        {
+                l = -light.positionOrDirection;
+        }
 //        const float attenuation = light.intensity / lightDistance;
         const vec3 v = gl_WorldRayDirectionEXT; // Ray direction. Already normalized
 //        const bool facingToLight = (dot(l, normal) > 0.);
@@ -194,47 +195,19 @@ void main()
         // diffuse BRDF
         const vec3 Fd = diffuseColor * Fd_Lambert();
 
-        // apply lighting...
+        const vec3 BSDF = Fr + Fd;
 
-//        // Check if in shadow
-//        // Vector towards the light
-//        vec3 l = push.lightPosition - worldPos;
-//        float lightDistance = length(l);
-//        l /= lightDistance;
-//        float attenuation = push.lightIntensity / lightDistance;
-//        const vec3 rayDir = gl_WorldRayDirectionEXT; // already normalized
-//        const bool facingToLight = (dot(l, normal) > 0.);
-
-//            // SHADOWS
-//            const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
-//                                     | gl_RayFlagsSkipClosestHitShaderEXT;
-//            // We initialize to true, if the miss shader will be called it sets it to false
-//            isShadowed = true;
-//            traceRayEXT(topLevelAS,  // acceleration structure
-//                        shadowFlags, // rayFlags
-//                        0xFF,        // cullMask
-//                        0,           // sbtRecordOffset
-//                        0,           // sbtRecordStride
-//                        1,           // missIndex
-//                        worldPos,    // ray origin
-//                        tMin,        // ray min range
-//                        l,           // ray direction
-//                        tMax,        // ray max range
-//                        1            // payload (location = 1)
-//            );
-
-//            vec3 diffuseC = vec3(0.);
-//            vec3 specularC = vec3(0.);
-//            vec3 reflectedC = vec3(0.);
-//            vec3 refractedC = vec3(0.);
-//            vec3 ambientC = vec3(0.);
-//            const float cos1 = -dot(rayDir, normal); // If positive, we are outside the object
-//            const bool entering = cos1 > 0.;
+        vec3 outColor = vec3(0.);
+        if(light.type == 1)
+        {
+                const float illuminance = light.intensity * NoL;
+                const vec3 luminance = BSDF * illuminance;
+                outColor = luminance;
+        }
 
         // Add this particular contribution to the total ray payload
-//        vec3 outColor = colorIn.xyz;
 //        vec3 outColor = abs(normal - normalVtx);
-        vec3 outColor = Fr + Fd;
+//        vec3 outColor = Fr + Fd;
 //        outColor /= (outColor + 1.);
         rayPayload.hitValue += rayPayload.energyFactor * outColor;
         // After color transfer, lose energy
