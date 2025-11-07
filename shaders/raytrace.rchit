@@ -15,12 +15,18 @@ hitAttributeEXT vec2 attribs;
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(set = 1, binding = 1) uniform sampler samplers[];
 layout(set = 1, binding = 2) uniform texture2D textures[];
-layout(set = 1, binding = 3, scalar) uniform Light
+
+struct Light
 {
         vec3 position;
         vec3 color;
         float intensity;
         uint type;
+};
+
+layout(set = 1, binding = 3, scalar) uniform LightsBuffer
+{
+        Light light;
 } lights[];
 
 layout(buffer_reference, std430, scalar) readonly buffer VertexBuffer
@@ -136,19 +142,59 @@ void main()
 
         const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
-        const vec4 colorIn = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
-        samplers[nonuniformEXT(colorSamplerIndex)]), uv) * mConstants.baseColorFactor;
+        const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
+        samplers[nonuniformEXT(colorSamplerIndex)]), uv) * mConstants.baseColorFactor; // range [0, 1]
 
-        const vec4 pbr = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
+        const vec4 metallicRoughness = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
         samplers[nonuniformEXT(materialSamplerIndex)]), uv)
-                * vec4(0, mConstants.roughnessFactor, mConstants.metallicFactor, 0);
+                * vec4(0, mConstants.roughnessFactor, mConstants.metallicFactor, 0);        
+        const float perceptualRoughness = metallicRoughness.y;
+        const float metallic = metallicRoughness.z;
 
         const vec4 normalTexRaw = 2. * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
         samplers[nonuniformEXT(normalSamplerIndex)]), uv) - 1.; // range [0, 1] -> [-1, 1]
         const vec3 normal = normalize(TBN * normalTexRaw.xyz);
 
         // Transforming the position to world space
-        const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
+        const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 0));
+
+        // Parametrization
+        const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
+        const float f90 = 1.;
+        const float reflectance = 0.5;
+        const vec3 f0 = 0.16 * reflectance * reflectance * (1. - metallic) + baseColor.xyz * metallic;
+        // perceptually linear roughness to roughness
+        const float a = perceptualRoughness * perceptualRoughness;
+//        print_val("%f ", metallic, 0.5, 1.);
+
+        // BRDF
+        // Ray directions
+        Light light = lights[nonuniformEXT(0)].light;
+        vec3 l = light.position - worldPos;
+        const float lightDistance = length(l);
+        l /= lightDistance;
+//        const float attenuation = light.intensity / lightDistance;
+        const vec3 v = gl_WorldRayDirectionEXT; // Ray direction. Already normalized
+//        const bool facingToLight = (dot(l, normal) > 0.);
+
+        const vec3 h = normalize(v + l);
+
+        const float NoV = abs(dot(normal, v)) + 1e-5;
+        const float NoL = clamp(dot(normal, l), 0.0, 1.0);
+        const float NoH = clamp(dot(normal, h), 0.0, 1.0);
+        const float LoH = clamp(dot(l, h), 0.0, 1.0);
+
+        const float D = D_GGX(NoH, a);
+        const vec3  F = F_Schlick(LoH, f0);
+        const float V = V_SmithGGXCorrelated(NoV, NoL, a);
+
+        // specular BRDF
+        const vec3 Fr = (D * V) * F;
+
+        // diffuse BRDF
+        const vec3 Fd = diffuseColor * Fd_Lambert();
+
+        // apply lighting...
 
 //        // Check if in shadow
 //        // Vector towards the light
@@ -188,7 +234,7 @@ void main()
         // Add this particular contribution to the total ray payload
 //        vec3 outColor = colorIn.xyz;
 //        vec3 outColor = abs(normal - normalVtx);
-        vec3 outColor = pbr.xyz;
+        vec3 outColor = Fr + Fd;
 //        outColor /= (outColor + 1.);
         rayPayload.hitValue += rayPayload.energyFactor * outColor;
         // After color transfer, lose energy

@@ -534,6 +534,7 @@ void Init::create_lights()
         pointLight.lightData.position = glm::vec3(x, y, z);
         pointLight.lightData.type = LightType::ePoint;
         pointLight.upload();
+        lights.emplace_back(pointLight);
     }
 }
 

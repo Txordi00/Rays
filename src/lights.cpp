@@ -2,12 +2,6 @@
 #include "utils.hpp"
 #include <print>
 
-Light::~Light()
-{
-    if (ubo.buffer)
-        destroy();
-}
-
 void Light::upload()
 {
     if (!ubo.buffer) {
@@ -30,5 +24,6 @@ void Light::update()
 
 void Light::destroy()
 {
-    utils::destroy_buffer(allocator, ubo);
+    if (ubo.buffer)
+        utils::destroy_buffer(allocator, ubo);
 }

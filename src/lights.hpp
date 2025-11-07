@@ -20,7 +20,7 @@ public:
         : device{device}
         , allocator{allocator}
     {}
-    ~Light();
+    ~Light() = default;
 
     void upload();
     void update();
@@ -28,7 +28,7 @@ public:
 
     LightData lightData{};
 
-    Buffer ubo;
+    Buffer ubo{};
 
 private:
     const vk::Device &device;

@@ -141,7 +141,7 @@ Buffer create_buffer(const vk::Device &device,
     vmaallocInfo.usage = memoryUsage;
     vmaallocInfo.flags = allocationFlags;
 
-    Buffer createdBuffer;
+    Buffer createdBuffer{};
     if (alignment == 0) {
         VK_CHECK_RES(vmaCreateBuffer(allocator,
                                      (VkBufferCreateInfo *) &bufferInfo,

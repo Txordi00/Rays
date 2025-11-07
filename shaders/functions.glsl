@@ -1,25 +1,3 @@
-// struct Material
-// {
-//     // Color
-//     vec3 color;
-//     // specular reflectiveness
-//     float specularR;
-//     // Diffuse reflectiveness
-//     float diffuseR;
-//     // Ambient reflectiveness
-//     float ambientR;
-//     // Shininess factor N.
-//     // From the approximation in https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
-//     // with beta=1
-//     int shininessN;
-//     // Reflectiveness
-//     float reflectiveness;
-//     // Refractiveness
-//     float refractiveness;
-//     // Refractive index. n_2 in https://en.wikipedia.org/wiki/Snell's_law
-//     float refractiveIndex;
-// };
-
 // float diffuse(const Material mat, const vec3 lightDir, const vec3 normal)
 // {
 //   if(mat.diffuseR > 0.01) {
@@ -51,12 +29,31 @@
 //     return 0.;
 // }
 
-#define printVal(message, val, valMin, valMax) if(val < valMin || val > valMax){ \
+#define print_val(message, val, valMin, valMax) if(val < valMin || val > valMax){ \
        debugPrintfEXT(message, val); \
      }
 
-// void printVal(const float val, const float valMin, const float valMax)
-// {
-//   if(val < valMin || val > valMax)
-//     debugPrintfEXT(text + "%f, ", val);
-// }
+float D_GGX(const float NoH, const float a) {
+    const float a2 = a * a;
+    const float f = (NoH * a2 - NoH) * NoH + 1.0;
+    return a2 / (PI * f * f);
+}
+
+vec3 F_Schlick(const float u, const vec3 f0) {
+     const float u11 = 1. - u;
+     const float u12 = u11 * u11; // u1^2
+     const float u14 = u12 * u12;
+     const float u15 = u14 * u11;
+     return f0 + (vec3(1.) - f0) * u15;
+}
+
+float V_SmithGGXCorrelated(const float NoV, const float NoL, const float a) {
+    const float a2 = a * a;
+    const float GGXL = NoV * sqrt((-NoL * a2 + NoL) * NoL + a2);
+    const float GGXV = NoL * sqrt((-NoV * a2 + NoV) * NoV + a2);
+    return 0.5 / (GGXV + GGXL);
+}
+
+float Fd_Lambert() {
+    return 1.0 / PI;
+}

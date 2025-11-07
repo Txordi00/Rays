@@ -1,3 +1,5 @@
+#define PI 3.1415926535897932384626433832795
+
 struct Vertex {
     vec3 position;
     vec3 normal;
