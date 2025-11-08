@@ -18,8 +18,9 @@ layout(set = 1, binding = 2) uniform texture2D textures[];
 
 layout(set = 1, binding = 3, scalar) uniform LightsBuffer
 {
-        Light light;
-} lights[];
+    Light light;
+}
+lights[];
 
 layout(buffer_reference, std430, scalar) readonly buffer VertexBuffer
 {
@@ -54,13 +55,15 @@ struct SurfaceStorage
 layout(std430, set = 1, binding = 0, std430, scalar) readonly buffer SurfaceStorageBuffer
 {
     SurfaceStorage surface;
-} surfaceStorages[];
+}
+surfaceStorages[];
 
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants
 {
-        RayPush rayPush;
-} push;
+    RayPush rayPush;
+}
+push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
@@ -78,6 +81,7 @@ void main()
         const uint surfaceId = gl_InstanceCustomIndexEXT;
         const uint primitiveIndex = gl_PrimitiveID * 3;
 
+        RayPush rayPush = push.rayPush;
         SurfaceStorage surface = surfaceStorages[nonuniformEXT(surfaceId)].surface;
 
         IndexBuffer iBuffer = surface.indexBuffer;
@@ -90,7 +94,6 @@ void main()
         const uint materialImageIndex = surface.materialImageIndex;
         const uint normalMapIndex = surface.normalMapIndex;
         const uint normalSamplerIndex = surface.normalSamplerIndex;
-
 
         const uint i0 = iBuffer.indices[primitiveIndex];
         const uint i1 = iBuffer.indices[primitiveIndex + 1];
@@ -118,19 +121,16 @@ void main()
         const vec3 pos = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y
                          + vertPos2 * barycentrics.z;
 
-
         const vec3 normalVtxRaw = norm0 * barycentrics.x + norm1 * barycentrics.y
-                            + norm2 * barycentrics.z; // already normalized
+                                  + norm2 * barycentrics.z; // already normalized
         // Apply the transformation to the normals (not done in BLAS creation)
         const vec3 normalVtx = normalize((gl_WorldToObjectEXT * vec4(normalVtxRaw, 0)).xyz);
 
+        const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
 
-        const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y
-        + uv2 * barycentrics.z;
-
-        const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y +
-                                v2.tangent.xyz * barycentrics.z; // range [-1, 1]
-        const float handedness = v0.tangent.w; // All vi.tangent.w are the same
+        const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y
+                                + v2.tangent.xyz * barycentrics.z; // range [-1, 1]
+        const float handedness = v0.tangent.w;                     // All vi.tangent.w are the same
         const vec3 tangent = normalize((gl_WorldToObjectEXT * vec4(tangentRaw, 0)).xyz);
 
         const vec3 bitangent = cross(normalVtx, tangent) * handedness;
@@ -138,78 +138,95 @@ void main()
         const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
         const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
-        samplers[nonuniformEXT(colorSamplerIndex)]), uv) * mConstants.baseColorFactor; // range [0, 1]
+                                                 samplers[nonuniformEXT(colorSamplerIndex)]),
+                                       uv)
+                               * mConstants.baseColorFactor; // range [0, 1]
 
-        const vec4 metallicRoughness = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
-        samplers[nonuniformEXT(materialSamplerIndex)]), uv)
-                * vec4(0, mConstants.roughnessFactor, mConstants.metallicFactor, 0);        
+        const vec4 metallicRoughness
+            = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
+                                samplers[nonuniformEXT(materialSamplerIndex)]),
+                      uv)
+              * vec4(0, mConstants.roughnessFactor, mConstants.metallicFactor, 0);
         const float perceptualRoughness = metallicRoughness.y;
         const float metallic = metallicRoughness.z;
 
-        const vec4 normalTexRaw = 2. * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
-        samplers[nonuniformEXT(normalSamplerIndex)]), uv) - 1.; // range [0, 1] -> [-1, 1]
+        const vec4 normalTexRaw
+            = 2.
+                  * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
+                                      samplers[nonuniformEXT(normalSamplerIndex)]),
+                            uv)
+              - 1.; // range [0, 1] -> [-1, 1]
         const vec3 normal = normalize(TBN * normalTexRaw.xyz);
 
         // Transforming the position to world space
         const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 0));
 
+        // -------------- BRDF --------------
+
         // Parametrization
         const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
         const float f90 = 1.;
         const float reflectance = 0.5;
-        const vec3 f0 = 0.16 * reflectance * reflectance * (1. - metallic) + baseColor.xyz * metallic;
+        const vec3 f0 = 0.16 * reflectance * reflectance * (1. - metallic)
+                        + baseColor.xyz * metallic;
         // perceptually linear roughness to roughness
         const float a = perceptualRoughness * perceptualRoughness;
-//        print_val("%f ", metallic, 0.5, 1.);
+        //        print_val("%f ", metallic, 0.5, 1.);
 
-        // BRDF
         // Ray directions
-        Light light = lights[nonuniformEXT(0)].light;
+        const vec3 v = -gl_WorldRayDirectionEXT; // Inverse incoming (view) ray direction. Already normalized
+        vec3 totalLuminance = vec3(0.);
+        for(uint i = 1; i < rayPush.numLights; i++)
+        {
+        Light light = lights[nonuniformEXT(i)].light;
         vec3 l;
-        if(light.type == 0) { // Point
-                l = light.positionOrDirection - worldPos;
-                const float lightDistance = length(l);
-                l /= lightDistance;
+        float distanceSquared = 1.;
+        // Vector to the light
+        if (light.type == 0) { // Point
+            l = light.positionOrDirection - worldPos;
+            distanceSquared = dot(l, l);
+            l /= sqrt(distanceSquared);
         } else if (light.type == 1) // Directional
         {
-                l = -light.positionOrDirection;
+            l = -light.positionOrDirection;
         }
-//        const float attenuation = light.intensity / lightDistance;
-        const vec3 v = gl_WorldRayDirectionEXT; // Ray direction. Already normalized
-//        const bool facingToLight = (dot(l, normal) > 0.);
+        //        const bool facingToLight = (dot(l, normal) > 0.);
 
-        const vec3 h = normalize(v + l);
+        const vec3 h = normalize(l + v);
 
         const float NoV = abs(dot(normal, v)) + 1e-5;
-        const float NoL = clamp(dot(normal, l), 0.0, 1.0);
-        const float NoH = clamp(dot(normal, h), 0.0, 1.0);
-        const float LoH = clamp(dot(l, h), 0.0, 1.0);
+        const float NoL = clamp(dot(normal, l), 0., 1.);
+        const float NoH = clamp(dot(normal, h), 0., 1.);
+        const float LoH = clamp(dot(l, h), 0., 1.);
 
         const float D = D_GGX(NoH, a);
-        const vec3  F = F_Schlick(LoH, f0);
+        const vec3 F = F_Schlick(LoH, f0, f90);
         const float V = V_SmithGGXCorrelated(NoV, NoL, a);
 
         // specular BRDF
-        const vec3 Fr = (D * V) * F;
+        const vec3 Fr = D * V * F;
 
         // diffuse BRDF
         const vec3 Fd = diffuseColor * Fd_Lambert();
 
         const vec3 BSDF = Fr + Fd;
 
-        vec3 outColor = vec3(0.);
-        if(light.type == 1)
-        {
-                const float illuminance = light.intensity * NoL;
-                const vec3 luminance = BSDF * illuminance;
-                outColor = luminance;
+        vec3 luminance = vec3(0.);
+        if (light.type == 0) { // Point light
+                luminance = evaluate_point_light(light, distanceSquared, BSDF, NoL);
         }
-
+        else if(light.type == 1) { // Directional light
+                luminance = evaluate_directional_light(light, BSDF, NoL);
+        }
+        totalLuminance += luminance;
+        }
         // Add this particular contribution to the total ray payload
-//        vec3 outColor = abs(normal - normalVtx);
-//        vec3 outColor = Fr + Fd;
-//        outColor /= (outColor + 1.);
-        rayPayload.hitValue += rayPayload.energyFactor * outColor;
+        //        vec3 outColor = abs(normal - normalVtx);
+        //        vec3 outColor = Fr + Fd;
+        //        outColor /= (outColor + 1.);
+        totalLuminance /= (totalLuminance + 1.);
+//        outColor = Fr;
+        rayPayload.hitValue += rayPayload.energyFactor * totalLuminance;
         // After color transfer, lose energy
         rayPayload.energyFactor *= ENERGY_LOSS;
     }

@@ -39,12 +39,12 @@ float D_GGX(const float NoH, const float a) {
     return a2 / (PI * f * f);
 }
 
-vec3 F_Schlick(const float u, const vec3 f0) {
+vec3 F_Schlick(const float u, const vec3 f0, const float f90) {
      const float u11 = 1. - u;
      const float u12 = u11 * u11; // u1^2
      const float u14 = u12 * u12;
      const float u15 = u14 * u11;
-     return f0 + (vec3(1.) - f0) * u15;
+     return f0 + (vec3(f90) - f0) * u15;
 }
 
 float V_SmithGGXCorrelated(const float NoV, const float NoL, const float a) {
@@ -56,4 +56,18 @@ float V_SmithGGXCorrelated(const float NoV, const float NoL, const float a) {
 
 float Fd_Lambert() {
     return 1.0 / PI;
+}
+
+vec3 evaluate_directional_light(const Light light, const vec3 BSDF, const float NoL)
+{
+    const float illuminance = light.intensity * NoL;
+    vec3 luminance = BSDF * illuminance * light.color;
+    return luminance;
+}
+
+vec3 evaluate_point_light(const Light light, const float distanceSquared, const vec3 BSDF, const float NoL)
+{
+    const float attenuation = light.intensity * NoL / distanceSquared;
+    vec3 luminance = BSDF * attenuation * light.color;
+    return luminance;
 }
