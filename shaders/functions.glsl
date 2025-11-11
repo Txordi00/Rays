@@ -71,3 +71,10 @@ vec3 evaluate_point_light(const Light light, const float distanceSquared, const 
     vec3 luminance = BSDF * attenuation * light.color;
     return luminance;
 }
+
+vec3 reinhard_jodie(const vec3 color)
+{
+    float l = luminance(color);
+    vec3 tv = v / (1.0f + color);
+    return lerp(v / (1.0f + l), tv, tv);
+}

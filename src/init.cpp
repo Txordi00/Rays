@@ -517,6 +517,7 @@ void Init::create_lights()
     directionalLight.lightData.intensity = 1.f;
     directionalLight.lightData.type = LightType::eDirectional;
     directionalLight.upload();
+    const glm::vec3 c{0.f, 0.f, 20.f};
     const float r = 5.f;
     const float y = -5.f;
     const uint32_t n = 4;
@@ -527,7 +528,7 @@ void Init::create_lights()
         const float x = r * cos(2.f * glm::pi<float>() * in);
         const float z = r * sin(2.f * glm::pi<float>() * in);
         Light pointLight{device, allocator};
-        pointLight.lightData.positionOrDirection = glm::vec3(x, y, z);
+        pointLight.lightData.positionOrDirection = c + glm::vec3(x, y, z);
         pointLight.lightData.intensity = 100.f;
         pointLight.lightData.type = LightType::ePoint;
         pointLight.upload();

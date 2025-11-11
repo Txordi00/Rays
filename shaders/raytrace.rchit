@@ -160,7 +160,7 @@ void main()
     const vec3 normal = normalize(TBN * normalTexRaw.xyz);
 
     // Transforming the position to world space
-    const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 0));
+    const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.));
 
     // -------------- BRDF --------------
 
@@ -237,7 +237,8 @@ void main()
         totalLuminance += luminance;
     }
     // Add this particular contribution to the total ray payload
-    rayPayload.hitValue += rayPayload.energyFactor * totalLuminance;
+    // reinhard_jodie to tonemap
+    rayPayload.hitValue += rayPayload.energyFactor * reinhard_jodie(totalLuminance);
     // After color transfer, lose energy
     //    rayPayload.energyFactor *= ENERGY_LOSS;
 }

@@ -1,7 +1,7 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_scalar_block_layout : enable
-#extension GL_EXT_debug_printf : require
+// #extension GL_EXT_debug_printf : require
 
 #include "types.glsl"
 //#include "functions.glsl"
