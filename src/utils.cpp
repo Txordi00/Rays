@@ -76,7 +76,7 @@ void copy_image(const vk::CommandBuffer &cmd,
     cmd.blitImage2(blitInfo);
 }
 
-vk::ShaderModule load_shader(const vk::Device &device, const std::string filePath)
+vk::ShaderModule load_shader(const vk::Device &device, const std::string &filePath)
 {
     // open the file. With cursor at the end
     std::ifstream file(filePath, std::ifstream::ate | std::ifstream::binary);

@@ -12,7 +12,7 @@ SimplePipelineData get_simple_rt_pipeline(const vk::Device &device);
 class RtPipelineBuilder
 {
 public:
-    enum StageIndices { eRaygen, eMiss, eShadow, eClosestHit, eShaderGroupCount };
+    enum StageIndices { eRaygen, eMiss, eShadow, eClosestHit, eShaderStageCount };
 
     RtPipelineBuilder(const vk::Device &device)
         : device{device}
@@ -30,6 +30,6 @@ public:
 
 private:
     const vk::Device &device;
-    std::array<vk::PipelineShaderStageCreateInfo, eShaderGroupCount> shaderStages;
+    std::array<vk::PipelineShaderStageCreateInfo, eShaderStageCount> shaderStages;
     std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups;
 };

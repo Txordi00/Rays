@@ -419,11 +419,6 @@ void Init::init_descriptors()
 
 void Init::init_pipelines()
 {
-    // simpleMeshGraphicsPipeline = get_simple_mesh_pipeline(device,
-    //                                                       frames[0].imageDraw.format,
-    //                                                       frames[0].imageDepth.format,
-    //                                                       {descriptorSetLayoutUAB});
-
     RtPipelineBuilder rtPipelineBuilder{device};
     rtPipelineBuilder.create_shader_stages();
     rtPipelineBuilder.create_shader_groups();
@@ -519,7 +514,7 @@ void Init::create_lights()
 {
     Light directionalLight{device, allocator};
     directionalLight.lightData.positionOrDirection = glm::normalize(glm::vec3(1.f, 1.f, 1.f));
-    directionalLight.lightData.intensity = 10.f;
+    directionalLight.lightData.intensity = 1.f;
     directionalLight.lightData.type = LightType::eDirectional;
     directionalLight.upload();
     const float r = 5.f;

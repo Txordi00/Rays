@@ -221,8 +221,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
                                        allocator,
                                        sizeInfo.accelerationStructureSize,
                                        vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR,
-                                       VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                       0);
+                                       VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
 
     // 4. Create the acceleration structure object
     vk::AccelerationStructureCreateInfoKHR asInfo{};
@@ -259,8 +258,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
 
     // Build the TLAS
     // Record the next set of commands
+    // asCmd.reset();
     utils::cmd_submit(device, queue, asFence, asCmd, [&](const vk::CommandBuffer &cmd) {
-        // cmd.reset();
         cmd.buildAccelerationStructuresKHR(buildInfo, &buildRangeInfo);
     });
 

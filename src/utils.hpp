@@ -61,7 +61,7 @@ void copy_to_buffer(const Buffer &buffer,
                    const vk::DeviceSize size = vk::WholeSize,
                    const vk::DeviceSize offset = 0);
 
-vk::ShaderModule load_shader(const vk::Device &device, const std::string filePath);
+vk::ShaderModule load_shader(const vk::Device &device, const std::string &filePath);
 
 glm::mat4 get_perspective_projection(const float fovy,
                                      const float aspect,

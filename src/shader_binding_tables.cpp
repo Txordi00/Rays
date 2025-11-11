@@ -59,7 +59,6 @@ Buffer SbtHelper::create_shader_binding_table(const vk::Pipeline &rtPipeline)
 
     // Helper to retrieve the handle data
     auto getHandle = [&](int i) { return handles.data() + i * handleSize; };
-    auto prova = [&](int i) { std::cout << i << std::endl; };
 
     // Map the SBT buffer and write in the handles.
     uint8_t *pBuffer = (uint8_t *) rtSBTBuffer.allocationInfo.pMappedData;
