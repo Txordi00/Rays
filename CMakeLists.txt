@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 project(lrt LANGUAGES CXX)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # The user can set this to ON or OFF
 set(USE_VULKANHPP_CPP20_MODULE OFF)
@@ -14,21 +15,21 @@ find_package(Vulkan REQUIRED)
 
 # Require Vulkan version ≥ 1.3.256 (earliest version where the Vulkan CXX20 module was available)
 if( ${Vulkan_VERSION} VERSION_LESS "1.3.256" )
-  message( FATAL_ERROR "Minimum supported Vulkan version is 1.3.256. "
+    message( FATAL_ERROR "Minimum supported Vulkan version is 1.3.256. "
            "Found ${Vulkan_VERSION}."
   )
 endif()
 
 # set up Vulkan C++ module as a library
 if(USE_VULKANHPP_CPP20_MODULE)
-  add_library(VulkanHppModule)
-  target_sources( VulkanHppModule PUBLIC
+    add_library(VulkanHppModule)
+    target_sources( VulkanHppModule PUBLIC
     FILE_SET CXX_MODULES
     BASE_DIRS ${Vulkan_INCLUDE_DIR}
     FILES ${Vulkan_INCLUDE_DIR}/vulkan/vulkan.cppm)
-  target_compile_features(VulkanHppModule PUBLIC cxx_std_23)
-  target_compile_definitions(VulkanHppModule PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
-  target_link_libraries(VulkanHppModule PUBLIC Vulkan::Headers)
+    target_compile_features(VulkanHppModule PUBLIC cxx_std_23)
+    target_compile_definitions(VulkanHppModule PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+    target_link_libraries(VulkanHppModule PUBLIC Vulkan::Headers)
 endif()
 
 # GLM
@@ -68,12 +69,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE fastgltf::fastgltf)
 
 # Link either vulkan either the vulkan_hpp module
 if(USE_VULKANHPP_CPP20_MODULE)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE USE_CXX20_MODULES)
-  target_link_libraries(${PROJECT_NAME} PRIVATE VulkanHppModule)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_CXX20_MODULES)
+    target_link_libraries(${PROJECT_NAME} PRIVATE VulkanHppModule)
 else()
-  target_compile_definitions(${PROJECT_NAME} PRIVATE VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
-  target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Headers)
-  target_precompile_headers(${PROJECT_NAME} PRIVATE <vulkan/vulkan.hpp> <vulkan/vulkan_handles.hpp> <vulkan/vulkan_structs.hpp> <vulkan/vulkan_funcs.hpp>)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Headers)
+    target_precompile_headers(${PROJECT_NAME} PRIVATE <vulkan/vulkan.hpp> <vulkan/vulkan_handles.hpp> <vulkan/vulkan_structs.hpp> <vulkan/vulkan_funcs.hpp>)
 endif()
 
 # Compile the shaders on build
