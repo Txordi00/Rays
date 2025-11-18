@@ -31,7 +31,7 @@ float V_SmithGGXCorrelatedFast(float NoV, float NoL, float roughness) {
 }
 
 float Fd_Lambert() {
-    return 1.0 / PI;
+    return ONEOVERPI;
 }
 
 vec3 evaluate_directional_light(const Light light, const vec3 BSDF, const float NoL)
@@ -56,15 +56,29 @@ float luminance(const vec3 v)
 vec3 reinhard_jodie(const vec3 color)
 {
     float l = luminance(color);
-    vec3 tv = color / (1.0f + color);
-    return mix(color / (1.0f + l), tv, tv);
+    vec3 tv = color / (1.f + color);
+    return mix(color / (1.f + l), tv, tv);
 }
 
 vec3 sample_hemisphere(const mat3 S, const float u, const float v)
 {
     // Sample phi and theta in the local normal frame
-    const float phi = 2. * PI * u;
+    const float phi = TWOPI * u;
     const float theta = acos(1. - v);
+    const float stheta = sin(theta);
+    const float b1 = stheta * cos(phi);
+    const float b2 = stheta * sin(phi);
+    const float n = cos(theta);
+
+    // Return in world frame
+    return vec3(b1, b2, n) * S;
+}
+
+vec3 sample_microfacet_ggx_specular(const mat3 S, const float u, const float v, const float a)
+{
+    // Sample phi and theta in the local normal frame
+    const float phi = TWOPI * u;
+    const float theta = acos(sqrt((1 - v) / (v * (a * a - 1.) + 1.)));
     const float stheta = sin(theta);
     const float b1 = stheta * cos(phi);
     const float b2 = stheta * sin(phi);

@@ -260,10 +260,12 @@ void main()
     vec3 indirectLuminance = vec3(0.);
     if (rayPayload.depth < 2)
     {
+        const bool isMetallic = (metallic > 0.5);
         for (uint s = 0; s < 16; s++)
         {
-            const vec3 diffuseDir = sample_hemisphere(S, U[s], V[s]);
-            const float attenuation = clamp(dot(diffuseDir, normal), 0., 1.);
+            const vec3 diffuseDir = (!isMetallic) ? sample_hemisphere(S, U[s], V[s]) :
+                sample_microfacet_ggx_specular(S, U[s], V[s], a);
+            const float sampleDotNormal = clamp(dot(diffuseDir, normal), 0., 1.);
             rayPayload.hitValue = vec3(0.);
             const uint originalDepth = rayPayload.depth;
             traceRayEXT(
@@ -281,14 +283,15 @@ void main()
             );
             rayPayload.depth = originalDepth;
             // Accumulate indirect lighting
-            indirectLuminance += rayPayload.hitValue * Fd_Lambert() * attenuation;
+            indirectLuminance += rayPayload.hitValue * sampleDotNormal;
         }
         indirectLuminance /= 16.;
     }
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap
     // rayPayload.hitValue = abs(vec3(0., 0., 1.) * S - normal);
-    rayPayload.hitValue = (rayPayload.depth == 1) ? indirectLuminance : directLuminance + indirectLuminance;
+    // rayPayload.hitValue = (rayPayload.depth == 1) ? indirectLuminance : directLuminance + indirectLuminance;
+    rayPayload.hitValue = reinhard_jodie(directLuminance + indirectLuminance);
     // After color transfer, lose energy
     //    rayPayload.energyFactor *= ENERGY_LOSS;
 }

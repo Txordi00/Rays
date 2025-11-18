@@ -1,4 +1,6 @@
-#define PI 3.1415926535897932384626433832795
+const float PI = 3.1415926535897932384626433832795;
+const float TWOPI = 2. * PI;
+const float ONEOVERPI = 1. / PI;
 
 struct Vertex {
     vec3 position;
