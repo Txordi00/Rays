@@ -288,7 +288,7 @@ void main()
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap
     // rayPayload.hitValue = abs(vec3(0., 0., 1.) * S - normal);
-    rayPayload.hitValue = indirectLuminance;
+    rayPayload.hitValue = (rayPayload.depth == 1) ? indirectLuminance : directLuminance + indirectLuminance;
     // After color transfer, lose energy
     //    rayPayload.energyFactor *= ENERGY_LOSS;
 }

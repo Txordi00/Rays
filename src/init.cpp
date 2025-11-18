@@ -15,6 +15,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
+#include <print>
 
 Init::Init()
 {
@@ -24,6 +25,7 @@ Init::Init()
     window = SDL_CreateWindow(PROJNAME, W, H, SDL_WINDOW_VULKAN);
 
     init_vulkan();
+
     init_rt();
     create_swapchain(W, H);
     create_camera();

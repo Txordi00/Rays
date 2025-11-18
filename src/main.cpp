@@ -9,10 +9,12 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #endif
 
 #include "engine.hpp"
-#include <memory>
+// #include <memory>
+#include <print>
 
 int main(int argc, char *argv[])
 {
+    std::println("Hello");
     // Load the basic functionality of the dynamic dispatcher
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 #ifndef USE_CXX20_MODULES
@@ -24,7 +26,6 @@ int main(int argc, char *argv[])
 #endif
 
     std::unique_ptr<Engine> engine = std::make_unique<Engine>();
-
     engine->run();
 
     return 0;

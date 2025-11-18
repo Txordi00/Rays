@@ -50,11 +50,11 @@ void Engine::run()
                 quit = true;
                 break;
 
-            case SDL_EVENT_WINDOW_MINIMIZED:
-                stopRendering = true;
+                // case SDL_EVENT_WINDOW_MINIMIZED:
+                //     stopRendering = true;
 
-            case SDL_EVENT_WINDOW_RESTORED:
-                stopRendering = false;
+                // case SDL_EVENT_WINDOW_RESTORED:
+                //     stopRendering = false;
 
             case SDL_EVENT_KEY_DOWN:
                 // key = e.key.key;
@@ -267,7 +267,7 @@ void Engine::draw()
     // submit command buffer to the queue and execute it.
     // BEFORE: frameFence will now block until the graphic commands finish execution
     // NOW: We pass over submit2 and will wait on present to finish during the next draw() execution
-    I->graphicsQueue.submit2(submitInfo, nullptr);
+    I->graphicsQueue.submit2(submitInfo, frameFence);
     // I->graphicsQueue.submit2(submitInfo, frameFence);
 
     // prepare present
@@ -275,14 +275,14 @@ void Engine::draw()
     // we want to wait on the submitSemaphore for that,
     // as its necessary that drawing commands have finished before the image is displayed to the user
     // We signal the frame fence in order for the next execution to know when it's safe to start
-    vk::SwapchainPresentFenceInfoKHR swapchainPresentInfo{};
-    swapchainPresentInfo.setFences(frameFence);
-    swapchainPresentInfo.setSwapchainCount(1);
+    // vk::SwapchainPresentFenceInfoKHR swapchainPresentInfo{};
+    // swapchainPresentInfo.setFences(frameFence);
+    // swapchainPresentInfo.setSwapchainCount(1);
     vk::PresentInfoKHR presentInfo{};
     presentInfo.setSwapchains(I->swapchain);
     presentInfo.setWaitSemaphores(submitSemaphore);
     presentInfo.setImageIndices(swapchainImageIndex);
-    presentInfo.setPNext(&swapchainPresentInfo);
+    // presentInfo.setPNext(&swapchainPresentInfo);
 
     VK_CHECK_RES(I->graphicsQueue.presentKHR(presentInfo));
 

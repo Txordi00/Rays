@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 project(lrt LANGUAGES CXX)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # The user can set this to ON or OFF
 set(USE_VULKANHPP_CPP20_MODULE OFF)
