@@ -239,62 +239,60 @@ void main()
 
     // DIRECT LIGHTING
     vec3 directLuminance = vec3(0.);
-    if (rayPayload.depth == 2) {
-        for (uint i = 0; i < rayPush.numLights; i++) {
-            Light light = lights[nonuniformEXT(i)].light;
-            vec3 l;
-            float distanceSquared = 1.;
-            // Vector to the light
-            if (light.type == 0) { // Point
-                l = light.positionOrDirection - worldPos;
-                distanceSquared = dot(l, l);
-                l /= sqrt(distanceSquared);
-            } else if (light.type == 1) // Directional
-            {
-                l = -light.positionOrDirection; // Already normalized from Host
-            }
-            // Skip light if light or camera not looking to the hit point
-            const float NoL = clamp(dot(normal, l), 0., 1.);
-            const float NoV = abs(dot(normal, v)) + 1e-5;
-            if (NoL < 0.01 || NoV < 0.01)
-                continue;
-            // SHADOWS
-            const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
-                    | gl_RayFlagsSkipClosestHitShaderEXT;
-            // We initialize to true, if the miss shader is called it sets it to false
-            isShadowed = true;
-            traceRayEXT(topLevelAS, // acceleration structure
-                shadowFlags, // rayFlags
-                0xFF, // cullMask
-                0, // sbtRecordOffset
-                0, // sbtRecordStride
-                1, // missIndex
-                worldPos, // ray origin
-                tMin, // ray min range
-                l, // ray direction
-                tMax, // ray max range
-                1 // payload (location = 1)
-            );
-            if (isShadowed)
-                continue;
-
-            const vec3 h = normalize(l + v);
-
-            const float NoH = clamp(dot(normal, h), 0., 1.);
-            const float LoH = clamp(dot(l, h), 0., 1.);
-
-            const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
-                    diffuseColor, f0, f90, a);
-
-            // DIRECT LUMINANCE
-            vec3 luminance = vec3(0.);
-            if (light.type == 0) { // Point light
-                luminance = evaluate_point_light(light, distanceSquared, BSDF, NoL);
-            } else if (light.type == 1) { // Directional light
-                luminance = evaluate_directional_light(light, BSDF, NoL);
-            }
-            directLuminance += luminance;
+    for (uint i = 0; i < rayPush.numLights; i++) {
+        Light light = lights[nonuniformEXT(i)].light;
+        vec3 l;
+        float distanceSquared = 1.;
+        // Vector to the light
+        if (light.type == 0) { // Point
+            l = light.positionOrDirection - worldPos;
+            distanceSquared = dot(l, l);
+            l /= sqrt(distanceSquared);
+        } else if (light.type == 1) // Directional
+        {
+            l = -light.positionOrDirection; // Already normalized from Host
         }
+        // Skip light if light or camera not looking to the hit point
+        const float NoL = clamp(dot(normal, l), 0., 1.);
+        const float NoV = abs(dot(normal, v)) + 1e-5;
+        if (NoL < 0.01 || NoV < 0.01)
+            continue;
+        // SHADOWS
+        const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
+                | gl_RayFlagsSkipClosestHitShaderEXT;
+        // We initialize to true, if the miss shader is called it sets it to false
+        isShadowed = true;
+        traceRayEXT(topLevelAS, // acceleration structure
+            shadowFlags, // rayFlags
+            0xFF, // cullMask
+            0, // sbtRecordOffset
+            0, // sbtRecordStride
+            1, // missIndex
+            worldPos, // ray origin
+            tMin, // ray min range
+            l, // ray direction
+            tMax, // ray max range
+            1 // payload (location = 1)
+        );
+        if (isShadowed)
+            continue;
+
+        const vec3 h = normalize(l + v);
+
+        const float NoH = clamp(dot(normal, h), 0., 1.);
+        const float LoH = clamp(dot(l, h), 0., 1.);
+
+        const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
+                diffuseColor, f0, f90, a);
+
+        // DIRECT LUMINANCE
+        vec3 luminance = vec3(0.);
+        if (light.type == 0) { // Point light
+            luminance = evaluate_point_light(light, distanceSquared, BSDF, NoL);
+        } else if (light.type == 1) { // Directional light
+            luminance = evaluate_directional_light(light, BSDF, NoL);
+        }
+        directLuminance += luminance;
     }
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap
