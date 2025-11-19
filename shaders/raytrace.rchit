@@ -75,6 +75,7 @@ const float[16] U = float[16](0.03332273, 0.47041965, 0.72911237, 0.81380096, 0.
 const float[16] V = float[16](0.6107228, 0.11324917, 0.05834493, 0.13260942, 0.20491391, 0.50296205,
         0.83338829, 0.18605494, 0.70188256, 0.64591837, 0.50017247, 0.9231305,
         0.95426205, 0.03092327, 0.78868944, 0.10192183);
+const float PDF = 1. / TWOPI;
 
 void main()
 {
@@ -191,82 +192,30 @@ void main()
 
     // Ray directions
     const vec3 v = -gl_WorldRayDirectionEXT; // Inverse incoming (view) ray direction. Already normalized
-    vec3 directLuminance = vec3(0.);
-    for (uint i = 0; i < rayPush.numLights; i++) {
-        Light light = lights[nonuniformEXT(i)].light;
-        vec3 l;
-        float distanceSquared = 1.;
-        // Vector to the light
-        if (light.type == 0) { // Point
-            l = light.positionOrDirection - worldPos;
-            distanceSquared = dot(l, l);
-            l /= sqrt(distanceSquared);
-        } else if (light.type == 1) // Directional
-        {
-            l = -light.positionOrDirection; // Already normalized from Host
-        }
-        // Skip light if light or camera not looking to the hit point
-        const float NoL = clamp(dot(normal, l), 0., 1.);
-        const float NoV = abs(dot(normal, v)) + 1e-5;
-        if (NoL < 0.01 || NoV < 0.01)
-            continue;
-        // SHADOWS
-        const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
-                | gl_RayFlagsSkipClosestHitShaderEXT;
-        // We initialize to true, if the miss shader is called it sets it to false
-        isShadowed = true;
-        traceRayEXT(topLevelAS, // acceleration structure
-            shadowFlags, // rayFlags
-            0xFF, // cullMask
-            0, // sbtRecordOffset
-            0, // sbtRecordStride
-            1, // missIndex
-            worldPos, // ray origin
-            tMin, // ray min range
-            l, // ray direction
-            tMax, // ray max range
-            1 // payload (location = 1)
-        );
-        if (isShadowed)
-            continue;
+    const float NoV = abs(dot(normal, v)) + 1e-5;
 
-        const vec3 h = normalize(l + v);
-
-        const float NoH = clamp(dot(normal, h), 0., 1.);
-        const float LoH = clamp(dot(l, h), 0., 1.);
-
-        const float D = D_GGX(NoH, a);
-        const vec3 F = F_Schlick(LoH, f0, f90);
-        const float V = V_SmithGGXCorrelatedFast(NoV, NoL, a);
-
-        // specular BRDF
-        const vec3 Fr = D * V * F;
-
-        // diffuse BRDF
-        const vec3 Fd = diffuseColor * Fd_Lambert();
-
-        const vec3 BSDF = Fr + Fd;
-
-        // DIRECT LUMINANCE
-        vec3 luminance = vec3(0.);
-        if (light.type == 0) { // Point light
-            luminance = evaluate_point_light(light, distanceSquared, BSDF, NoL);
-        } else if (light.type == 1) { // Directional light
-            luminance = evaluate_directional_light(light, BSDF, NoL);
-        }
-        directLuminance += luminance;
-    }
-    // INDIRECT LUMINANCE
+    // INDIRECT LIGHTING
     vec3 indirectLuminance = vec3(0.);
-    if (rayPayload.depth < 2)
+    const uint numSamples = 8;
+    if (rayPayload.depth == 1)
     {
         const bool isMetallic = (metallic > 0.5);
-        for (uint s = 0; s < 16; s++)
+        for (uint s = 0; s < numSamples; s++)
         {
-            const vec3 diffuseDir = (!isMetallic) ? sample_hemisphere(S, U[s], V[s]) :
+            const vec3 l = (!isMetallic) ? sample_hemisphere(S, U[s], V[s]) :
                 sample_microfacet_ggx_specular(S, U[s], V[s], a);
-            const float sampleDotNormal = clamp(dot(diffuseDir, normal), 0., 1.);
-            rayPayload.hitValue = vec3(0.);
+
+            const vec3 h = normalize(l + v);
+            const float NoL = clamp(dot(normal, l), 0., 1.);
+            if (NoL < 0.01 || NoV < 0.01)
+                continue;
+            const float NoH = clamp(dot(normal, h), 0., 1.);
+            const float LoH = clamp(dot(l, h), 0., 1.);
+
+            const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
+                    diffuseColor, f0, f90, a);
+
+            // rayPayload.hitValue = vec3(0.);
             const uint originalDepth = rayPayload.depth;
             traceRayEXT(
                 topLevelAS,
@@ -277,21 +226,81 @@ void main()
                 0,
                 worldPos,
                 tMin,
-                diffuseDir,
+                l,
                 tMax,
                 0
             );
             rayPayload.depth = originalDepth;
             // Accumulate indirect lighting
-            indirectLuminance += rayPayload.hitValue * sampleDotNormal;
+            indirectLuminance += BSDF * rayPayload.hitValue * NoL / PDF;
         }
-        indirectLuminance /= 16.;
+        indirectLuminance /= float(numSamples);
+    }
+
+    // DIRECT LIGHTING
+    vec3 directLuminance = vec3(0.);
+    if (rayPayload.depth == 2) {
+        for (uint i = 0; i < rayPush.numLights; i++) {
+            Light light = lights[nonuniformEXT(i)].light;
+            vec3 l;
+            float distanceSquared = 1.;
+            // Vector to the light
+            if (light.type == 0) { // Point
+                l = light.positionOrDirection - worldPos;
+                distanceSquared = dot(l, l);
+                l /= sqrt(distanceSquared);
+            } else if (light.type == 1) // Directional
+            {
+                l = -light.positionOrDirection; // Already normalized from Host
+            }
+            // Skip light if light or camera not looking to the hit point
+            const float NoL = clamp(dot(normal, l), 0., 1.);
+            const float NoV = abs(dot(normal, v)) + 1e-5;
+            if (NoL < 0.01 || NoV < 0.01)
+                continue;
+            // SHADOWS
+            const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
+                    | gl_RayFlagsSkipClosestHitShaderEXT;
+            // We initialize to true, if the miss shader is called it sets it to false
+            isShadowed = true;
+            traceRayEXT(topLevelAS, // acceleration structure
+                shadowFlags, // rayFlags
+                0xFF, // cullMask
+                0, // sbtRecordOffset
+                0, // sbtRecordStride
+                1, // missIndex
+                worldPos, // ray origin
+                tMin, // ray min range
+                l, // ray direction
+                tMax, // ray max range
+                1 // payload (location = 1)
+            );
+            if (isShadowed)
+                continue;
+
+            const vec3 h = normalize(l + v);
+
+            const float NoH = clamp(dot(normal, h), 0., 1.);
+            const float LoH = clamp(dot(l, h), 0., 1.);
+
+            const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
+                    diffuseColor, f0, f90, a);
+
+            // DIRECT LUMINANCE
+            vec3 luminance = vec3(0.);
+            if (light.type == 0) { // Point light
+                luminance = evaluate_point_light(light, distanceSquared, BSDF, NoL);
+            } else if (light.type == 1) { // Directional light
+                luminance = evaluate_directional_light(light, BSDF, NoL);
+            }
+            directLuminance += luminance;
+        }
     }
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap
     // rayPayload.hitValue = abs(vec3(0., 0., 1.) * S - normal);
     // rayPayload.hitValue = (rayPayload.depth == 1) ? indirectLuminance : directLuminance + indirectLuminance;
-    rayPayload.hitValue = reinhard_jodie(directLuminance + indirectLuminance);
+    rayPayload.hitValue = directLuminance + indirectLuminance;
     // After color transfer, lose energy
     //    rayPayload.energyFactor *= ENERGY_LOSS;
 }

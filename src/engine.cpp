@@ -18,7 +18,7 @@ Engine::Engine()
     I = std::make_unique<Init>();
 
     // Init push constants
-    rayPush.clearColor = glm::vec4(0.f, 114.f/255.f, 160.f/255.f, 1.f);
+    rayPush.clearColor = glm::vec4(0.f, 0.2f, 0.5f, 1.f);
     rayPush.nLights = I->lights.size();
 }
 

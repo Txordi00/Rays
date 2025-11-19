@@ -34,6 +34,21 @@ float Fd_Lambert() {
     return ONEOVERPI;
 }
 
+vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float nDotL,
+    const vec3 diffuseColor, const vec3 f0, const float f90, const float a) {
+    const float D = D_GGX(nDotH, a);
+    const vec3 F = F_Schlick(lDotH, f0, f90);
+    const float V = V_SmithGGXCorrelatedFast(nDotV, nDotL, a);
+
+    // specular BRDF
+    const vec3 Fr = D * V * F;
+
+    // diffuse BRDF
+    const vec3 Fd = diffuseColor * Fd_Lambert();
+
+    return Fr + Fd;
+}
+
 vec3 evaluate_directional_light(const Light light, const vec3 BSDF, const float NoL)
 {
     const float illuminance = light.intensity * NoL;
