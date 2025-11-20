@@ -110,5 +110,5 @@ void sample_microfacet_ggx_specular(in const mat3 S, in const float u, in const 
 
     // Return in world frame
     sampleDir = vec3(b1, b2, n) * S;
-    pdf = D_specular_Disney_Epic(ctheta, a2);
+    pdf = D_specular_Disney_Epic(ctheta, a2) * ctheta * stheta;
 }

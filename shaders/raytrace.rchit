@@ -196,7 +196,7 @@ void main()
     // Set depth +1
     rayPayload.depth++;
 
-    if (rayPayload.depth > 2)
+    if (rayPayload.depth > 3)
         return;
 
     // -------- LOAD ALL THE DATA --------
@@ -299,11 +299,11 @@ void main()
     const vec3 v = -gl_WorldRayDirectionEXT; // Inverse incoming (view) ray direction. Already normalized
     const float NoV = abs(dot(normal, v)) + 1e-5;
 
-    // DIRECT LIGHTING
-    vec3 directLuminance = direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
-
     // INDIRECT LIGHTING
     vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, metallic);
+
+    // DIRECT LIGHTING
+    vec3 directLuminance = direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
 
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap
