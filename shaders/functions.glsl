@@ -23,42 +23,42 @@ float V_SmithGGXCorrelated(const float NoV, const float NoL, const float a) {
     return 0.5 / (GGXV + GGXL);
 }
 
-float V_SmithGGXCorrelatedFast(float NoV, float NoL, float roughness) {
-    const float a = roughness;
+float V_SmithGGXCorrelatedFast(const float NoV, const float NoL, const float a) {
+    // const float a2 = a * a;
     const float first = 2. * NoL * NoV;
     const float second = NoL + NoV;
     return mix(first, second, a);
 }
 
-float Fd_Lambert() {
-    return ONEOVERPI;
+float Fd_Lambert(const float nDotL) {
+    return nDotL * ONEOVERPI;
 }
 
 vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float nDotL,
     const vec3 diffuseColor, const vec3 f0, const float f90, const float a) {
     const float D = D_GGX(nDotH, a);
     const vec3 F = F_Schlick(lDotH, f0, f90);
-    const float V = V_SmithGGXCorrelatedFast(nDotV, nDotL, a);
+    const float V = V_SmithGGXCorrelated(nDotV, nDotL, a);
 
     // specular BRDF
     const vec3 Fr = D * V * F;
 
     // diffuse BRDF
-    const vec3 Fd = diffuseColor * Fd_Lambert();
+    const vec3 Fd = diffuseColor * Fd_Lambert(nDotL);
 
     return Fr + Fd;
 }
 
-vec3 evaluate_directional_light(const Light light, const vec3 BSDF, const float NoL)
+vec3 evaluate_directional_light(const Light light, const vec3 BSDF)
 {
-    const float illuminance = light.intensity * NoL;
+    const float illuminance = light.intensity;
     vec3 luminance = BSDF * illuminance * light.color;
     return luminance;
 }
 
-vec3 evaluate_point_light(const Light light, const float distanceSquared, const vec3 BSDF, const float NoL)
+vec3 evaluate_point_light(const Light light, const float distanceSquared, const vec3 BSDF)
 {
-    const float attenuation = light.intensity * NoL / distanceSquared;
+    const float attenuation = light.intensity / distanceSquared;
     vec3 luminance = BSDF * attenuation * light.color;
     return luminance;
 }

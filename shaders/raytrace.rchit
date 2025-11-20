@@ -67,8 +67,6 @@ push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
-const float ENERGY_LOSS = 0.8;
-float ENERGY_MIN = 1. * pow(ENERGY_LOSS, MAX_RT_DEPTH);
 const float[16] U = float[16](0.03332273, 0.47041965, 0.72911237, 0.81380096, 0.3772636, 0.11612163,
         0.85174269, 0.24601098, 0.96685445, 0.27057876, 0.50078939, 0.34142292,
         0.65175932, 0.27192558, 0.15626343, 0.09365886);
@@ -127,9 +125,9 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
         // DIRECT LUMINANCE
         vec3 luminance = vec3(0.);
         if (light.type == 0) { // Point light
-            luminance = evaluate_point_light(light, distanceSquared, BSDF, NoL);
+            luminance = evaluate_point_light(light, distanceSquared, BSDF);
         } else if (light.type == 1) { // Directional light
-            luminance = evaluate_directional_light(light, BSDF, NoL);
+            luminance = evaluate_directional_light(light, BSDF);
         }
         directLuminance += luminance;
     }
@@ -150,14 +148,15 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
 
     // Start sampling
     vec3 indirectLuminance = vec3(0.);
-    const uint numSamples = 8;
+    const uint numSamples = 16;
     const bool isMetallic = (metallic > 0.5);
     for (uint s = 0; s < numSamples; s++)
     {
         vec3 l;
         float pdf;
-        (!isMetallic) ? sample_hemisphere(S, U[s], V[s], l, pdf) :
-        sample_microfacet_ggx_specular(S, U[s], V[s], a, l, pdf);
+        sample_hemisphere(S, U[s], V[s], l, pdf);
+        // (!isMetallic) ? sample_hemisphere(S, U[s], V[s], l, pdf) :
+        // sample_microfacet_ggx_specular(S, U[s], V[s], a, l, pdf);
 
         const vec3 h = normalize(l + v);
         const float NoL = clamp(dot(normal, l), 0., 1.);
@@ -185,7 +184,7 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
         );
         rayPayload.depth = originalDepth;
         // Accumulate indirect lighting
-        indirectLuminance += BSDF * rayPayload.hitValue * NoL / pdf;
+        indirectLuminance += BSDF * rayPayload.hitValue / pdf;
     }
     indirectLuminance /= float(numSamples);
     return indirectLuminance;
@@ -196,7 +195,7 @@ void main()
     // Set depth +1
     rayPayload.depth++;
 
-    if (rayPayload.depth > 3)
+    if (rayPayload.depth > 2)
         return;
 
     // -------- LOAD ALL THE DATA --------
@@ -263,6 +262,7 @@ void main()
                 samplers[nonuniformEXT(colorSamplerIndex)]),
             uv)
             * mConstants.baseColorFactor; // range [0, 1]
+    // const vec4 baseColor = vec4(1.);
 
     const vec4 metallicRoughness = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
                 samplers[nonuniformEXT(materialSamplerIndex)]),
@@ -280,6 +280,7 @@ void main()
                 uv)
             - 1.; // range [0, 1] -> [-1, 1]
     const vec3 normal = normalize(TBN * normalTexRaw.xyz);
+    // const vec3 normal = normalVtx;
 
     // Transforming the position to world space
     const vec3 worldPos = (gl_ObjectToWorldEXT * vec4(pos, 1.)).xyz;
@@ -288,6 +289,7 @@ void main()
 
     // Parametrization
     const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
+    // const vec3 diffuseColor = vec3(1.);
     const float f90 = 1.;
     const float reflectance = 0.5;
     const vec3 f0 = mix(vec3(0.16 * reflectance * reflectance), baseColor.xyz, metallic);
@@ -297,7 +299,7 @@ void main()
 
     // Ray directions
     const vec3 v = -gl_WorldRayDirectionEXT; // Inverse incoming (view) ray direction. Already normalized
-    const float NoV = abs(dot(normal, v)) + 1e-5;
+    const float NoV = clamp(dot(normal, v), 1e-5, 1.);
 
     // INDIRECT LIGHTING
     vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, metallic);
@@ -310,27 +312,3 @@ void main()
     // rayPayload.hitValue = (rayPayload.depth == 1) ? indirectLuminance : directLuminance + indirectLuminance;
     rayPayload.hitValue = directLuminance + indirectLuminance;
 }
-
-// ColorRGB32F attenuation = ColorRGB32F(1.0f);
-// ColorRGB32F final_pixel_color = ColorRGB32F(1.0f);
-
-// Ray ray = camera_ray();
-// for (bounces)
-// {
-//     bool intersection_found = find_intersection(ray);
-
-//     if (intersection_found)
-//     {
-//         // compute_direct_lighting includes the BRDF evaluation
-//         ColorRGB32F direct_lighting = compute_direct_lighting();
-//         final_pixel_color += direct_lighting * attenuation;
-
-//         float pdf;
-//         ColorRGB32F bsdf_color = sample_BSDF_for_next_bounce(out ray, out pdf);
-
-//         attenuation *= bsdf_color / pdf;
-//     }
-//     else
-//         final_pixel_color  += envmap_color * attenuation;
-//     }
-// }
