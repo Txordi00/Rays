@@ -75,7 +75,7 @@ vec3 reinhard_jodie(const vec3 color)
     return mix(color / (1.f + l), tv, tv);
 }
 
-vec3 sample_hemisphere(const mat3 S, const float u, const float v)
+void sample_hemisphere(in const mat3 S, in const float u, in const float v, out vec3 sampleDir, out float pdf)
 {
     // Sample phi and theta in the local normal frame
     const float phi = TWOPI * u;
@@ -86,19 +86,29 @@ vec3 sample_hemisphere(const mat3 S, const float u, const float v)
     const float n = cos(theta);
 
     // Return in world frame
-    return vec3(b1, b2, n) * S;
+    sampleDir = vec3(b1, b2, n) * S;
+    pdf = ONEOVERTWOPI;
 }
 
-vec3 sample_microfacet_ggx_specular(const mat3 S, const float u, const float v, const float a)
+float D_specular_Disney_Epic(const float cosTheta, const float a2)
+{
+    const float denom = cosTheta * cosTheta * (a2 - 1.) + 1.;
+    return ONEOVERPI * a2 / (denom * denom);
+}
+
+void sample_microfacet_ggx_specular(in const mat3 S, in const float u, in const float v, in const float a, out vec3 sampleDir, out float pdf)
 {
     // Sample phi and theta in the local normal frame
     const float phi = TWOPI * u;
-    const float theta = acos(sqrt((1 - v) / (v * (a * a - 1.) + 1.)));
+    const float a2 = a * a;
+    const float theta = acos(sqrt((1 - v) / (v * (a2 - 1.) + 1.)));
     const float stheta = sin(theta);
+    const float ctheta = cos(theta);
     const float b1 = stheta * cos(phi);
     const float b2 = stheta * sin(phi);
-    const float n = cos(theta);
+    const float n = ctheta;
 
     // Return in world frame
-    return vec3(b1, b2, n) * S;
+    sampleDir = vec3(b1, b2, n) * S;
+    pdf = D_specular_Disney_Epic(ctheta, a2);
 }

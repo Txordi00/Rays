@@ -75,7 +75,6 @@ const float[16] U = float[16](0.03332273, 0.47041965, 0.72911237, 0.81380096, 0.
 const float[16] V = float[16](0.6107228, 0.11324917, 0.05834493, 0.13260942, 0.20491391, 0.50296205,
         0.83338829, 0.18605494, 0.70188256, 0.64591837, 0.50017247, 0.9231305,
         0.95426205, 0.03092327, 0.78868944, 0.10192183);
-const float PDF = 1. / TWOPI;
 
 void main()
 {
@@ -202,8 +201,10 @@ void main()
         const bool isMetallic = (metallic > 0.5);
         for (uint s = 0; s < numSamples; s++)
         {
-            const vec3 l = (!isMetallic) ? sample_hemisphere(S, U[s], V[s]) :
-                sample_microfacet_ggx_specular(S, U[s], V[s], a);
+            vec3 l;
+            float pdf;
+            (!isMetallic) ? sample_hemisphere(S, U[s], V[s], l, pdf) :
+            sample_microfacet_ggx_specular(S, U[s], V[s], a, l, pdf);
 
             const vec3 h = normalize(l + v);
             const float NoL = clamp(dot(normal, l), 0., 1.);
@@ -232,7 +233,7 @@ void main()
             );
             rayPayload.depth = originalDepth;
             // Accumulate indirect lighting
-            indirectLuminance += BSDF * rayPayload.hitValue * NoL / PDF;
+            indirectLuminance += BSDF * rayPayload.hitValue * NoL / pdf;
         }
         indirectLuminance /= float(numSamples);
     }
@@ -302,3 +303,27 @@ void main()
     // After color transfer, lose energy
     //    rayPayload.energyFactor *= ENERGY_LOSS;
 }
+
+// ColorRGB32F attenuation = ColorRGB32F(1.0f);
+// ColorRGB32F final_pixel_color = ColorRGB32F(1.0f);
+
+// Ray ray = camera_ray();
+// for (bounces)
+// {
+//     bool intersection_found = find_intersection(ray);
+
+//     if (intersection_found)
+//     {
+//         // compute_direct_lighting includes the BRDF evaluation
+//         ColorRGB32F direct_lighting = compute_direct_lighting();
+//         final_pixel_color += direct_lighting * attenuation;
+
+//         float pdf;
+//         ColorRGB32F bsdf_color = sample_BSDF_for_next_bounce(out ray, out pdf);
+
+//         attenuation *= bsdf_color / pdf;
+//     }
+//     else
+//         final_pixel_color  += envmap_color * attenuation;
+//     }
+// }
