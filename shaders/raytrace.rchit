@@ -67,12 +67,17 @@ push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
-const float[16] U = float[16](0.03332273, 0.47041965, 0.72911237, 0.81380096, 0.3772636, 0.11612163,
-        0.85174269, 0.24601098, 0.96685445, 0.27057876, 0.50078939, 0.34142292,
-        0.65175932, 0.27192558, 0.15626343, 0.09365886);
-const float[16] V = float[16](0.6107228, 0.11324917, 0.05834493, 0.13260942, 0.20491391, 0.50296205,
-        0.83338829, 0.18605494, 0.70188256, 0.64591837, 0.50017247, 0.9231305,
-        0.95426205, 0.03092327, 0.78868944, 0.10192183);
+const float[32] U = float[32](0.34361464, 0.85259443, 0.95633438, 0.54498809, 0.47627678, 0.56800618,
+        0.95203225, 0.86357389, 0.52722322, 0.02165122, 0.63769189, 0.80383463,
+        0.40038148, 0.88932535, 0.88761048, 0.67530902, 0.39644019, 0.99768781,
+        0.68291475, 0.19409989, 0.13159295, 0.42667955, 0.35874672, 0.26434985,
+        0.98143588, 0.89834575, 0.94807148, 0.55996671, 0.03799118, 0.62289601,
+        0.12558687, 0.09053281);
+const float[32] V = float[32](0.4593, 0.0435, 0.1560, 0.5664, 0.5184, 0.1265, 0.5784, 0.0231,
+        0.4089, 0.0002, 0.3500, 0.5367, 0.2603, 0.2816, 0.1707, 0.9832,
+        0.9082, 0.4580, 0.2491, 0.1814, 0.2087, 0.3002, 0.5458, 0.8119,
+        0.1780, 0.9022, 0.3494, 0.8041, 0.1553, 0.0321, 0.8280, 0.8341);
+const uint maxDepth = 2;
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
 {
@@ -148,27 +153,27 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
 
     // Start sampling
     vec3 indirectLuminance = vec3(0.);
-    const uint numSamples = 16;
+    const uint numSamples = 32;
     const bool isMetallic = (metallic > 0.5);
     for (uint s = 0; s < numSamples; s++)
     {
         vec3 l;
         float pdf;
-        sample_hemisphere(S, U[s], V[s], l, pdf);
+        cosine_sample_hemisphere(S, vec2(U[s], V[s]), l, pdf);
+        // sample_hemisphere(S, U[s], V[s], l, pdf);
         // (!isMetallic) ? sample_hemisphere(S, U[s], V[s], l, pdf) :
         // sample_microfacet_ggx_specular(S, U[s], V[s], a, l, pdf);
 
         const vec3 h = normalize(l + v);
         const float NoL = clamp(dot(normal, l), 0., 1.);
-        if (NoL < 0.01 || NoV < 0.01)
-            continue;
+        // if (NoL < 0.01 || NoV < 0.01)
+        //     continue;
         const float NoH = clamp(dot(normal, h), 0., 1.);
         const float LoH = clamp(dot(l, h), 0., 1.);
 
         const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
                 diffuseColor, f0, f90, a);
 
-        // rayPayload.hitValue = vec3(0.);
         const uint originalDepth = rayPayload.depth;
         traceRayEXT(topLevelAS, // acceleration structure
             gl_IncomingRayFlagsEXT, // rayFlags
@@ -195,8 +200,10 @@ void main()
     // Set depth +1
     rayPayload.depth++;
 
-    if (rayPayload.depth > 2)
+    if (rayPayload.depth > maxDepth) {
+        // rayPayload.hitValue = vec3(0.);
         return;
+    }
 
     // -------- LOAD ALL THE DATA --------
     const uint surfaceId = gl_InstanceCustomIndexEXT;
@@ -258,11 +265,11 @@ void main()
 
     const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
-    const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
-                samplers[nonuniformEXT(colorSamplerIndex)]),
-            uv)
-            * mConstants.baseColorFactor; // range [0, 1]
-    // const vec4 baseColor = vec4(1.);
+    // const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
+    //             samplers[nonuniformEXT(colorSamplerIndex)]),
+    //         uv)
+    //         * mConstants.baseColorFactor; // range [0, 1]
+    const vec4 baseColor = vec4(1.);
 
     const vec4 metallicRoughness = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
                 samplers[nonuniformEXT(materialSamplerIndex)]),
@@ -279,8 +286,8 @@ void main()
                     samplers[nonuniformEXT(normalSamplerIndex)]),
                 uv)
             - 1.; // range [0, 1] -> [-1, 1]
-    const vec3 normal = normalize(TBN * normalTexRaw.xyz);
-    // const vec3 normal = normalVtx;
+    // const vec3 normal = normalize(TBN * normalTexRaw.xyz);
+    const vec3 normal = normalVtx;
 
     // Transforming the position to world space
     const vec3 worldPos = (gl_ObjectToWorldEXT * vec4(pos, 1.)).xyz;
@@ -288,8 +295,8 @@ void main()
     // -------------- BRDF --------------
 
     // Parametrization
-    const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
-    // const vec3 diffuseColor = vec3(1.);
+    // const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
+    const vec3 diffuseColor = vec3(1.);
     const float f90 = 1.;
     const float reflectance = 0.5;
     const vec3 f0 = mix(vec3(0.16 * reflectance * reflectance), baseColor.xyz, metallic);
@@ -299,13 +306,14 @@ void main()
 
     // Ray directions
     const vec3 v = -gl_WorldRayDirectionEXT; // Inverse incoming (view) ray direction. Already normalized
-    const float NoV = clamp(dot(normal, v), 1e-5, 1.);
+    const float NoV = clamp(dot(normal, v), 0., 1.);
 
     // INDIRECT LIGHTING
-    vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, metallic);
+    // rayPayload.hitValue = vec3(0.);
+    vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, 0.);
 
     // DIRECT LIGHTING
-    vec3 directLuminance = direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
+    vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
 
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap

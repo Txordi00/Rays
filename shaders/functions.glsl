@@ -46,7 +46,7 @@ vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float n
     // diffuse BRDF
     const vec3 Fd = diffuseColor * Fd_Lambert(nDotL);
 
-    return Fr + Fd;
+    return Fd;
 }
 
 vec3 evaluate_directional_light(const Light light, const vec3 BSDF)
@@ -77,9 +77,10 @@ vec3 reinhard_jodie(const vec3 color)
 
 void sample_hemisphere(in const mat3 S, in const float u, in const float v, out vec3 sampleDir, out float pdf)
 {
-    // Sample phi and theta in the local normal frame
+    // Sample phi and theta
     const float phi = TWOPI * u;
     const float theta = acos(1. - v);
+    // Sample in the local normal frame (b1, b2, n)
     const float stheta = sin(theta);
     const float b1 = stheta * cos(phi);
     const float b2 = stheta * sin(phi);
@@ -111,4 +112,32 @@ void sample_microfacet_ggx_specular(in const mat3 S, in const float u, in const 
     // Return in world frame
     sampleDir = vec3(b1, b2, n) * S;
     pdf = D_specular_Disney_Epic(ctheta, a2) * ctheta * stheta;
+}
+
+vec2 concentric_sample_disk(const vec2 u, out float cosTheta) {
+    vec2 uOffset = 2. * u - vec2(1.);
+    if (abs(uOffset.x) < 0.001 && abs(uOffset.y) < 0.001) {
+        cosTheta = 0.;
+        return vec2(0.);
+    }
+    float theta, r;
+    if (abs(uOffset.x) > abs(uOffset.y)) {
+        r = uOffset.x;
+        theta = PI / 4. * (uOffset.y / uOffset.x);
+    } else {
+        r = uOffset.y;
+        theta = PI / 2. - PI / 4. * (uOffset.x / uOffset.y);
+    }
+    cosTheta = cos(theta);
+    return r * vec2(cosTheta, sin(theta));
+}
+
+void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf) {
+    float cosTheta;
+    const vec2 d = concentric_sample_disk(u, cosTheta);
+    const float d2 = dot(d, d);
+    const float z = sqrt(max(0., 1. - d2));
+    const vec3 sampleInNormalFrame = vec3(d.x, d.y, z);
+    sampleDir = sampleInNormalFrame * S;
+    pdf = cosTheta * ONEOVERPI;
 }
