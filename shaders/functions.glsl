@@ -114,7 +114,7 @@ void sample_microfacet_ggx_specular(in const mat3 S, in const float u, in const 
     pdf = D_specular_Disney_Epic(ctheta, a2) * ctheta * stheta;
 }
 
-vec2 concentric_sample_disk(const vec2 u, out float cosTheta) {
+vec2 concentric_sample_disk(const vec2 u, out float cosTheta, out float sinTheta) {
     vec2 uOffset = 2. * u - vec2(1.);
     if (abs(uOffset.x) < 0.001 && abs(uOffset.y) < 0.001) {
         cosTheta = 0.;
@@ -129,15 +129,21 @@ vec2 concentric_sample_disk(const vec2 u, out float cosTheta) {
         theta = PI / 2. - PI / 4. * (uOffset.x / uOffset.y);
     }
     cosTheta = cos(theta);
-    return r * vec2(cosTheta, sin(theta));
+    sinTheta = sin(theta);
+    return r * vec2(cosTheta, sinTheta);
 }
 
 void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf) {
-    float cosTheta;
-    const vec2 d = concentric_sample_disk(u, cosTheta);
+    float cosTheta, sinTheta;
+    const vec2 d = concentric_sample_disk(u, cosTheta, sinTheta);
     const float d2 = dot(d, d);
     const float z = sqrt(max(0., 1. - d2));
-    const vec3 sampleInNormalFrame = vec3(d.x, d.y, z);
-    sampleDir = sampleInNormalFrame * S;
+    const vec3 sampleInNormalFrame = normalize(vec3(d.x, d.y, z));
+    sampleDir = normalize(sampleInNormalFrame * S);
     pdf = cosTheta * ONEOVERPI;
+}
+
+float rand(vec2 co)
+{
+    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }

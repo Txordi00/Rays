@@ -67,17 +67,50 @@ push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
-const float[32] U = float[32](0.34361464, 0.85259443, 0.95633438, 0.54498809, 0.47627678, 0.56800618,
-        0.95203225, 0.86357389, 0.52722322, 0.02165122, 0.63769189, 0.80383463,
-        0.40038148, 0.88932535, 0.88761048, 0.67530902, 0.39644019, 0.99768781,
-        0.68291475, 0.19409989, 0.13159295, 0.42667955, 0.35874672, 0.26434985,
-        0.98143588, 0.89834575, 0.94807148, 0.55996671, 0.03799118, 0.62289601,
-        0.12558687, 0.09053281);
-const float[32] V = float[32](0.4593, 0.0435, 0.1560, 0.5664, 0.5184, 0.1265, 0.5784, 0.0231,
-        0.4089, 0.0002, 0.3500, 0.5367, 0.2603, 0.2816, 0.1707, 0.9832,
-        0.9082, 0.4580, 0.2491, 0.1814, 0.2087, 0.3002, 0.5458, 0.8119,
-        0.1780, 0.9022, 0.3494, 0.8041, 0.1553, 0.0321, 0.8280, 0.8341);
-const uint maxDepth = 2;
+// const float[32] U = float[32](0.34361464, 0.85259443, 0.95633438, 0.54498809, 0.47627678, 0.56800618,
+//         0.95203225, 0.86357389, 0.52722322, 0.02165122, 0.63769189, 0.80383463,
+//         0.40038148, 0.88932535, 0.88761048, 0.67530902, 0.39644019, 0.99768781,
+//         0.68291475, 0.19409989, 0.13159295, 0.42667955, 0.35874672, 0.26434985,
+//         0.98143588, 0.89834575, 0.94807148, 0.55996671, 0.03799118, 0.62289601,
+//         0.12558687, 0.09053281);
+// const float[32] V = float[32](0.4593, 0.0435, 0.1560, 0.5664, 0.5184, 0.1265, 0.5784, 0.0231,
+//         0.4089, 0.0002, 0.3500, 0.5367, 0.2603, 0.2816, 0.1707, 0.9832,
+//         0.9082, 0.4580, 0.2491, 0.1814, 0.2087, 0.3002, 0.5458, 0.8119,
+//         0.1780, 0.9022, 0.3494, 0.8041, 0.1553, 0.0321, 0.8280, 0.8341);
+float[32][2] UV = float[32][2](
+        float[2](0.80918866, 0.73555427),
+        float[2](0.31952403, 0.46541552),
+        float[2](0.98199345, 0.05692386),
+        float[2](0.93412786, 0.86172431),
+        float[2](0.21233514, 0.51606522),
+        float[2](0.46286697, 0.59213721),
+        float[2](0.05000782, 0.82653978),
+        float[2](0.73490317, 0.02261001),
+        float[2](0.25135304, 0.41662461),
+        float[2](0.57209909, 0.07445831),
+        float[2](0.26934258, 0.90995006),
+        float[2](0.8215488, 0.62998104),
+        float[2](0.30568502, 0.00312605),
+        float[2](0.16574971, 0.84374354),
+        float[2](0.56525967, 0.38960361),
+        float[2](0.8389401, 0.45214875),
+        float[2](0.69068081, 0.23294052),
+        float[2](0.22936854, 0.73513904),
+        float[2](0.77063564, 0.91051739),
+        float[2](0.89193338, 0.32682744),
+        float[2](0.67525698, 0.4864062),
+        float[2](0.10102081, 0.61900286),
+        float[2](0.97006881, 0.72581968),
+        float[2](0.35163832, 0.47681911),
+        float[2](0.31438029, 0.59929662),
+        float[2](0.85507134, 0.62248693),
+        float[2](0.23788793, 0.30178636),
+        float[2](0.10893564, 0.54384167),
+        float[2](0.50782942, 0.21646965),
+        float[2](0.71244726, 0.81729762),
+        float[2](0.12920395, 0.21908925),
+        float[2](0.44975938, 0.52771852));
+const uint maxDepth = 3;
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
 {
@@ -139,8 +172,11 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
     return directLuminance;
 }
 
-vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV, const float metallic)
+void indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV, const float metallic)
 {
+    if (rayPayload.depth == maxDepth)
+        return;
+
     // Local normal frame
     const float nx = normal.x;
     const float ny = normal.y;
@@ -152,14 +188,14 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
             -nx, -ny, nz) : mat3(0., -1., 0., -1., 0., 0., 0., 0., -1.);
 
     // Start sampling
-    vec3 indirectLuminance = vec3(0.);
+    // vec3 indirectLuminance = vec3(0.);
     const uint numSamples = 32;
     const bool isMetallic = (metallic > 0.5);
     for (uint s = 0; s < numSamples; s++)
     {
         vec3 l;
         float pdf;
-        cosine_sample_hemisphere(S, vec2(U[s], V[s]), l, pdf);
+        cosine_sample_hemisphere(S, vec2(UV[s][0], UV[s][1]), l, pdf);
         // sample_hemisphere(S, U[s], V[s], l, pdf);
         // (!isMetallic) ? sample_hemisphere(S, U[s], V[s], l, pdf) :
         // sample_microfacet_ggx_specular(S, U[s], V[s], a, l, pdf);
@@ -175,6 +211,7 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
                 diffuseColor, f0, f90, a);
 
         const uint originalDepth = rayPayload.depth;
+        const vec3 originalHitValue = rayPayload.hitValue;
         traceRayEXT(topLevelAS, // acceleration structure
             gl_IncomingRayFlagsEXT, // rayFlags
             0xFF, // cullMask
@@ -187,12 +224,14 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
             tMax, // ray max range
             0 // payload
         );
-        rayPayload.depth = originalDepth;
         // Accumulate indirect lighting
-        indirectLuminance += BSDF * rayPayload.hitValue / pdf;
+        // indirectLuminance += BSDF * rayPayload.hitValue / pdf;
+        rayPayload.hitValue += BSDF * rayPayload.hitValue / (pdf * float(numSamples));
+        // rayPayload.hitValue = originalHitValue;
+        rayPayload.depth = originalDepth;
     }
-    indirectLuminance /= float(numSamples);
-    return indirectLuminance;
+    // indirectLuminance /= float(numSamples);
+    // return indirectLuminance;
 }
 
 void main()
@@ -201,7 +240,7 @@ void main()
     rayPayload.depth++;
 
     if (rayPayload.depth > maxDepth) {
-        // rayPayload.hitValue = vec3(0.);
+        rayPayload.hitValue = vec3(0.);
         return;
     }
 
@@ -310,13 +349,14 @@ void main()
 
     // INDIRECT LIGHTING
     // rayPayload.hitValue = vec3(0.);
-    vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, 0.);
+    // vec3 indirectLuminance =
+    indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, 0.);
 
     // DIRECT LIGHTING
-    vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
+    // vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
 
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap
     // rayPayload.hitValue = (rayPayload.depth == 1) ? indirectLuminance : directLuminance + indirectLuminance;
-    rayPayload.hitValue = directLuminance + indirectLuminance;
+    // rayPayload.hitValue = directLuminance + indirectLuminance;
 }
