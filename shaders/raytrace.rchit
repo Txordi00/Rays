@@ -9,7 +9,8 @@
 #include "functions.glsl"
 
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
-layout(location = 1) rayPayloadEXT bool isShadowed;
+layout(location = 1) rayPayloadEXT HitPayload recursivePayload; // Separate payload for recursive shots
+layout(location = 2) rayPayloadEXT bool isShadowed;
 layout(constant_id = 0) const uint MAX_RT_DEPTH = 3;
 hitAttributeEXT vec2 attribs;
 layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
@@ -110,7 +111,7 @@ float[32][2] UV = float[32][2](
         float[2](0.71244726, 0.81729762),
         float[2](0.12920395, 0.21908925),
         float[2](0.44975938, 0.52771852));
-const uint maxDepth = 3;
+const uint maxDepth = 4;
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
 {
@@ -147,7 +148,7 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
             tMin, // ray min range
             l, // ray direction
             tMax, // ray max range
-            1 // payload (location = 1)
+            2 // payload (location = 1)
         );
         if (isShadowed)
             continue;
@@ -172,10 +173,10 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
     return directLuminance;
 }
 
-void indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV, const float metallic)
+vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV, const float metallic)
 {
     if (rayPayload.depth == maxDepth)
-        return;
+        return vec3(0.);
 
     // Local normal frame
     const float nx = normal.x;
@@ -188,30 +189,33 @@ void indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
             -nx, -ny, nz) : mat3(0., -1., 0., -1., 0., 0., 0., 0., -1.);
 
     // Start sampling
-    // vec3 indirectLuminance = vec3(0.);
-    const uint numSamples = 32;
+    vec3 indirectLuminance = vec3(0.);
+    const uint numSamples = 4;
     const bool isMetallic = (metallic > 0.5);
+    uint samples = numSamples;
     for (uint s = 0; s < numSamples; s++)
     {
         vec3 l;
-        float pdf;
-        cosine_sample_hemisphere(S, vec2(UV[s][0], UV[s][1]), l, pdf);
+        float pdf, cosTheta;
+        cosine_sample_hemisphere(S, vec2(UV[s][0], UV[s][1]), l, pdf, cosTheta);
         // sample_hemisphere(S, U[s], V[s], l, pdf);
         // (!isMetallic) ? sample_hemisphere(S, U[s], V[s], l, pdf) :
         // sample_microfacet_ggx_specular(S, U[s], V[s], a, l, pdf);
 
         const vec3 h = normalize(l + v);
-        const float NoL = clamp(dot(normal, l), 0., 1.);
-        // if (NoL < 0.01 || NoV < 0.01)
+        // const float NoL = clamp(dot(normal, l), 0., 1.);
+        // if (NoL < 0.01 || NoV < 0.01) {
+        //     samples--;
         //     continue;
+        // }
         const float NoH = clamp(dot(normal, h), 0., 1.);
         const float LoH = clamp(dot(l, h), 0., 1.);
 
-        const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
+        const vec3 BSDF = BSDF(NoH, LoH, NoV, cosTheta,
                 diffuseColor, f0, f90, a);
 
-        const uint originalDepth = rayPayload.depth;
-        const vec3 originalHitValue = rayPayload.hitValue;
+        recursivePayload.hitValue = vec3(0.);
+        recursivePayload.depth = rayPayload.depth;
         traceRayEXT(topLevelAS, // acceleration structure
             gl_IncomingRayFlagsEXT, // rayFlags
             0xFF, // cullMask
@@ -222,16 +226,14 @@ void indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
             tMin, // ray min range
             l, // ray direction
             tMax, // ray max range
-            0 // payload
+            1 // payload
         );
         // Accumulate indirect lighting
-        // indirectLuminance += BSDF * rayPayload.hitValue / pdf;
-        rayPayload.hitValue += BSDF * rayPayload.hitValue / (pdf * float(numSamples));
-        // rayPayload.hitValue = originalHitValue;
-        rayPayload.depth = originalDepth;
+        indirectLuminance += BSDF * recursivePayload.hitValue / (pdf);
+        // rayPayload.hitValue += BSDF * rayPayload.hitValue / (pdf * float(numSamples));
     }
-    // indirectLuminance /= float(numSamples);
-    // return indirectLuminance;
+    indirectLuminance /= float(samples);
+    return indirectLuminance;
 }
 
 void main()
@@ -240,7 +242,7 @@ void main()
     rayPayload.depth++;
 
     if (rayPayload.depth > maxDepth) {
-        rayPayload.hitValue = vec3(0.);
+        // rayPayload.hitValue = vec3(1.);
         return;
     }
 
@@ -349,14 +351,13 @@ void main()
 
     // INDIRECT LIGHTING
     // rayPayload.hitValue = vec3(0.);
-    // vec3 indirectLuminance =
-    indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, 0.);
+    vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, 0.);
 
     // DIRECT LIGHTING
-    // vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
+    vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
 
     // Add this particular contribution to the total ray payload
     // reinhard_jodie to tonemap
     // rayPayload.hitValue = (rayPayload.depth == 1) ? indirectLuminance : directLuminance + indirectLuminance;
-    // rayPayload.hitValue = directLuminance + indirectLuminance;
+    rayPayload.hitValue = directLuminance + indirectLuminance;
 }

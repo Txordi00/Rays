@@ -6,7 +6,7 @@
 #include "types.glsl"
 //#include "functions.glsl"
 
-layout(location = 1) rayPayloadInEXT bool isShadowed;
+layout(location = 2) rayPayloadInEXT bool isShadowed;
 
 //push constants block
 layout(scalar, push_constant) uniform RayPushConstants
@@ -17,5 +17,5 @@ push;
 
 void main()
 {
-  isShadowed = false;
+    isShadowed = false;
 }

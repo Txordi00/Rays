@@ -133,8 +133,8 @@ vec2 concentric_sample_disk(const vec2 u, out float cosTheta, out float sinTheta
     return r * vec2(cosTheta, sinTheta);
 }
 
-void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf) {
-    float cosTheta, sinTheta;
+void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf, out float cosTheta) {
+    float sinTheta;
     const vec2 d = concentric_sample_disk(u, cosTheta, sinTheta);
     const float d2 = dot(d, d);
     const float z = sqrt(max(0., 1. - d2));
