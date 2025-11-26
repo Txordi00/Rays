@@ -77,19 +77,23 @@ vec3 reinhard_jodie(const vec3 color)
     return mix(color / (1.f + l), tv, tv);
 }
 
-void sample_hemisphere(in const mat3 S, in const float u, in const float v, out vec3 sampleDir, out float pdf)
+void sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf, out float nDotL)
 {
     // Sample phi and theta
-    const float phi = TWOPI * u;
-    const float theta = acos(1. - v);
+    const float phi = TWOPI * u[0];
+    const float ctheta = 1. - u[1];
     // Sample in the local normal frame (b1, b2, n)
-    const float stheta = sin(theta);
+    const float stheta = sqrt(1. - ctheta * ctheta);
     const float b1 = stheta * cos(phi);
     const float b2 = stheta * sin(phi);
-    const float n = cos(theta);
+    // const float n = ctheta;
+    const vec3 sampleInNormalFrame = vec3(b1, b2, ctheta);
 
     // Return in world frame
-    sampleDir = vec3(b1, b2, n) * S;
+    sampleDir = S * sampleInNormalFrame;
+    nDotL = dot(sampleDir, S[2]);
+    // if (S[2].z == -1.)
+    print_val("sh: %f ", abs(nDotL - ctheta), 0., 0.01);
     pdf = ONEOVERTWOPI;
 }
 
@@ -105,12 +109,13 @@ void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const v
     const float phi = TWOPI * u[0];
     const float a2 = a * a; // a in my case is already a = perceptualRoughness^2
     const float ctheta = sqrt((1 - u[1]) / (u[1] * (a2 - 1.) + 1.));
+    // print_val("ct: %f ", ctheta, -1., 1.);
     const float stheta = sqrt(1.0 - ctheta * ctheta);
 
     // Half vector in local frame
     const vec3 hLocal = vec3(stheta * cos(phi), stheta * sin(phi), ctheta);
     // Move to world frame
-    const vec3 hWorld = normalize(S * hLocal);
+    const vec3 hWorld = S * hLocal;
 
     // Reflect view direction around half-vector to get light direction
     sampleDir = normalize(reflect(-v, hWorld));
@@ -151,43 +156,14 @@ void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleD
     const vec2 d = concentric_sample_disk(u);
     const float d2 = dot(d, d);
     const float z = sqrt(max(0., 1. - d2));
-    const vec3 sampleInNormalFrame = vec3(d.x, d.y, z);
-    sampleDir = normalize(S * sampleInNormalFrame);
-    nDotL = clamp(dot(sampleDir, S[2]), 1e-5, 1.);
-    pdf = nDotL * ONEOVERPI;
+    const vec3 sampleInNormalFrame = normalize(vec3(d.x, d.y, z));
+    sampleDir = S * sampleInNormalFrame;
+    nDotL = sampleInNormalFrame.z;
+    // print_val("dc: %f ", abs(sampleInNormalFrame.z - nDotL), 0., 0.01);
+    pdf = (nDotL > 1e-5) ? nDotL * ONEOVERPI : -1.;
 }
 
 float rand(vec2 co)
 {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
-// vec3 trowbridge_reitz_sample(const vec3 wo,
-//     const Point2f & u ) const {
-//     Vector3f wh;
-// if ( ! sampleVisibleArea ) {
-// Float cosTheta = 0, phi = (2 * Pi) * u[1];
-// if ( alphax == alphay ) {
-// Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
-// cosTheta = 1 / std : : sqrt(1+tanTheta2);
-// } else {
-// phi =
-// std : : atan(alphay/alphax*std: : tan(2*Pi*u[1]+.5f*Pi));
-// if ( u[1] > .5f ) phi += Pi;
-// Float sinPhi = std : : sin(phi), cosPhi = std : : cos(phi);
-// const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
-// const Float alpha2 =
-//     1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
-// Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
-// cosTheta = 1 / std : : sqrt(1+tanTheta2);
-// }
-// Float sinTheta =
-//     std : : sqrt(std: : max((Float)0., (Float)1.-cosTheta*cosTheta));
-// wh = SphericalDirection(sinTheta, cosTheta, phi);
-// if ( ! SameHemisphere(wo, wh)) wh = - wh;
-// } else {
-// bool flip = wo.z < 0;
-// wh = TrowbridgeReitzSample(flip?-wo: wo, alphax, alphay, u[0], u[1]);
-// if ( flip ) wh = - wh;
-// }
-// return wh;
-// }

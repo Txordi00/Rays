@@ -68,7 +68,7 @@ push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
-const uint maxDepth = 3;
+const uint maxDepth = 2;
 const uint numSamples = 32;
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
@@ -140,10 +140,11 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
     const float nx = normal.x;
     const float ny = normal.y;
     const float nz = normal.z;
-    const float nz1 = 1. / (1 + nz);
+    const float nz1 = 1. / (1. + nz);
     const float nxony = -nx * ny;
-    const mat3 S = (nz > -0.999) ? transpose(mat3(1. - nx * nx * nz1, nxony, nx,
-                nxony, 1. - ny * ny * nz1, ny,
+    const float nxonynz1 = nxony * nz1;
+    const mat3 S = (nz > -0.999999) ? transpose(mat3(1. - nx * nx * nz1, nxonynz1, nx,
+                nxonynz1, 1. - ny * ny * nz1, ny,
                 -nx, -ny, nz)) : mat3(0., -1., 0., -1., 0., 0., 0., 0., -1.);
 
     // Start sampling
@@ -304,7 +305,7 @@ void main()
     const float NoV = clamp(dot(normal, v), 0., 1.);
 
     // INDIRECT LIGHTING
-    vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, 0.2, NoV, 0.);
+    vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, perceptualRoughness, NoV, 0.);
 
     // DIRECT LIGHTING
     vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
