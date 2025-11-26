@@ -1,3 +1,5 @@
+#extension GL_EXT_debug_printf : require
+
 #define print_val(message, val, valMin, valMax) if(val < valMin || val > valMax){ \
        debugPrintfEXT(message, val); \
      }
@@ -46,7 +48,7 @@ vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float n
     // diffuse BRDF
     const vec3 Fd = diffuseColor * Fd_Lambert(nDotL);
 
-    return Fd;
+    return Fr;
 }
 
 vec3 evaluate_directional_light(const Light light, const vec3 BSDF)
@@ -97,27 +99,41 @@ float D_specular_Disney_Epic(const float cosTheta, const float a2)
     return ONEOVERPI * a2 / (denom * denom);
 }
 
-void sample_microfacet_ggx_specular(in const mat3 S, in const float u, in const float v, in const float a, out vec3 sampleDir, out float pdf)
+void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const vec2 u, in const float a, out vec3 sampleDir, out float nDotL, out float pdf)
 {
     // Sample phi and theta in the local normal frame
-    const float phi = TWOPI * u;
-    const float a2 = a * a;
-    const float theta = acos(sqrt((1 - v) / (v * (a2 - 1.) + 1.)));
-    const float stheta = sin(theta);
-    const float ctheta = cos(theta);
-    const float b1 = stheta * cos(phi);
-    const float b2 = stheta * sin(phi);
-    const float n = ctheta;
+    const float phi = TWOPI * u[0];
+    const float a2 = a * a; // a in my case is already a = perceptualRoughness^2
+    const float ctheta = sqrt((1 - u[1]) / (u[1] * (a2 - 1.) + 1.));
+    const float stheta = sqrt(1.0 - ctheta * ctheta);
 
-    // Return in world frame
-    sampleDir = vec3(b1, b2, n) * S;
-    pdf = D_specular_Disney_Epic(ctheta, a2) * ctheta * stheta;
+    // Half vector in local frame
+    const vec3 hLocal = vec3(stheta * cos(phi), stheta * sin(phi), ctheta);
+    // Move to world frame
+    const vec3 hWorld = normalize(S * hLocal);
+
+    // Reflect view direction around half-vector to get light direction
+    sampleDir = normalize(reflect(-v, hWorld));
+
+    nDotL = dot(sampleDir, S[2]);
+    float vDotH = dot(v, hWorld);
+    // ctheta = nDotH
+    if (nDotL < 1e-5 || vDotH < 1e-5 || ctheta < 1e-5)
+    {
+        pdf = -1.; // If pdf negative, the sample will be skipped
+        return;
+    }
+    // PDF transformation from half-vector to light direction
+    const float D = D_specular_Disney_Epic(ctheta, a2);
+    const float pdf_h = D * ctheta;
+
+    // Jacobian: pdf_l = pdf_h / (4 * |v·h|)
+    pdf = pdf_h / (4. * vDotH);
 }
 
-vec2 concentric_sample_disk(const vec2 u, out float cosTheta, out float sinTheta) {
+vec2 concentric_sample_disk(const vec2 u) {
     vec2 uOffset = 2. * u - vec2(1.);
     if (abs(uOffset.x) < 0.001 && abs(uOffset.y) < 0.001) {
-        cosTheta = 0.;
         return vec2(0.);
     }
     float theta, r;
@@ -128,22 +144,50 @@ vec2 concentric_sample_disk(const vec2 u, out float cosTheta, out float sinTheta
         r = uOffset.y;
         theta = PI / 2. - PI / 4. * (uOffset.x / uOffset.y);
     }
-    cosTheta = cos(theta);
-    sinTheta = sin(theta);
-    return r * vec2(cosTheta, sinTheta);
+    return r * vec2(cos(theta), sin(theta));
 }
 
-void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf, out float cosTheta) {
-    float sinTheta;
-    const vec2 d = concentric_sample_disk(u, cosTheta, sinTheta);
+void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf, out float nDotL) {
+    const vec2 d = concentric_sample_disk(u);
     const float d2 = dot(d, d);
     const float z = sqrt(max(0., 1. - d2));
-    const vec3 sampleInNormalFrame = normalize(vec3(d.x, d.y, z));
-    sampleDir = normalize(sampleInNormalFrame * S);
-    pdf = cosTheta * ONEOVERPI;
+    const vec3 sampleInNormalFrame = vec3(d.x, d.y, z);
+    sampleDir = normalize(S * sampleInNormalFrame);
+    nDotL = clamp(dot(sampleDir, S[2]), 1e-5, 1.);
+    pdf = nDotL * ONEOVERPI;
 }
 
 float rand(vec2 co)
 {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
+// vec3 trowbridge_reitz_sample(const vec3 wo,
+//     const Point2f & u ) const {
+//     Vector3f wh;
+// if ( ! sampleVisibleArea ) {
+// Float cosTheta = 0, phi = (2 * Pi) * u[1];
+// if ( alphax == alphay ) {
+// Float tanTheta2 = alphax * alphax * u[0] / (1.0f - u[0]);
+// cosTheta = 1 / std : : sqrt(1+tanTheta2);
+// } else {
+// phi =
+// std : : atan(alphay/alphax*std: : tan(2*Pi*u[1]+.5f*Pi));
+// if ( u[1] > .5f ) phi += Pi;
+// Float sinPhi = std : : sin(phi), cosPhi = std : : cos(phi);
+// const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
+// const Float alpha2 =
+//     1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
+// Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
+// cosTheta = 1 / std : : sqrt(1+tanTheta2);
+// }
+// Float sinTheta =
+//     std : : sqrt(std: : max((Float)0., (Float)1.-cosTheta*cosTheta));
+// wh = SphericalDirection(sinTheta, cosTheta, phi);
+// if ( ! SameHemisphere(wo, wh)) wh = - wh;
+// } else {
+// bool flip = wo.z < 0;
+// wh = TrowbridgeReitzSample(flip?-wo: wo, alphax, alphay, u[0], u[1]);
+// if ( flip ) wh = - wh;
+// }
+// return wh;
+// }
