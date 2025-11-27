@@ -531,7 +531,7 @@ void Init::create_lights()
         const float z = r * sin(2.f * glm::pi<float>() * in);
         Light pointLight{device, allocator};
         pointLight.lightData.positionOrDirection = c + glm::vec3(x, y, z);
-        pointLight.lightData.intensity = 100.f;
+        pointLight.lightData.intensity = 40.f;
         pointLight.lightData.type = LightType::ePoint;
         pointLight.upload();
         lights.emplace_back(pointLight);
@@ -555,4 +555,3 @@ void Init::destroy_swapchain()
     }
     swapchainImages.clear();
 }
-

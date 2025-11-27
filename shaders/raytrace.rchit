@@ -68,8 +68,9 @@ push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
-const uint maxDepth = 2;
-const uint numSamples = 32;
+const uint maxDepth = 3;
+const uint numSamples = 4;
+const bool random = true;
 uint rngState = gl_LaunchSizeEXT.x * gl_LaunchIDEXT.y + gl_LaunchIDEXT.x; // Initial seed
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
@@ -90,7 +91,7 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
         }
         // Skip light if light or camera not looking to the hit point
         const float NoL = clamp(dot(normal, l), 0., 1.);
-        if (NoL < 0.01 || NoV < 0.01)
+        if (NoL < 1e-5 || NoV < 1e-5)
             continue;
         // SHADOWS
         const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
@@ -146,56 +147,56 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
     // Start sampling
     vec3 indirectLuminance = vec3(0.);
     // const bool isMetallic = (metallic > 0.5);
-    const uint samplesPerStrategy = numSamples; // Split samples between hemisphere and microfacet ggx sampling
+    const uint samplesPerStrategy = numSamples / 2; // Split samples between hemisphere and microfacet ggx sampling
     uint samples = numSamples;
 
-    // // Sample hemisphere
-    // for (uint s = 0; s < samplesPerStrategy; s++)
-    // {
-    //     vec2 u = vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState));
-    //     vec3 l;
-    //     float pdf_diffuse, NoL;
-    //     cosine_sample_hemisphere(S, u, l, pdf_diffuse, NoL);
-    //     if (pdf_diffuse < 1e-5) {
-    //         samples--;
-    //         continue;
-    //     }
-    //     const vec3 h = normalize(l + v);
-    //     const float NoH = dot(normal, h);
-    //     const float LoH = dot(l, h);
-    //     const float VoH = dot(v, h);
-    //     const float pdf_specular = pdf_microfacet_ggx_specular(NoH, a * a, VoH);
+    // Sample hemisphere
+    for (uint s = 0; s < samplesPerStrategy; s++)
+    {
+        vec2 u = (random) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
+        vec3 l;
+        float pdf_diffuse, NoL;
+        cosine_sample_hemisphere(S, u, l, pdf_diffuse, NoL);
+        if (pdf_diffuse < 1e-5) {
+            samples--;
+            continue;
+        }
+        const vec3 h = normalize(l + v);
+        const float NoH = dot(normal, h);
+        const float LoH = dot(l, h);
+        const float VoH = dot(v, h);
+        const float pdf_specular = pdf_microfacet_ggx_specular(NoH, a * a, VoH);
 
-    //     // Balance heuristic MIS weight
-    //     // const float weight = (pdf_diffuse * pdf_diffuse) /
-    //     //         (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
-    //     const float weight = 1.;
+        // Balance heuristic MIS weight
+        const float weight = (pdf_diffuse * pdf_diffuse) /
+                (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
+        // const float weight = 1.;
 
-    //     const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
-    //             diffuseColor, f0, f90, a);
+        const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
+                diffuseColor, f0, f90, a);
 
-    //     recursivePayload.hitValue = vec3(0.);
-    //     recursivePayload.depth = rayPayload.depth;
-    //     traceRayEXT(topLevelAS, // acceleration structure
-    //         gl_IncomingRayFlagsEXT, // rayFlags
-    //         0xFF, // cullMask
-    //         0, // sbtRecordOffset
-    //         0, // sbtRecordStride
-    //         0, // missIndex
-    //         worldPos, // ray origin
-    //         tMin, // ray min range
-    //         l, // ray direction
-    //         tMax, // ray max range
-    //         1 // payload
-    //     );
-    //     // Accumulate indirect lighting
-    //     indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_diffuse;
-    // }
+        recursivePayload.hitValue = vec3(0.);
+        recursivePayload.depth = rayPayload.depth;
+        traceRayEXT(topLevelAS, // acceleration structure
+            gl_IncomingRayFlagsEXT, // rayFlags
+            0xFF, // cullMask
+            0, // sbtRecordOffset
+            0, // sbtRecordStride
+            0, // missIndex
+            worldPos, // ray origin
+            tMin, // ray min range
+            l, // ray direction
+            tMax, // ray max range
+            1 // payload
+        );
+        // Accumulate indirect lighting
+        indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_diffuse;
+    }
 
     // Sample microfacet GGX specular
     for (uint s = 0; s < samplesPerStrategy; s++)
     {
-        vec2 u = vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState));
+        vec2 u = (random) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
         vec3 l;
         float pdf_specular, NoL, VoH;
         sample_microfacet_ggx_specular(S, v, u, a, l, NoL, VoH, pdf_specular);
@@ -209,12 +210,11 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
         const vec3 h = normalize(l + v);
         const float NoH = dot(normal, h);
         const float LoH = dot(l, h);
-        // const float pdf_specular = pdf_microfacet_ggx_specular(NoH, a * a, VoH);
 
         // Balance heuristic MIS weight
-        // const float weight = (pdf_specular * pdf_specular) /
-        //         (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
-        const float weight = 1.;
+        const float weight = (pdf_specular * pdf_specular) /
+                (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
+        // const float weight = 1.;
 
         const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
                 diffuseColor, f0, f90, a);
@@ -247,7 +247,6 @@ void main()
     rayPayload.depth++;
 
     if (rayPayload.depth > maxDepth) {
-        // rayPayload.hitValue = vec3(1.);
         return;
     }
 
@@ -311,11 +310,11 @@ void main()
 
     const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
-    // const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
-    //             samplers[nonuniformEXT(colorSamplerIndex)]),
-    //         uv)
-    //         * mConstants.baseColorFactor; // range [0, 1]
-    const vec4 baseColor = vec4(1.);
+    const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
+                samplers[nonuniformEXT(colorSamplerIndex)]),
+            uv)
+            * mConstants.baseColorFactor; // range [0, 1]
+    // const vec4 baseColor = vec4(1.);
 
     const vec4 metallicRoughness = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
                 samplers[nonuniformEXT(materialSamplerIndex)]),
@@ -331,8 +330,8 @@ void main()
             * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
                     samplers[nonuniformEXT(normalSamplerIndex)]),
                 uv) - 1.; // range [0, 1] -> [-1, 1]
-    // const vec3 normal = normalize(TBN * normalTexRaw.xyz);
-    const vec3 normal = normalVtx;
+    const vec3 normal = normalize(TBN * normalTexRaw.xyz);
+    // const vec3 normal = normalVtx;
 
     // Transforming the position to world space
     const vec3 worldPos = (gl_ObjectToWorldEXT * vec4(pos, 1.)).xyz;
@@ -340,23 +339,24 @@ void main()
     // -------------- BRDF --------------
 
     // Parametrization
-    // const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
-    const vec3 diffuseColor = vec3(1.);
+    const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
+    // const vec3 diffuseColor = vec3(1.);
     const float f90 = 1.;
     const float reflectance = 0.5;
     const vec3 f0 = mix(vec3(0.16 * reflectance * reflectance), baseColor.xyz, metallic);
     // perceptually linear roughness to roughness
-    const float a = perceptualRoughness * perceptualRoughness;
-
+    const float a = perceptualRoughness;
+    // const float a = 0.001;
     // Ray directions
     const vec3 v = -gl_WorldRayDirectionEXT; // Inverse incoming (view) ray direction. Already normalized
     const float NoV = dot(normal, v);
 
     // INDIRECT LIGHTING
-    vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, 0.001, NoV, metallic);
+    const vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV, metallic);
 
     // DIRECT LIGHTING
-    vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
+    const vec3 directLuminance = direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
+    // const vec3 directLuminance = vec3(0.);
 
     rayPayload.hitValue = directLuminance + indirectLuminance;
 }
