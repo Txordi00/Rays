@@ -375,6 +375,46 @@ vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
 
 } // namespace init
 
+void copy_to_device_buffer(const Buffer &buffer,
+                           const vk::Device &device,
+                           const VmaAllocator &allocator,
+                           const vk::CommandBuffer &cmd,
+                           const vk::Queue &queue,
+                           const vk::Fence &fence,
+                           const void *data,
+                           const vk::DeviceSize size,
+                           const vk::DeviceSize offset)
+{
+    vk::DeviceSize stagingSize = (size == vk::WholeSize) ? buffer.allocationInfo.size : size;
+    Buffer stagingBuffer = utils::create_buffer(device,
+                                                allocator,
+                                                stagingSize,
+                                                vk::BufferUsageFlagBits::eTransferSrc,
+                                                VMA_MEMORY_USAGE_AUTO,
+                                                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                                                    | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    utils::copy_to_buffer(stagingBuffer, allocator, data, stagingSize);
+
+    utils::cmd_submit(device, queue, fence, cmd, [&](const vk::CommandBuffer &cmdTmp) {
+        // Set info structures to copy from staging to vertex & index buffers
+        vk::BufferCopy2 bufferCopy{};
+        bufferCopy.setSrcOffset(0);
+        bufferCopy.setDstOffset(offset);
+        bufferCopy.setSize(stagingSize);
+        vk::CopyBufferInfo2 copyInfo{};
+        copyInfo.setSrcBuffer(stagingBuffer.buffer);
+        copyInfo.setDstBuffer(buffer.buffer);
+        copyInfo.setRegions(bufferCopy);
+
+        cmdTmp.copyBuffer2(copyInfo);
+    });
+
+    utils::destroy_buffer(allocator, stagingBuffer);
+}
+
+// namespace init
+
 // namespace init
 
 // namespace init

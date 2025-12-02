@@ -78,6 +78,16 @@ void cmd_submit(const vk::Device &device,
                 const vk::CommandBuffer &cmd,
                 std::function<void(const vk::CommandBuffer &cmd)> &&function);
 
+void copy_to_device_buffer(const Buffer &buffer,
+                           const vk::Device &device,
+                           const VmaAllocator &allocator,
+                           const vk::CommandBuffer &cmd,
+                           const vk::Queue &queue,
+                           const vk::Fence &fence,
+                           const void *data,
+                           const vk::DeviceSize size = vk::WholeSize,
+                           const vk::DeviceSize offset = 0);
+
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,

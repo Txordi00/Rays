@@ -39,6 +39,7 @@ Init::Init()
     init_pipelines();
     create_sbt();
     init_imgui();
+    presample();
 
     isInitialized = true;
 }
@@ -498,6 +499,16 @@ void Init::init_rt()
         throw std::runtime_error("Driver recursion depth not enough. Driver: "
                                  + std::to_string(rtProperties.maxRayRecursionDepth)
                                  + ". Required: " + std::to_string(MAX_RT_RECURSION));
+}
+
+void Init::presample()
+{
+    presampler = std::make_unique<Presampler>(device,
+                                              allocator,
+                                              cmdTransfer,
+                                              transferQueue,
+                                              transferFence);
+    presampler->presample();
 }
 
 void Init::load_meshes()

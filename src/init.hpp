@@ -4,7 +4,7 @@
 #include "descriptors.hpp"
 #include "lights.hpp"
 #include "loader.hpp"
-#include "raster_pipelines.hpp"
+#include "presampling.hpp"
 #include "shader_binding_tables.hpp"
 #include "types.hpp"
 #include <SDL3/SDL.h>
@@ -74,6 +74,7 @@ public:
     Buffer rtSBTBuffer;
     std::unique_ptr<SbtHelper> sbtHelper;
     std::unique_ptr<ASBuilder> asBuilder;
+    std::unique_ptr<Presampler> presampler;
 
     // Meshes
     // std::vector<std::shared_ptr<Model>> models;
@@ -89,6 +90,7 @@ private:
     // Initialization calls
     void init_vulkan();
     void init_rt();
+    void presample();
     void create_draw_data();
     void create_camera();
     void init_commands();
