@@ -2,6 +2,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <print>
 
 namespace utils {
 void transition_image(const vk::CommandBuffer &cmd,
@@ -211,7 +212,6 @@ ImageData create_image(const vk::Device &device,
 {
     ImageData image;
 
-    // Overkill format
     image.format = format;
     image.extent = extent;
 
@@ -257,7 +257,7 @@ ImageData create_image(const vk::Device &device,
 
     // Map data if requested so
     if (data != nullptr)
-        utils::copy_to_image(device, allocator, cmd, fence, queue, image.image, extent, data);
+        utils::copy_to_image(device, allocator, cmd, fence, queue, image, extent, data);
 
     return image;
 }
@@ -267,13 +267,30 @@ void copy_to_image(const vk::Device &device,
                    const vk::CommandBuffer &cmd,
                    const vk::Fence &fence,
                    const vk::Queue &queue,
-                   const vk::Image &image,
+                   const ImageData &image,
                    const vk::Extent3D &extent,
                    const void *data)
 {
     // We need to move the data into the image
     assert(data != nullptr && "Data to map must be non-null");
-    vk::DeviceSize dataSize = extent.width * extent.height * extent.depth * 4;
+
+    vk::DeviceSize bytesPerPixel;
+    switch (image.format) {
+    case vk::Format::eR32G32B32A32Sfloat:
+        bytesPerPixel = 4 * 4; // 4 floats * 4 bytes
+        break;
+    case vk::Format::eR8G8B8A8Unorm:
+        bytesPerPixel = 4 * 1;
+        break;
+    case vk::Format::eR16G16B16A16Sfloat:
+        bytesPerPixel = 4 * 2;
+        break;
+    default:
+        throw std::runtime_error("Unsupported format");
+    }
+
+    // vk::DeviceSize dataSize = extent.width * extent.height * extent.depth * bytesPerPixel;
+    vk::DeviceSize dataSize = extent.width * extent.height * extent.depth * bytesPerPixel;
     Buffer tmpBuffer = create_buffer(device,
                                      allocator,
                                      dataSize,
@@ -293,7 +310,7 @@ void copy_to_image(const vk::Device &device,
         copyRegion.setImageSubresource(subResource);
         vk::CopyBufferToImageInfo2 copyInfo{};
         copyInfo.setSrcBuffer(tmpBuffer.buffer);
-        copyInfo.setDstImage(image);
+        copyInfo.setDstImage(image.image);
         copyInfo.setDstImageLayout(vk::ImageLayout::eGeneral);
         copyInfo.setRegions(copyRegion);
 
@@ -411,6 +428,14 @@ void copy_to_device_buffer(const Buffer &buffer,
     });
 
     utils::destroy_buffer(allocator, stagingBuffer);
+}
+
+void destroy_image(const vk::Device &device, const VmaAllocator &allocator, const ImageData &image)
+{
+    vmaDestroyImage(allocator, image.image, image.allocation);
+    device.destroyImageView(image.imageView);
+    if (image.sampler)
+        device.destroySampler(image.sampler);
 }
 
 // namespace init

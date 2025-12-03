@@ -62,6 +62,9 @@ public:
     void add_sampled_image(const vk::DescriptorSet &descSet,
                            const uint32_t binding,
                            const std::vector<ImageData> &images);
+    void add_combined_image(const vk::DescriptorSet &descSet,
+                            const uint32_t binding,
+                            const std::vector<ImageData> &images);
     void add_sampler(const vk::DescriptorSet &descSet,
                      const uint32_t binding,
                      const std::vector<vk::Sampler> &samplers);
@@ -81,6 +84,8 @@ private:
         imageStorageInfos{};
     std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorImageInfo>>>
         imageSampledInfos{};
+    std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorImageInfo>>>
+        combinedImageInfos{};
     std::vector<std::tuple<vk::DescriptorSet, uint32_t, std::vector<vk::DescriptorImageInfo>>>
         samplerInfos{};
     std::vector<

@@ -18,6 +18,11 @@ public:
 
     void presample();
 
+    void destroy();
+
+    // Buffer uniformBuffer;
+    ImageData samplingImage;
+
 private:
     const vk::Device &device;
     const VmaAllocator &allocator;
@@ -25,7 +30,6 @@ private:
     const vk::Queue &queue;
     const vk::Fence &fence;
 
-    Buffer uniformBuffer;
 
     glm::vec2 concentric_sample_disk(const glm::vec2 &u);
 
@@ -33,5 +37,7 @@ private:
 
     glm::vec4 cosine_sample_hemisphere(const glm::vec2 &u);
 
-    void create_uniform_buffer();
+    void create_image();
+
+    // void create_uniform_buffer();
 };

@@ -70,6 +70,7 @@ struct ImageData
     VmaAllocationInfo allocationInfo;
     vk::Extent3D extent;
     vk::Format format;
+    vk::Sampler sampler = nullptr;
 };
 
 struct FrameData

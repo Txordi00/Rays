@@ -49,11 +49,13 @@ void copy_to_image(const vk::Device &device,
                    const vk::CommandBuffer &cmd,
                    const vk::Fence &fence,
                    const vk::Queue &queue,
-                   const vk::Image &image,
+                   const ImageData &image,
                    const vk::Extent3D &extent,
                    const void *data);
 
 void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
+
+void destroy_image(const vk::Device &device, const VmaAllocator &allocator, const ImageData &image);
 
 void copy_to_buffer(const Buffer &buffer,
                    const VmaAllocator &allocator,

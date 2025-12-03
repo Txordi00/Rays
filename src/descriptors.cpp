@@ -174,6 +174,25 @@ void DescriptorUpdater::add_sampled_image(const vk::DescriptorSet &descSet,
     descriptorCount += images.size();
 }
 
+void DescriptorUpdater::add_combined_image(const vk::DescriptorSet &descSet,
+                                           const uint32_t binding,
+                                           const std::vector<ImageData> &images)
+{
+    std::vector<vk::DescriptorImageInfo> imageInfosTmp;
+    imageInfosTmp.reserve(images.size());
+    for (const auto &im : images) {
+        assert(im.sampler && "Sampler missing");
+        vk::DescriptorImageInfo imageInfo{};
+        imageInfo.setImageLayout(vk::ImageLayout::eGeneral);
+        imageInfo.setImageView(im.imageView);
+        imageInfo.setSampler(im.sampler);
+        imageInfosTmp.emplace_back(imageInfo);
+    }
+    const auto imageInfoTumpleTmp = std::make_tuple(descSet, binding, imageInfosTmp);
+    combinedImageInfos.push_back(imageInfoTumpleTmp);
+    descriptorCount += images.size();
+}
+
 void DescriptorUpdater::add_sampler(const vk::DescriptorSet &descSet,
                                     const uint32_t binding,
                                     const std::vector<vk::Sampler> &samplers)
@@ -228,6 +247,14 @@ void DescriptorUpdater::update()
         imageWrite.setDstBinding(std::get<1>(ii));
         imageWrite.setImageInfo(std::get<2>(ii));
         imageWrite.setDescriptorType(vk::DescriptorType::eSampledImage);
+        descriptorWrites.emplace_back(imageWrite);
+    }
+    for (const auto &ii : combinedImageInfos) {
+        vk::WriteDescriptorSet imageWrite{};
+        imageWrite.setDstSet(std::get<0>(ii));
+        imageWrite.setDstBinding(std::get<1>(ii));
+        imageWrite.setImageInfo(std::get<2>(ii));
+        imageWrite.setDescriptorType(vk::DescriptorType::eCombinedImageSampler);
         descriptorWrites.emplace_back(imageWrite);
     }
     for (const auto &ii : samplerInfos) {

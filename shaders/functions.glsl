@@ -64,7 +64,7 @@ vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float n
     // diffuse BRDF
     const vec3 Fd = diffuseColor * Fd_Lambert(nDotL);
 
-    return Fd + Fr;
+    return Fd;
 }
 
 vec3 evaluate_directional_light(const Light light, const vec3 BSDF)
@@ -91,26 +91,6 @@ vec3 reinhard_jodie(const vec3 color)
     float l = luminance(color);
     vec3 tv = color / (1.f + color);
     return mix(color / (1.f + l), tv, tv);
-}
-
-void sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf, out float nDotL)
-{
-    // Sample phi and theta
-    const float phi = TWOPI * u[0];
-    const float ctheta = 1. - u[1];
-    // Sample in the local normal frame (b1, b2, n)
-    const float stheta = sqrt(1. - ctheta * ctheta);
-    const float b1 = stheta * cos(phi);
-    const float b2 = stheta * sin(phi);
-    // const float n = ctheta;
-    const vec3 sampleInNormalFrame = vec3(b1, b2, ctheta);
-
-    // Return in world frame
-    sampleDir = S * sampleInNormalFrame;
-    nDotL = dot(sampleDir, S[2]);
-    // if (S[2].z == -1.)
-    print_val("sh: %f ", abs(nDotL - ctheta), 0., 0.01);
-    pdf = ONEOVERTWOPI;
 }
 
 float D_specular_Disney_Epic(const float cosTheta, const float a2)

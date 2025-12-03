@@ -15,7 +15,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
-#include <print>
 
 Init::Init()
 {
@@ -56,6 +55,8 @@ void Init::clean()
         asBuilder->destroy();
 
         gltfLoader->destroy();
+
+        presampler->destroy();
 
         // Destroy lights
         for (auto &l : lights)
@@ -402,6 +403,9 @@ void Init::init_descriptors()
                                      frameOverlap); // drawImage
     descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1},
                                      frameOverlap); // camera
+    descHelperRt
+        ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1},
+                             frameOverlap); // Presampling
     descHelperRt->create_descriptor_pool();
     descHelperRt->add_binding(
         Binding{vk::DescriptorType::eAccelerationStructureKHR,
@@ -413,6 +417,9 @@ void Init::init_descriptors()
     descHelperRt->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
                                       vk::ShaderStageFlagBits::eRaygenKHR,
                                       2}); // camera
+    descHelperRt->add_binding(Binding{vk::DescriptorType::eCombinedImageSampler,
+                                      vk::ShaderStageFlagBits::eClosestHitKHR,
+                                      3}); // presampling
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt
         = descHelperRt->allocate_descriptor_sets(rtDescriptorSetLayout, frameOverlap);
