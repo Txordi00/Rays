@@ -114,9 +114,9 @@ void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const v
     // Sample phi and theta in the local normal frame
     const float phi = TWOPI * u[0];
     const float a2 = a * a; // a in my case is already a = perceptualRoughness^2
-    const float ctheta = sqrt((1 - u[1]) / (u[1] * (a2 - 1.) + 1.));
+    const float ctheta = sqrt((1. - u[1]) / (u[1] * (a2 - 1.) + 1.));
     // print_val("ct: %f ", ctheta, -1., 1.);
-    const float stheta = sqrt(1.0 - ctheta * ctheta);
+    const float stheta = sqrt(1. - ctheta * ctheta);
 
     // Half vector in local frame
     const vec3 hLocal = vec3(stheta * cos(phi), stheta * sin(phi), ctheta);

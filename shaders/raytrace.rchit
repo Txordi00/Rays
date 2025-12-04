@@ -177,10 +177,12 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
     for (uint s = 0; s < samplesPerStrategy; s++)
     {
         vec2 u = (random) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
-        vec3 l;
-        float pdf_diffuse, NoL;
+        u = round(u * 100.f) / 100.f;
+        vec3 l, l1;
+        float pdf_diffuse, NoL, pdf_diffuse1, NoL1;
         // cosine_sample_hemisphere(S, u, l, pdf_diffuse, NoL);
         cosine_sample_hemisphere_cached(S, u, l, pdf_diffuse, NoL);
+        // print_val("d %f ", length(l - l1), 2., 1.);
 
         if (pdf_diffuse < 1e-5) {
             samples--;

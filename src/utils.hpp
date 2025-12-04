@@ -95,8 +95,7 @@ vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
                                       const vk::Extent3D &extent);
 
-vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
-                                               const vk::Image &image,
+vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
                                                const vk::ImageAspectFlags &aspectMask);
 
 } // namespace init

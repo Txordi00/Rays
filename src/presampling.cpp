@@ -3,6 +3,7 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/packing.hpp>
 #include <glm/gtc/type_precision.hpp>
+#include <glm/gtx/norm.hpp>
 #include <print>
 
 #define PI glm::pi<float>()
@@ -18,8 +19,7 @@ Presampler::Presampler(const vk::Device &device,
     , queue{queue}
     , fence{fence}
 {
-    // create_uniform_buffer();
-    create_image();
+    create_images();
 }
 
 glm::vec2 Presampler::concentric_sample_disk(const glm::vec2 &u)
@@ -58,20 +58,22 @@ glm::vec4 Presampler::cosine_sample_hemisphere(const glm::vec2 &u)
     return sampleInNormalFrame;
 }
 
-void Presampler::create_image()
+glm::vec4 Presampler::sample_microfacet_ggx_specular(const glm::vec2 &u, const float a)
 {
-    samplingImage = utils::create_image(device,
-                                        allocator,
-                                        cmd,
-                                        fence,
-                                        queue,
-                                        vk::Format::eR16G16B16A16Sfloat,
-                                        vk::ImageUsageFlagBits::eSampled
-                                            | vk::ImageUsageFlagBits::eTransferDst,
-                                        vk::Extent3D{SAMPLING_DISCRETIZATION,
-                                                     SAMPLING_DISCRETIZATION,
-                                                     1});
+    // Sample phi and theta in the local normal frame
+    const float phi = glm::two_pi<float>() * u.x;
+    const float a2 = a * a; // a in my case is already a = perceptualRoughness^2
+    const float ctheta = std::sqrt((1. - u.y) / (u.y * (a2 - 1.) + 1.));
+    const float stheta = std::sqrt(1. - ctheta * ctheta);
 
+    // Half vector in local frame
+    const glm::vec3 hLocal = glm::vec3(stheta * std::cos(phi), stheta * std::sin(phi), ctheta);
+    assert(glm::length2(hLocal) > 0.99 && glm::length2(hLocal) < 1.01);
+    return glm::vec4(hLocal, 0.);
+}
+
+void Presampler::create_images()
+{
     vk::SamplerCreateInfo samplerCreate{};
     samplerCreate.setMaxLod(vk::LodClampNone);
     samplerCreate.setMinLod(0.f);
@@ -79,22 +81,43 @@ void Presampler::create_image()
     samplerCreate.setMinFilter(vk::Filter::eNearest);
     samplerCreate.setMipmapMode(vk::SamplerMipmapMode::eNearest);
 
-    samplingImage.sampler = device.createSampler(samplerCreate);
+    hemisphereImage = utils::create_image(device,
+                                          allocator,
+                                          cmd,
+                                          fence,
+                                          queue,
+                                          vk::Format::eR16G16B16A16Sfloat,
+                                          vk::ImageUsageFlagBits::eSampled
+                                              | vk::ImageUsageFlagBits::eTransferDst,
+                                          vk::Extent3D{SAMPLING_DISCRETIZATION,
+                                                       SAMPLING_DISCRETIZATION,
+                                                       1});
+    hemisphereImage.sampler = device.createSampler(samplerCreate);
+
+    ggxImage = utils::create_image(device,
+                                   allocator,
+                                   cmd,
+                                   fence,
+                                   queue,
+                                   vk::Format::eR16G16B16A16Sfloat,
+                                   vk::ImageUsageFlagBits::eSampled
+                                       | vk::ImageUsageFlagBits::eTransferDst,
+                                   vk::Extent3D{SAMPLING_DISCRETIZATION,
+                                                SAMPLING_DISCRETIZATION,
+                                                SAMPLING_DISCRETIZATION});
+    ggxImage.sampler = device.createSampler(samplerCreate);
 }
 
-void Presampler::presample()
+void Presampler::run()
 {
     std::array<std::uint64_t, SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION * 4>
         hemisphereSamples;
-    for (size_t j = 0; j < SAMPLING_DISCRETIZATION; j++) {
-        const float u = static_cast<float>(j) / static_cast<float>(SAMPLING_DISCRETIZATION);
-        for (size_t i = 0; i < SAMPLING_DISCRETIZATION; i++) {
-            const float v = static_cast<float>(i) / static_cast<float>(SAMPLING_DISCRETIZATION);
+    for (size_t i = 0; i < SAMPLING_DISCRETIZATION; i++) {
+        const float v = static_cast<float>(i) / static_cast<float>(SAMPLING_DISCRETIZATION);
+        for (size_t j = 0; j < SAMPLING_DISCRETIZATION; j++) {
+            const float u = static_cast<float>(j) / static_cast<float>(SAMPLING_DISCRETIZATION);
             const glm::vec4 sample = cosine_sample_hemisphere(glm::vec2(u, v));
-            hemisphereSamples[j * SAMPLING_DISCRETIZATION + i] = glm::packHalf4x16(sample);
-            // hemisphereSamples[j * SAMPLING_DISCRETIZATION + i + 1] = glm::packHalf1x16(sample.y);
-            // hemisphereSamples[j * SAMPLING_DISCRETIZATION + i + 2] = glm::packHalf1x16(sample.z);
-            // hemisphereSamples[j * SAMPLING_DISCRETIZATION + i + 3] = glm::packHalf1x16(sample.w);
+            hemisphereSamples[i * SAMPLING_DISCRETIZATION + j] = glm::packHalf4x16(sample);
         }
     }
     utils::copy_to_image(device,
@@ -102,32 +125,44 @@ void Presampler::presample()
                          cmd,
                          fence,
                          queue,
-                         samplingImage,
-                         samplingImage.extent,
+                         hemisphereImage,
+                         hemisphereImage.extent,
                          hemisphereSamples.data());
+
+    std::vector<std::uint64_t> ggxSamples(SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION
+                                          * SAMPLING_DISCRETIZATION * 4);
+    for (size_t i = 0; i < SAMPLING_DISCRETIZATION; i++) {
+        const float v = static_cast<float>(i) / static_cast<float>(SAMPLING_DISCRETIZATION);
+        for (size_t j = 0; j < SAMPLING_DISCRETIZATION; j++) {
+            const float u = static_cast<float>(j) / static_cast<float>(SAMPLING_DISCRETIZATION);
+            for (size_t k = 0; k < SAMPLING_DISCRETIZATION; k++) {
+                const float a = static_cast<float>(k) / static_cast<float>(SAMPLING_DISCRETIZATION);
+                const glm::vec4 sampleggx = sample_microfacet_ggx_specular(glm::vec2(u, v), a);
+                ggxSamples[i * SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION
+                           + j * SAMPLING_DISCRETIZATION + k]
+                    = glm::packHalf4x16(sampleggx);
+            }
+        }
+    }
+
+    utils::copy_to_image(device,
+                         allocator,
+                         cmd,
+                         fence,
+                         queue,
+                         ggxImage,
+                         ggxImage.extent,
+                         ggxSamples.data());
 
     // std::cout << "sizeof(glm::mediump_vec4): " << sizeof(glm::mediump_vec4) << std::endl;
     // std::cout << "Expected size: " << (4 * 2) << " bytes" << std::endl;
     // std::cout << "Total data size: " << sizeof(hemisphereSamples) << std::endl;
     // std::cout << "Expected total: " << (SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION * 4 * 2)
     //           << std::endl;
-
-    // utils::copy_to_device_buffer(uniformBuffer, device, allocator, cmd, queue, fence, &uboData);
 }
 
 void Presampler::destroy()
 {
-    utils::destroy_image(device, allocator, samplingImage);
-    // utils::destroy_buffer(allocator, uniformBuffer);
+    utils::destroy_image(device, allocator, hemisphereImage);
+    utils::destroy_image(device, allocator, ggxImage);
 }
-
-// void Presampler::create_uniform_buffer()
-// {
-//     vk::DeviceSize uboSize = sizeof(UniformData);
-//     uniformBuffer = utils::create_buffer(device,
-//                                          allocator,
-//                                          uboSize,
-//                                          vk::BufferUsageFlagBits::eUniformBuffer
-//                                              | vk::BufferUsageFlagBits::eTransferDst,
-//                                          VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-// }

@@ -16,12 +16,12 @@ public:
                const vk::Fence &fence);
     ~Presampler() = default;
 
-    void presample();
+    void run();
 
     void destroy();
 
-    // Buffer uniformBuffer;
-    ImageData samplingImage;
+    ImageData hemisphereImage;
+    ImageData ggxImage;
 
 private:
     const vk::Device &device;
@@ -37,7 +37,7 @@ private:
 
     glm::vec4 cosine_sample_hemisphere(const glm::vec2 &u);
 
-    void create_image();
+    glm::vec4 sample_microfacet_ggx_specular(const glm::vec2 &u, const float a);
 
-    // void create_uniform_buffer();
+    void create_images();
 };

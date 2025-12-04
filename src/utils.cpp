@@ -240,7 +240,7 @@ ImageData create_image(const vk::Device &device,
 
     // Create the handle vk::ImageView. Not possible to do this with VMA
     const vk::ImageViewCreateInfo imageViewCreateInfo
-        = utils::init::image_view_create_info(format, image.image, aspectFlags);
+        = utils::init::image_view_create_info(image, aspectFlags);
     image.imageView = device.createImageView(imageViewCreateInfo);
 
     // Thanks to the extension UINIFIED_IMAGE_LAYOUTS, we can safely move to
@@ -359,7 +359,7 @@ vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::Extent3D &extent)
 {
     vk::ImageCreateInfo imageCreateInfo{};
-    imageCreateInfo.setImageType(vk::ImageType::e2D);
+    imageCreateInfo.setImageType((extent.depth > 1) ? vk::ImageType::e3D : vk::ImageType::e2D);
     imageCreateInfo.setFormat(format);
     imageCreateInfo.setExtent(extent);
     imageCreateInfo.setUsage(flags);
@@ -371,14 +371,14 @@ vk::ImageCreateInfo image_create_info(const vk::Format &format,
     return imageCreateInfo;
 }
 
-vk::ImageViewCreateInfo image_view_create_info(const vk::Format &format,
-                                               const vk::Image &image,
+vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
                                                const vk::ImageAspectFlags &aspectMask)
 {
     vk::ImageViewCreateInfo imageViewCreateInfo{};
-    imageViewCreateInfo.setImage(image);
-    imageViewCreateInfo.setFormat(format);
-    imageViewCreateInfo.setViewType(vk::ImageViewType::e2D);
+    imageViewCreateInfo.setImage(image.image);
+    imageViewCreateInfo.setFormat(image.format);
+    imageViewCreateInfo.setViewType((image.extent.depth > 1) ? vk::ImageViewType::e3D
+                                                             : vk::ImageViewType::e2D);
     vk::ImageSubresourceRange imSubResRan{};
     imSubResRan.setAspectMask(aspectMask);
     imSubResRan.setBaseMipLevel(0);

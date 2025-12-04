@@ -155,7 +155,7 @@ void Engine::update_descriptors()
         descUpdater.add_as(descriptorSetRt, 0, tlas);
         descUpdater.add_storage_image(descriptorSetRt, 1, {frame.imageDraw});
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
-        descUpdater.add_combined_image(descriptorSetRt, 3, {I->presampler->samplingImage});
+        descUpdater.add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
         descUpdater.update();
     }
 }
