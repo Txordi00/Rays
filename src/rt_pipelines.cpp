@@ -1,5 +1,6 @@
 #include "rt_pipelines.hpp"
 #include "utils.hpp"
+#include <print>
 
 void RtPipelineBuilder::create_shader_stages()
 {
@@ -84,7 +85,7 @@ vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipeline
     vk::SpecializationInfo specInfo{};
     specInfo.setMapEntries(mapEntry);
     specInfo.setDataSize(sizeof(uint32_t));
-    specInfo.setData<const uint32_t>(MAX_RT_RECURSION);
+    specInfo.setData<uint32_t>(MAX_RT_RECURSION);
     // attach specInfo to its shader stage
     shaderStages[eClosestHit].setPSpecializationInfo(&specInfo);
     vk::RayTracingPipelineCreateInfoKHR rtPipelineInfo{};
@@ -98,9 +99,11 @@ vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipeline
 
     rtPipelineInfo.setLayout(pipelineLayout);
 
+    std::println("before create");
     auto [res, val] = device.createRayTracingPipelinesKHR(nullptr, nullptr, rtPipelineInfo);
+    std::println("after create");
     VK_CHECK_RES(res);
-
+    std::println("before destroy");
     for (const auto &s : shaderStages)
         device.destroyShaderModule(s.module);
 

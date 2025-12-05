@@ -14,9 +14,9 @@ import vulkan_hpp;
 
 #define VK_CHECK_RES(x) \
     { \
-        vk::Result res = static_cast<vk::Result>(x); \
-        if (res != vk::Result::eSuccess) { \
-            std::cerr << "\033[1;33m" << "NON SUCCESSFUL vk::Result: " << vk::to_string(res) \
+        const vk::Result xcpp = static_cast<vk::Result>(x); \
+        if (xcpp != vk::Result::eSuccess) { \
+            std::cerr << "\033[1;33m" << "NON SUCCESSFUL vk::Result: " << vk::to_string(xcpp) \
                       << "\033[0m" << std::endl; \
         } \
     }

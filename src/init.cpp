@@ -15,6 +15,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_vulkan.h>
+#include <print>
 
 Init::Init()
 {
@@ -33,14 +34,22 @@ Init::Init()
     create_draw_data();
     load_meshes();
     create_lights();
+    std::println("a");
     create_as();
+    std::println("b");
     init_descriptors();
+    std::println("c");
     init_pipelines();
+    std::println("d");
     create_sbt();
+    std::println("e");
     init_imgui();
+    std::println("f");
     presample();
+    std::println("g");
 
     isInitialized = true;
+    std::println("Initialization complete");
 }
 
 void Init::clean()
@@ -438,11 +447,15 @@ void Init::init_pipelines()
 {
     RtPipelineBuilder rtPipelineBuilder{device};
     rtPipelineBuilder.create_shader_stages();
+    std::println("pa");
     rtPipelineBuilder.create_shader_groups();
+    std::println("pb");
     std::vector<vk::DescriptorSetLayout> descLayouts = {rtDescriptorSetLayout,
                                                         descriptorSetLayoutUAB};
     simpleRtPipeline.pipelineLayout = rtPipelineBuilder.buildPipelineLayout(descLayouts);
+    std::println("pc");
     simpleRtPipeline.pipeline = rtPipelineBuilder.buildPipeline(simpleRtPipeline.pipelineLayout);
+    std::println("pd");
 }
 
 void Init::create_sbt()
@@ -530,6 +543,7 @@ void Init::load_meshes()
     gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
     scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/ABeautifulGame.glb")
                 .value();
+    std::println("Asset loaded");
 
     glm::mat4 S = glm::scale(20.f * glm::vec3(1.f));
     glm::mat4 R = glm::rotate(glm::pi<float>(), glm::vec3(0.f, 0.f, 1.f));
