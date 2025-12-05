@@ -405,7 +405,10 @@ void Init::init_descriptors()
                                      frameOverlap); // camera
     descHelperRt
         ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1},
-                             frameOverlap); // Presampling
+                             frameOverlap); // Presampling hemisphere
+    descHelperRt
+        ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1},
+                             frameOverlap); // Presampling ggx
     descHelperRt->create_descriptor_pool();
     descHelperRt->add_binding(
         Binding{vk::DescriptorType::eAccelerationStructureKHR,
@@ -419,7 +422,11 @@ void Init::init_descriptors()
                                       2}); // camera
     descHelperRt->add_binding(Binding{vk::DescriptorType::eCombinedImageSampler,
                                       vk::ShaderStageFlagBits::eClosestHitKHR,
-                                      3}); // presampling
+                                      3}); // presampling hemisphere
+    descHelperRt->add_binding(Binding{vk::DescriptorType::eCombinedImageSampler,
+                                      vk::ShaderStageFlagBits::eClosestHitKHR,
+                                      4}); // presampling ggx
+
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt
         = descHelperRt->allocate_descriptor_sets(rtDescriptorSetLayout, frameOverlap);

@@ -110,8 +110,7 @@ void Presampler::create_images()
 
 void Presampler::run()
 {
-    std::array<std::uint64_t, SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION * 4>
-        hemisphereSamples;
+    std::vector<std::uint64_t> hemisphereSamples(SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION);
     for (size_t i = 0; i < SAMPLING_DISCRETIZATION; i++) {
         const float v = static_cast<float>(i) / static_cast<float>(SAMPLING_DISCRETIZATION);
         for (size_t j = 0; j < SAMPLING_DISCRETIZATION; j++) {
@@ -130,16 +129,17 @@ void Presampler::run()
                          hemisphereSamples.data());
 
     std::vector<std::uint64_t> ggxSamples(SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION
-                                          * SAMPLING_DISCRETIZATION * 4);
-    for (size_t i = 0; i < SAMPLING_DISCRETIZATION; i++) {
-        const float v = static_cast<float>(i) / static_cast<float>(SAMPLING_DISCRETIZATION);
-        for (size_t j = 0; j < SAMPLING_DISCRETIZATION; j++) {
-            const float u = static_cast<float>(j) / static_cast<float>(SAMPLING_DISCRETIZATION);
-            for (size_t k = 0; k < SAMPLING_DISCRETIZATION; k++) {
-                const float a = static_cast<float>(k) / static_cast<float>(SAMPLING_DISCRETIZATION);
+                                          * SAMPLING_DISCRETIZATION);
+
+    for (size_t k = 0; k < SAMPLING_DISCRETIZATION; k++) {
+        const float a = static_cast<float>(k) / static_cast<float>(SAMPLING_DISCRETIZATION);
+        for (size_t i = 0; i < SAMPLING_DISCRETIZATION; i++) {
+            const float v = static_cast<float>(i) / static_cast<float>(SAMPLING_DISCRETIZATION);
+            for (size_t j = 0; j < SAMPLING_DISCRETIZATION; j++) {
+                const float u = static_cast<float>(j) / static_cast<float>(SAMPLING_DISCRETIZATION);
                 const glm::vec4 sampleggx = sample_microfacet_ggx_specular(glm::vec2(u, v), a);
-                ggxSamples[i * SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION
-                           + j * SAMPLING_DISCRETIZATION + k]
+                ggxSamples[k * SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION
+                           + i * SAMPLING_DISCRETIZATION + j]
                     = glm::packHalf4x16(sampleggx);
             }
         }

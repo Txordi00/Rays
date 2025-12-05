@@ -17,12 +17,8 @@ layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
 layout(set = 1, binding = 1) uniform sampler samplers[];
 layout(set = 1, binding = 2) uniform texture2D textures[];
 
-// layout(std140, binding = 3, set = 0) readonly uniform PresamplingData
-// {
-//     vec4 samples[100 * 100];
-// } presampling;
-
-layout(binding = 3, set = 0) uniform sampler2D presamplingTexture;
+layout(binding = 3, set = 0) uniform sampler2D presamplingHemisphere;
+layout(binding = 4, set = 0) uniform sampler3D presamplingGGX;
 
 layout(set = 1, binding = 3, scalar) uniform LightsBuffer
 {
@@ -143,18 +139,38 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
 void cosine_sample_hemisphere_cached(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf, out float nDotL) {
     // Round to 2 decimals: 0.0132345 -> 0.01
     const ivec2 index = min(ivec2(round(u * 100.f)), ivec2(99));
-    // print_val("i %i ", max(index.x, index.y), 2, 1);
-    // index = min(index, TABLE_SIZE - 1u); // Clamp to avoid index 100
-    // const vec4 presample = presampling.samples[index.x * 100 + index.y];
-    // const vec4
-    // const vec4 presample = texelFetch(presamplingTexture, index, 0);
-    // const vec4 presample = texture(presamplingTexture, u);
-    const vec3 sampleInNormalFrame = texelFetch(presamplingTexture, index, 0).xyz;
-    // const vec3 sampleInNormalFrame = texture(presamplingTexture, u).xyz;
+    const vec3 sampleInNormalFrame = texelFetch(presamplingHemisphere, index, 0).xyz;
     // print_val("s %f ", presample.w, 2., 1.);
     sampleDir = S * sampleInNormalFrame;
     nDotL = sampleInNormalFrame.z;
     pdf = nDotL * ONEOVERPI;
+}
+
+void sample_microfacet_ggx_specular_cached(in const mat3 S, in const vec3 v, in const vec2 u, in const float a, out vec3 sampleDir, out float nDotL, out float vDotH, out float pdf)
+{
+    const float a2 = a * a;
+    // Round to 2 decimals: 0.0132345 -> 0.01
+    const ivec3 index = min(ivec3(round(vec3(u, a) * 100.f)), ivec3(99));
+
+    // Half vector in local frame
+    // const vec3 hLocal = vec3(stheta * cos(phi), stheta * sin(phi), ctheta);
+    const vec3 hLocal = texelFetch(presamplingGGX, index, 0).xyz;
+    const float ctheta = hLocal.z;
+    // Move to world frame
+    const vec3 hWorld = S * hLocal;
+
+    // Reflect view direction around half-vector to get light direction
+    sampleDir = reflect(-v, hWorld);
+
+    nDotL = dot(sampleDir, S[2]);
+    vDotH = dot(v, hWorld);
+    // ctheta = nDotH
+    // if (nDotL < 1e-5 || vDotH < 1e-5 || ctheta < 1e-5)
+    // {
+    //     pdf = -1.; // If pdf negative, the sample will be skipped
+    //     return;
+    // }
+    pdf = pdf_microfacet_ggx_specular(ctheta, a2, vDotH);
 }
 
 vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
@@ -174,28 +190,79 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
     uint samples = numSamples;
 
     // Sample hemisphere
+    // for (uint s = 0; s < samplesPerStrategy; s++)
+    // {
+    //     vec2 u = (random) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
+    //     u = round(u * 100.f) / 100.f;
+    //     vec3 l;
+    //     float pdf_diffuse, NoL;
+    //     // cosine_sample_hemisphere(S, u, l, pdf_diffuse, NoL);
+    //     cosine_sample_hemisphere_cached(S, u, l, pdf_diffuse, NoL);
+    //     // print_val("d %f ", length(l - l1), 2., 1.);
+
+    //     if (pdf_diffuse < 1e-5) {
+    //         samples--;
+    //         continue;
+    //     }
+    //     const vec3 h = normalize(l + v);
+    //     const float NoH = dot(normal, h);
+    //     const float LoH = dot(l, h);
+    //     const float VoH = dot(v, h);
+    //     const float pdf_specular = pdf_microfacet_ggx_specular(NoH, a * a, VoH);
+
+    //     // Balance heuristic MIS weight
+    //     // const float weight = (pdf_diffuse * pdf_diffuse) /
+    //     //         (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
+    //     const float weight = 1.;
+
+    //     const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
+    //             diffuseColor, f0, f90, a);
+
+    //     recursivePayload.hitValue = vec3(0.);
+    //     recursivePayload.depth = rayPayload.depth;
+    //     traceRayEXT(topLevelAS, // acceleration structure
+    //         gl_IncomingRayFlagsEXT, // rayFlags
+    //         0xFF, // cullMask
+    //         0, // sbtRecordOffset
+    //         0, // sbtRecordStride
+    //         0, // missIndex
+    //         worldPos, // ray origin
+    //         tMin, // ray min range
+    //         l, // ray direction
+    //         tMax, // ray max range
+    //         1 // payload
+    //     );
+    //     // Accumulate indirect lighting
+    //     indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_diffuse;
+    // }
+
+    // Sample microfacet GGX specular
     for (uint s = 0; s < samplesPerStrategy; s++)
     {
         vec2 u = (random) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
-        u = round(u * 100.f) / 100.f;
-        vec3 l, l1;
-        float pdf_diffuse, NoL, pdf_diffuse1, NoL1;
-        // cosine_sample_hemisphere(S, u, l, pdf_diffuse, NoL);
-        cosine_sample_hemisphere_cached(S, u, l, pdf_diffuse, NoL);
-        // print_val("d %f ", length(l - l1), 2., 1.);
+        // u = min(round(u * 100.) / 100., 0.99);
+        // float aa = min(round(a * 100.) / 100., 0.99);
+        vec3 l;
+        float pdf_specular, NoL, VoH;
+        vec3 l1;
+        float pdf_specular1, NoL1, VoH1;
+        sample_microfacet_ggx_specular_cached(S, v, u, a, l, NoL, VoH, pdf_specular);
+        // sample_microfacet_ggx_specular(S, v, u, aa, l1, NoL1, VoH1, pdf_specular1);
 
-        if (pdf_diffuse < 1e-5) {
+        // print_val("d %f ", length(l - l1), 0., 0.1);
+
+        if (pdf_specular < 1e-5) {
             samples--;
             continue;
         }
+        const float pdf_diffuse = pdf_cosine_sample_hemisphere(NoL);
+
         const vec3 h = normalize(l + v);
         const float NoH = dot(normal, h);
         const float LoH = dot(l, h);
-        const float VoH = dot(v, h);
-        const float pdf_specular = pdf_microfacet_ggx_specular(NoH, a * a, VoH);
 
         // Balance heuristic MIS weight
-        // const float weight = (pdf_diffuse * pdf_diffuse) /
+        // const float weight = (pdf_specular * pdf_specular) /
         //         (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
         const float weight = 1.;
 
@@ -217,52 +284,8 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
             1 // payload
         );
         // Accumulate indirect lighting
-        indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_diffuse;
+        indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_specular;
     }
-
-    // // Sample microfacet GGX specular
-    // for (uint s = 0; s < samplesPerStrategy; s++)
-    // {
-    //     vec2 u = (random) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
-    //     vec3 l;
-    //     float pdf_specular, NoL, VoH;
-    //     sample_microfacet_ggx_specular(S, v, u, a, l, NoL, VoH, pdf_specular);
-
-    //     if (pdf_specular < 1e-5) {
-    //         samples--;
-    //         continue;
-    //     }
-    //     const float pdf_diffuse = pdf_cosine_sample_hemisphere(NoL);
-
-    //     const vec3 h = normalize(l + v);
-    //     const float NoH = dot(normal, h);
-    //     const float LoH = dot(l, h);
-
-    //     // Balance heuristic MIS weight
-    //     const float weight = (pdf_specular * pdf_specular) /
-    //             (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
-    //     // const float weight = 1.;
-
-    //     const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
-    //             diffuseColor, f0, f90, a);
-
-    //     recursivePayload.hitValue = vec3(0.);
-    //     recursivePayload.depth = rayPayload.depth;
-    //     traceRayEXT(topLevelAS, // acceleration structure
-    //         gl_IncomingRayFlagsEXT, // rayFlags
-    //         0xFF, // cullMask
-    //         0, // sbtRecordOffset
-    //         0, // sbtRecordStride
-    //         0, // missIndex
-    //         worldPos, // ray origin
-    //         tMin, // ray min range
-    //         l, // ray direction
-    //         tMax, // ray max range
-    //         1 // payload
-    //     );
-    //     // Accumulate indirect lighting
-    //     indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_specular;
-    // }
 
     indirectLuminance /= float(numSamples);
     return indirectLuminance;
@@ -357,8 +380,8 @@ void main()
             * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
                     samplers[nonuniformEXT(normalSamplerIndex)]),
                 uv) - 1.; // range [0, 1] -> [-1, 1]
-    const vec3 normal = normalize(TBN * normalTexRaw.xyz);
-    //    const vec3 normal = normalVtx;
+    // const vec3 normal = normalize(TBN * normalTexRaw.xyz);
+    const vec3 normal = normalVtx;
 
     // Transforming the position to world space
     const vec3 worldPos = (gl_ObjectToWorldEXT * vec4(pos, 1.)).xyz;
@@ -379,7 +402,7 @@ void main()
     const float NoV = dot(normal, v);
 
     // INDIRECT LIGHTING
-    const vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
+    const vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, 0.2, NoV);
 
     // DIRECT LIGHTING
     const vec3 directLuminance = vec3(0.); //direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);

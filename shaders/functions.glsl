@@ -56,7 +56,7 @@ vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float n
     // const float a2 = a * a;
     const float D = D_GGX(nDotH, a);
     const vec3 F = F_Schlick(lDotH, f0, f90);
-    const float V = V_SmithGGXCorrelated(nDotV, nDotL, a);
+    const float V = V_SmithGGXCorrelatedFast(nDotV, nDotL, a);
 
     // specular BRDF
     const vec3 Fr = D * V * F * nDotL;
@@ -129,11 +129,11 @@ void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const v
     nDotL = dot(sampleDir, S[2]);
     vDotH = dot(v, hWorld);
     // ctheta = nDotH
-    if (nDotL < 1e-5 || vDotH < 1e-5 || ctheta < 1e-5)
-    {
-        pdf = -1.; // If pdf negative, the sample will be skipped
-        return;
-    }
+    // if (nDotL < 1e-5 || vDotH < 1e-5 || ctheta < 1e-5)
+    // {
+    //     pdf = -1.; // If pdf negative, the sample will be skipped
+    //     return;
+    // }
     pdf = pdf_microfacet_ggx_specular(ctheta, a2, vDotH);
 }
 
