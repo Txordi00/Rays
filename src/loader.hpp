@@ -88,11 +88,14 @@ struct MeshNode : Node
 {
     std::shared_ptr<Mesh> mesh;
     // The key is going to be used as the customInstanceIndex when building the TLAS
-    std::unordered_map<uint32_t, Buffer> surfaceStorageBuffers;
+    std::unordered_map<uint32_t, Buffer> surfaceUniformBuffers;
 };
 
 struct GLTFObj
 {
+    GLTFObj() = default;
+    ~GLTFObj() = default;
+
     // storage for all the data on a given gltf file
     std::unordered_multimap<std::string, std::shared_ptr<Mesh>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
@@ -107,7 +110,11 @@ struct GLTFObj
     std::vector<vk::Sampler> samplers;
     std::vector<ImageData> images;
 
-    ~GLTFObj() = default;
+    void destroy(const vk::Device &device, const VmaAllocator &allocator);
+
+    std::vector<std::shared_ptr<Buffer>> bufferQueue;
+    std::vector<vk::Sampler> samplerQueue;
+    std::vector<ImageData> imageQueue;
 };
 
 vk::Filter extract_filter(const fastgltf::Filter &filter);
@@ -138,9 +145,9 @@ private:
     vk::Sampler samplerLinear, samplerNearest;
     fastgltf::Parser parser{};
 
-    std::vector<std::shared_ptr<Buffer>> bufferQueue;
-    std::vector<vk::Sampler> samplerQueue;
-    std::vector<ImageData> imageQueue;
+    // std::vector<std::shared_ptr<Buffer>> bufferQueue;
+    // std::vector<vk::Sampler> samplerQueue;
+    // std::vector<ImageData> imageQueue;
 
     void load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene);
 
@@ -167,5 +174,5 @@ private:
     void create_mesh_buffers(const std::vector<uint32_t> &indices,
                              const std::vector<Vertex> &vertices,
                              std::shared_ptr<Mesh> &mesh);
-    void destroy_buffers();
+    // void destroy_buffers();
 };

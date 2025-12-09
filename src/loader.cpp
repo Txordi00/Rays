@@ -100,34 +100,22 @@ GLTFLoader::GLTFLoader(const vk::Device &device,
     samplerInfo.setMagFilter(vk::Filter::eLinear);
     samplerInfo.setMinFilter(vk::Filter::eLinear);
     samplerLinear = device.createSampler(samplerInfo);
-    samplerQueue.push_back(samplerLinear);
 
     samplerInfo.setMagFilter(vk::Filter::eNearest);
     samplerInfo.setMinFilter(vk::Filter::eNearest);
     samplerNearest = device.createSampler(samplerInfo);
-    samplerQueue.push_back(samplerNearest);
 }
 
 void GLTFLoader::destroy()
 {
-    vmaDestroyImage(allocator, checkerboardImage.image, checkerboardImage.allocation);
-    vmaDestroyImage(allocator, whiteImage.image, whiteImage.allocation);
-    vmaDestroyImage(allocator, blackImage.image, blackImage.allocation);
-    vmaDestroyImage(allocator, greyImage.image, greyImage.allocation);
-    device.destroyImageView(checkerboardImage.imageView);
-    device.destroyImageView(whiteImage.imageView);
-    device.destroyImageView(blackImage.imageView);
-    device.destroyImageView(greyImage.imageView);
+    utils::destroy_image(device, allocator, checkerboardImage);
+    utils::destroy_image(device, allocator, whiteImage);
+    utils::destroy_image(device, allocator, blackImage);
+    utils::destroy_image(device, allocator, greyImage);
+    device.destroySampler(samplerLinear);
+    device.destroySampler(samplerNearest);
     device.destroyFence(gltfFence);
     device.destroyCommandPool(gltfCmdPool);
-    for (const vk::Sampler &s : samplerQueue)
-        device.destroySampler(s);
-    for (const ImageData &im : imageQueue) {
-        vmaDestroyImage(allocator, im.image, im.allocation);
-        device.destroyImageView(im.imageView);
-    }
-
-    destroy_buffers();
 }
 
 std::optional<std::shared_ptr<GLTFObj>> GLTFLoader::load_gltf_asset(const std::filesystem::path &path)
@@ -181,7 +169,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader::load_gltf_asset(const std::f
 void GLTFLoader::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene)
 {
     scene->samplers.reserve(asset.samplers.size());
-    samplerQueue.reserve(samplerQueue.size() + asset.samplers.size());
+    scene->samplerQueue.reserve(scene->samplerQueue.size() + asset.samplers.size());
     for (const fastgltf::Sampler &s : asset.samplers) {
         vk::SamplerCreateInfo samplerCreate{};
         samplerCreate.setMaxLod(vk::LodClampNone);
@@ -193,7 +181,7 @@ void GLTFLoader::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLT
 
         vk::Sampler sampler = device.createSampler(samplerCreate);
         scene->samplers.emplace_back(sampler);
-        samplerQueue.emplace_back(sampler);
+        scene->samplerQueue.emplace_back(sampler);
     }
 }
 
@@ -201,13 +189,13 @@ void GLTFLoader::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLT
 void GLTFLoader::load_images(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene)
 {
     scene->images.reserve(asset.images.size());
-    imageQueue.reserve(imageQueue.size() + asset.images.size());
+    scene->imageQueue.reserve(scene->imageQueue.size() + asset.images.size());
     // const auto start = std::chrono::system_clock::now();
     for (const fastgltf::Image &im : asset.images) {
         const auto image = load_image(asset, im);
         if (image.has_value()) {
             scene->images.emplace_back(image.value());
-            imageQueue.emplace_back(image.value());
+            scene->imageQueue.emplace_back(image.value());
         } else {
             std::println("Load image error. Emplacing default image.");
             scene->images.emplace_back(checkerboardImage);
@@ -341,7 +329,7 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
                                 std::vector<std::shared_ptr<GLTFMaterial>> &vMaterials)
 {
     vMaterials.reserve(asset.materials.size());
-    bufferQueue.reserve(bufferQueue.size() + asset.materials.size());
+    scene->bufferQueue.reserve(scene->bufferQueue.size() + asset.materials.size());
     for (size_t i = 0; i < asset.materials.size(); i++) {
         const fastgltf::Material &m = asset.materials[i];
         std::shared_ptr<GLTFMaterial> matTmp = std::make_shared<GLTFMaterial>();
@@ -361,12 +349,20 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
                                    allocator,
                                    sizeof(GLTFMaterial::MaterialConstants),
                                    vk::BufferUsageFlagBits::eStorageBuffer
-                                       | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                                   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                   VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+                                       | vk::BufferUsageFlagBits::eShaderDeviceAddress
+                                       | vk::BufferUsageFlagBits::eTransferDst,
+                                   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
         matTmp->materialResources.dataBuffer = *materialConstantsBuffer;
-        bufferQueue.emplace_back(materialConstantsBuffer);
-        utils::copy_to_buffer(matTmp->materialResources.dataBuffer, allocator, &materialConstants);
+        scene->bufferQueue.emplace_back(materialConstantsBuffer);
+        utils::copy_to_device_buffer(matTmp->materialResources.dataBuffer,
+                                     device,
+                                     allocator,
+                                     gltfCmd,
+                                     queue,
+                                     gltfFence,
+                                     &materialConstants,
+                                     sizeof(GLTFMaterial::MaterialConstants));
+        // utils::copy_to_buffer(matTmp->materialResources.dataBuffer, allocator, &materialConstants);
 
         // Material type
         matTmp->materialPass = (m.alphaMode == fastgltf::AlphaMode::Blend)
@@ -537,9 +533,13 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
             meshTmp->surfaces.emplace_back(surface);
         }
         // Fill meshTmp index and vertex buffers
-        if (!meshBuffersExist)
+        if (!meshBuffersExist) {
             create_mesh_buffers(indices, vertices, meshTmp);
-        else {
+            scene->bufferQueue.reserve(scene->bufferQueue.size() + 2);
+            scene->bufferQueue.emplace_back(meshTmp->indexBuffer);
+            scene->bufferQueue.emplace_back(meshTmp->vertexBuffer);
+
+        } else {
             const auto &sameMesh = scene->meshes.find(meshTmp->name)->second;
             meshTmp->indexBuffer = sameMesh->indexBuffer;
             meshTmp->vertexBuffer = sameMesh->vertexBuffer;
@@ -568,7 +568,7 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
             std::shared_ptr<MeshNode> meshNodeTmp = std::dynamic_pointer_cast<MeshNode>(nodeTmp);
             const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
             meshNodeTmp->mesh = mesh;
-            meshNodeTmp->surfaceStorageBuffers.reserve(mesh->surfaces.size());
+            meshNodeTmp->surfaceUniformBuffers.reserve(mesh->surfaces.size());
             // bufferQueue.reserve(mesh->surfaces.size());
             // Create a bound storage buffer for every surface with the device addresses
             // that will allow us access all the data from the shaders
@@ -587,20 +587,28 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
                 surfaceStorage.normalSamplerIndex = s.material->materialResources.normalSamplerIndex;
                 surfaceStorage.startIndex = s.startIndex;
                 surfaceStorage.count = s.count;
-                std::shared_ptr<Buffer> surfaceStorageBuffer = std::make_shared<Buffer>();
-                *surfaceStorageBuffer
+                std::shared_ptr<Buffer> surfaceUniformBuffer = std::make_shared<Buffer>();
+                *surfaceUniformBuffer
                     = utils::create_buffer(device,
                                            allocator,
                                            sizeof(SurfaceStorage),
-                                           vk::BufferUsageFlagBits::eStorageBuffer,
-                                           VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                           VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-                utils::copy_to_buffer(*surfaceStorageBuffer, allocator, &surfaceStorage);
+                                           vk::BufferUsageFlagBits::eUniformBuffer
+                                               | vk::BufferUsageFlagBits::eTransferDst,
+                                           VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+                utils::copy_to_device_buffer(*surfaceUniformBuffer,
+                                             device,
+                                             allocator,
+                                             gltfCmd,
+                                             queue,
+                                             gltfFence,
+                                             &surfaceStorage,
+                                             sizeof(SurfaceStorage));
+                // utils::copy_to_buffer(*surfaceStorageBuffer, allocator, &surfaceStorage);
                 // Store a unique surface Id for each surface. This will be used as the customInstanceID
                 // when building the BLASes
-                meshNodeTmp->surfaceStorageBuffers[surfaceId] = *surfaceStorageBuffer;
+                meshNodeTmp->surfaceUniformBuffers[surfaceId] = *surfaceUniformBuffer;
                 surfaceId++;
-                bufferQueue.emplace_back(surfaceStorageBuffer);
+                scene->bufferQueue.emplace_back(surfaceUniformBuffer);
                 scene->meshNodes.emplace_back(std::move(meshNodeTmp));
             }
         } else
@@ -643,9 +651,9 @@ void GLTFLoader::create_mesh_buffers(const std::vector<uint32_t> &indices,
 {
     mesh->indexBuffer = std::make_shared<Buffer>();
     mesh->vertexBuffer = std::make_shared<Buffer>();
-    bufferQueue.reserve(bufferQueue.size() + 2);
-    bufferQueue.emplace_back(mesh->indexBuffer);
-    bufferQueue.emplace_back(mesh->vertexBuffer);
+    // bufferQueue.reserve(bufferQueue.size() + 2);
+    // bufferQueue.emplace_back(mesh->indexBuffer);
+    // bufferQueue.emplace_back(mesh->vertexBuffer);
 
     const vk::DeviceSize verticesSize = vertices.size() * sizeof(Vertex);
     const vk::DeviceSize indicesSize = indices.size() * sizeof(uint32_t);
@@ -706,11 +714,11 @@ void GLTFLoader::create_mesh_buffers(const std::vector<uint32_t> &indices,
     utils::destroy_buffer(allocator, stagingBuffer);
 }
 
-void GLTFLoader::destroy_buffers()
-{
-    for (auto &b : bufferQueue)
-        utils::destroy_buffer(allocator, *b);
-}
+// void GLTFLoader::destroy_buffers()
+// {
+//     for (auto &b : bufferQueue)
+//         utils::destroy_buffer(allocator, *b);
+// }
 
 vk::Filter extract_filter(const fastgltf::Filter &filter)
 {
@@ -742,4 +750,15 @@ vk::SamplerMipmapMode extract_mipmap_mode(const fastgltf::Filter &filter)
     default:
         return vk::SamplerMipmapMode::eLinear;
     }
+}
+
+void GLTFObj::destroy(const vk::Device &device, const VmaAllocator &allocator)
+{
+    for (const vk::Sampler &s : samplerQueue)
+        device.destroySampler(s);
+    for (const ImageData &im : imageQueue) {
+        utils::destroy_image(device, allocator, im);
+    }
+    for (const auto &b : bufferQueue)
+        utils::destroy_buffer(allocator, *b);
 }

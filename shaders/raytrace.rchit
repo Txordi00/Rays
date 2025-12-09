@@ -20,7 +20,7 @@ layout(set = 1, binding = 2) uniform texture2D textures[];
 layout(binding = 3, set = 0) uniform sampler2D presamplingHemisphere;
 layout(binding = 4, set = 0) uniform sampler3D presamplingGGX;
 
-layout(set = 1, binding = 3, scalar) uniform LightsBuffer
+layout(set = 1, binding = 3, scalar) readonly uniform LightsBuffer
 {
     Light light;
 }
@@ -36,7 +36,7 @@ layout(buffer_reference, std430, scalar) readonly buffer IndexBuffer
     uint indices[];
 };
 
-layout(buffer_reference, std430, scalar) readonly buffer MaterialConstantsBuffer
+layout(buffer_reference, std140, scalar) readonly buffer MaterialConstantsBuffer
 {
     MaterialConstants materialConstants;
 };
@@ -56,14 +56,14 @@ struct SurfaceStorage
     uint count;
 };
 
-layout(std430, set = 1, binding = 0, std430, scalar) readonly buffer SurfaceStorageBuffer
+layout(set = 1, binding = 0, std140, scalar) readonly uniform SurfaceStorageBuffer
 {
     SurfaceStorage surface;
 }
 surfaceStorages[];
 
 //push constants block
-layout(scalar, push_constant) uniform RayPushConstants
+layout(scalar, std430, push_constant) uniform RayPushConstants
 {
     RayPush rayPush;
 }

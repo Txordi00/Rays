@@ -57,6 +57,7 @@ void Init::clean()
         asBuilder->destroy();
 
         gltfLoader->destroy();
+        scene->destroy(device, allocator);
 
         presampler->destroy();
 
@@ -359,7 +360,7 @@ void Init::init_descriptors()
                                                  physicalDeviceProperties,
                                                  asProperties,
                                                  true);
-    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer,
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
                                                              static_cast<uint32_t>(
                                                                  scene->surfaceStorageBuffersCount)},
                                       frameOverlap); // per-surface storage
@@ -375,18 +376,23 @@ void Init::init_descriptors()
                                                              static_cast<uint32_t>(lights.size())},
                                       frameOverlap); // Lights
     descHelperUAB->create_descriptor_pool();
-    descHelperUAB->add_binding(Binding{vk::DescriptorType::eStorageBuffer,
-                                       vk::ShaderStageFlagBits::eClosestHitKHR,
-                                       0}); // per-surface storage
-    descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
-                                       vk::ShaderStageFlagBits::eClosestHitKHR,
-                                       1}); // samplers
-    descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampledImage,
-                                       vk::ShaderStageFlagBits::eClosestHitKHR,
-                                       2}); // sampled images
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
-                                       3}); // sampled images
+                                       0,
+                                       scene->surfaceStorageBuffersCount}); // per-surface storage
+    descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
+                                       vk::ShaderStageFlagBits::eClosestHitKHR,
+                                       1,
+                                       static_cast<uint32_t>(scene->samplers.size())}); // samplers
+    descHelperUAB->add_binding(
+        Binding{vk::DescriptorType::eSampledImage,
+                vk::ShaderStageFlagBits::eClosestHitKHR,
+                2,
+                static_cast<uint32_t>(scene->images.size())}); // sampled images
+    descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
+                                       vk::ShaderStageFlagBits::eClosestHitKHR,
+                                       3,
+                                       static_cast<uint32_t>(lights.size())}); // lights
     descriptorSetLayoutUAB = descHelperUAB->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(descriptorSetLayoutUAB, frameOverlap);

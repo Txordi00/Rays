@@ -145,7 +145,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
         // Get all the MeshNodes associated with a single mesh
         const auto &[rangeFirst, rangeEnd] = meshNodes.equal_range(it->first);
         for (auto r = rangeFirst; r != rangeEnd; ++r) {
-            for (const auto &[key, buffer] : r->second->surfaceStorageBuffers) {
+            for (const auto &[key, buffer] : r->second->surfaceUniformBuffers) {
                 blases.push_back({key, blas, glm::transpose(r->second->worldTransform)});
             }
         }

@@ -11,6 +11,7 @@ struct Binding
     vk::DescriptorType type;
     vk::ShaderStageFlags shaderStageFlags;
     uint32_t binding;
+    uint32_t descriptorCount{1};
 };
 
 class DescHelper

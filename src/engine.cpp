@@ -135,7 +135,7 @@ void Engine::update_descriptors()
     std::vector<Buffer> surfaceStorageBuffers;
     surfaceStorageBuffers.reserve(I->scene->surfaceStorageBuffersCount);
     for (const auto &m : I->scene->meshNodes) {
-        for (const auto &b : m->surfaceStorageBuffers)
+        for (const auto &b : m->surfaceUniformBuffers)
             surfaceStorageBuffers.emplace_back(b.second);
     }
     std::vector<Buffer> lightBuffers;
@@ -148,7 +148,7 @@ void Engine::update_descriptors()
         vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
         vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
-        descUpdater.add_storage(descriptorSetUAB, 0, surfaceStorageBuffers);
+        descUpdater.add_uniform(descriptorSetUAB, 0, surfaceStorageBuffers);
         descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
         descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
         descUpdater.add_uniform(descriptorSetUAB, 3, lightBuffers);
