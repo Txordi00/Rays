@@ -71,10 +71,10 @@ push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
-const uint maxDepth = 2;
-const uint numSamples = 16;
+const uint maxDepth = 3;
+const uint numSamples = 8;
 const bool random = true;
-const bool cached = true;
+const bool cached = false;
 uint rngState = gl_LaunchSizeEXT.x * gl_LaunchIDEXT.y + gl_LaunchIDEXT.x; // Initial seed
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
@@ -342,18 +342,28 @@ void main()
     const vec3 normalVtxRaw = norm0 * barycentrics.x + norm1 * barycentrics.y
             + norm2 * barycentrics.z; // already normalized
     // Apply the transformation to the normals (not done in BLAS creation)
-    const vec3 normalVtx = normalize((normalVtxRaw * gl_WorldToObjectEXT).xyz);
+    const vec3 normalVtx = gl_WorldToObjectEXT * vec4(normalVtxRaw, 0);
+    // print_val("n %f ", length(normalVtxRaw), 2., 1.);
 
     const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
 
     const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y
             + v2.tangent.xyz * barycentrics.z; // range [-1, 1]
     const float handedness = v0.tangent.w; // All vi.tangent.w are the same
-    const vec3 tangent = normalize((tangentRaw * gl_WorldToObjectEXT).xyz);
+    const vec3 tangent = gl_WorldToObjectEXT * vec4(tangentRaw, 0);
 
     const vec3 bitangent = cross(normalVtx, tangent) * handedness;
 
     const mat3 TBN = mat3(tangent, bitangent, normalVtx);
+
+    const vec4 normalTexRaw = 2.
+            * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
+                    samplers[nonuniformEXT(normalSamplerIndex)]),
+                uv) - 1.; // range [0, 1] -> [-1, 1]
+
+    const vec3 normal = normalize(TBN * normalTexRaw.xyz);
+    // print_val("n %f ", length(normal), 0.99, 1.);
+    // const vec3 normal = normalVtx;
 
     const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
                 samplers[nonuniformEXT(colorSamplerIndex)]),
@@ -371,13 +381,6 @@ void main()
     const float perceptualRoughness = metallicRoughness.y;
     const float metallic = metallicRoughness.z;
 
-    const vec4 normalTexRaw = 2.
-            * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
-                    samplers[nonuniformEXT(normalSamplerIndex)]),
-                uv) - 1.; // range [0, 1] -> [-1, 1]
-    const vec3 normal = normalize(TBN * normalTexRaw.xyz);
-    // const vec3 normal = normalVtx;
-
     // Transforming the position to world space
     const vec3 worldPos = (gl_ObjectToWorldEXT * vec4(pos, 1.)).xyz;
 
@@ -386,9 +389,9 @@ void main()
     // Parametrization
     const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
     // const vec3 diffuseColor = vec3(1.);
-    const float f90 = 1.;
     const float reflectance = 0.5;
     const vec3 f0 = mix(vec3(0.16 * reflectance * reflectance), baseColor.xyz, metallic);
+    const float f90 = clamp(50.0 * f0.y, 0.0, 1.0);
     // perceptually linear roughness to roughness
     const float a = perceptualRoughness;
     // const float a = 0.001;

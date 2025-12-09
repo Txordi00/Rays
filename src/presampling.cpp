@@ -63,7 +63,7 @@ glm::vec4 Presampler::sample_microfacet_ggx_specular(const glm::vec2 &u, const f
     // Sample phi and theta in the local normal frame
     const float phi = glm::two_pi<float>() * u.x;
     const float a2 = a * a; // a in my case is already a = perceptualRoughness^2
-    const float ctheta = std::sqrt((1. - u.y) / (u.y * (a2 - 1.) + 1.));
+    const float ctheta = (a2 > 1e-5) ? std::sqrt((1. - u.y) / (u.y * (a2 - 1.) + 1.)) : 1.;
     const float stheta = std::sqrt(1. - ctheta * ctheta);
 
     // Half vector in local frame

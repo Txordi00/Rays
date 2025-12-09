@@ -22,7 +22,7 @@ mat3 normal_cob(const vec3 normal) {
 float D_GGX(const float NoH, const float a) {
     const float a2 = a * a;
     const float f = (NoH * a2 - NoH) * NoH + 1.0;
-    return a2 * ONEOVERPI / (f * f);
+    return (a2 > 1e-5) ? a2 * ONEOVERPI / (f * f) : ONEOVERPI;
 }
 
 vec3 F_Schlick(const float u, const vec3 f0, const float f90) {
@@ -41,7 +41,6 @@ float V_SmithGGXCorrelated(const float NoV, const float NoL, const float a) {
 }
 
 float V_SmithGGXCorrelatedFast(const float NoV, const float NoL, const float a) {
-    // const float a2 = a * a;
     const float first = 2. * NoL * NoV;
     const float second = NoL + NoV;
     return 0.5 / mix(first, second, a);
@@ -96,7 +95,7 @@ vec3 reinhard_jodie(const vec3 color)
 float D_specular_Disney_Epic(const float cosTheta, const float a2)
 {
     const float denom = cosTheta * cosTheta * (a2 - 1.) + 1.;
-    return ONEOVERPI * a2 / (denom * denom);
+    return (a2 > 1e-5) ? ONEOVERPI * a2 / (denom * denom) : ONEOVERPI;
 }
 
 float pdf_microfacet_ggx_specular(const float ctheta, const float a2, const float vDotH)
@@ -112,9 +111,9 @@ float pdf_microfacet_ggx_specular(const float ctheta, const float a2, const floa
 void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const vec2 u, in const float a, out vec3 sampleDir, out vec3 h, out float nDotL, out float vDotH, out float pdf)
 {
     // Sample phi and theta in the local normal frame
-    const float phi = TWOPI * u[0];
+    const float phi = TWOPI * u.x;
     const float a2 = a * a; // a in my case is already a = perceptualRoughness^2
-    const float ctheta = sqrt((1. - u[1]) / (u[1] * (a2 - 1.) + 1.));
+    const float ctheta = (a2 > 1e-5) ? sqrt((1. - u.y) / (u.y * (a2 - 1.) + 1.)) : 1.;
     // print_val("ct: %f ", ctheta, -1., 1.);
     const float stheta = sqrt(1. - ctheta * ctheta);
 
