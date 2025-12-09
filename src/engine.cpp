@@ -9,8 +9,8 @@ import vulkan_hpp;
 #include "types.hpp"
 #include "utils.hpp"
 #include <glm/ext.hpp>
-#include <imgui/imgui_impl_sdl3.h>
-#include <imgui/imgui_impl_vulkan.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_vulkan.h>
 #include <thread>
 
 Engine::Engine()

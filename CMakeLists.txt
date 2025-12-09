@@ -13,7 +13,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math")
 
 find_package(Vulkan REQUIRED)
 
-# Require Vulkan version ≥ 1.3.256 (earliest version where the Vulkan CXX20 module was available)
+# Require Vulkan from the system at version ≥ 1.3.256 (earliest version where the Vulkan CXX20 module was available)
 if( ${Vulkan_VERSION} VERSION_LESS "1.3.256" )
     message( FATAL_ERROR "Minimum supported Vulkan version is 1.3.256. "
            "Found ${Vulkan_VERSION}."
@@ -32,33 +32,79 @@ if(USE_VULKANHPP_CPP20_MODULE)
     target_link_libraries(VulkanHppModule PUBLIC Vulkan::Headers)
 endif()
 
-# GLM
+# GLM from system
 find_package(glm CONFIG REQUIRED)
-# SDL3
+# SDL3 from system
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+
 # ImGui
-add_library(imgui STATIC "include/imgui/imgui.cpp" "include/imgui/imgui_demo.cpp"
-  "include/imgui/imgui_draw.cpp" "include/imgui/imgui_tables.cpp" "include/imgui/imgui_widgets.cpp"
-  "include/imgui/imgui_impl_sdl3.cpp" "include/imgui/imgui_impl_vulkan.cpp")
-target_link_libraries(imgui PRIVATE Vulkan::Vulkan)
-# Fastgltf
-set(FASTGLTF_COMPILE_AS_CPP20 YES)
-add_subdirectory("third_party_non_include/fastgltf")
+include(FetchContent)
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG v1.92.5  # Specify a version tag or use 'docking' or 'master'
+)
+FetchContent_MakeAvailable(imgui)
+
+# Create the imgui library target
+add_library(imgui STATIC
+  ${imgui_SOURCE_DIR}/imgui.cpp
+  ${imgui_SOURCE_DIR}/imgui_demo.cpp
+  ${imgui_SOURCE_DIR}/imgui_draw.cpp
+  ${imgui_SOURCE_DIR}/imgui_tables.cpp
+  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+)
+
+# Add include directories
+target_include_directories(imgui PUBLIC
+  ${imgui_SOURCE_DIR}
+  ${imgui_SOURCE_DIR}/backends
+)
+
+target_link_libraries(imgui PRIVATE Vulkan::Vulkan SDL3::SDL3)
+
 
 # Vk-bootstrap
-include(FetchContent)
 FetchContent_Declare(
     fetch_vk_bootstrap
     GIT_REPOSITORY "https://github.com/charles-lunarg/vk-bootstrap"
-    GIT_TAG        "v1.4.328" #suggest using a tag so the library doesn't update whenever new commits are pushed to a branch
+    GIT_TAG        "v1.4.328"
 )
 FetchContent_MakeAvailable(fetch_vk_bootstrap)
+
+
+# Fastgltf
+FetchContent_Declare(
+  fastgltf
+  GIT_REPOSITORY  "https://github.com/spnda/fastgltf.git"
+  GIT_TAG         "v0.9.0"
+)
+set(FASTGLTF_COMPILE_AS_CPP20 YES)
+FetchContent_MakeAvailable(fastgltf)
+
+# VMA
+FetchContent_Declare(
+  vma
+  GIT_REPOSITORY  "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git"
+  GIT_TAG         "v3.3.0"  # Specify the version you want
+)
+FetchContent_MakeAvailable(vma)
+
+# stb_image
+FetchContent_Declare(
+  stb
+  GIT_REPOSITORY  "https://github.com/nothings/stb.git"
+  GIT_TAG         "master"  # or a specific commit hash for stability
+)
+FetchContent_MakeAvailable(stb)
 
 # Add all folders with code (with or without their own CMakeLists.txt)
 add_executable(${PROJECT_NAME} "src/main.cpp")
 add_subdirectory("src")
 add_subdirectory("shaders")
-target_include_directories(${PROJECT_NAME} PRIVATE "include")
+target_include_directories(${PROJECT_NAME} PRIVATE ${stb_SOURCE_DIR} ${vma_SOURCE_DIR}/include)
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
