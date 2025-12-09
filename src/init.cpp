@@ -34,19 +34,12 @@ Init::Init()
     create_draw_data();
     load_meshes();
     create_lights();
-    std::println("a");
     create_as();
-    std::println("b");
     init_descriptors();
-    std::println("c");
     init_pipelines();
-    std::println("d");
     create_sbt();
-    std::println("e");
     init_imgui();
-    std::println("f");
     presample();
-    std::println("g");
 
     isInitialized = true;
     std::println("Initialization complete");
@@ -447,15 +440,11 @@ void Init::init_pipelines()
 {
     RtPipelineBuilder rtPipelineBuilder{device};
     rtPipelineBuilder.create_shader_stages();
-    std::println("pa");
     rtPipelineBuilder.create_shader_groups();
-    std::println("pb");
     std::vector<vk::DescriptorSetLayout> descLayouts = {rtDescriptorSetLayout,
                                                         descriptorSetLayoutUAB};
     simpleRtPipeline.pipelineLayout = rtPipelineBuilder.buildPipelineLayout(descLayouts);
-    std::println("pc");
     simpleRtPipeline.pipeline = rtPipelineBuilder.buildPipeline(simpleRtPipeline.pipelineLayout);
-    std::println("pd");
 }
 
 void Init::create_sbt()

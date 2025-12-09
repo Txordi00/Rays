@@ -99,11 +99,8 @@ vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipeline
 
     rtPipelineInfo.setLayout(pipelineLayout);
 
-    std::println("before create");
     auto [res, val] = device.createRayTracingPipelinesKHR(nullptr, nullptr, rtPipelineInfo);
-    std::println("after create");
     VK_CHECK_RES(res);
-    std::println("before destroy");
     for (const auto &s : shaderStages)
         device.destroyShaderModule(s.module);
 

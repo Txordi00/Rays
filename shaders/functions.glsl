@@ -22,7 +22,7 @@ mat3 normal_cob(const vec3 normal) {
 float D_GGX(const float NoH, const float a) {
     const float a2 = a * a;
     const float f = (NoH * a2 - NoH) * NoH + 1.0;
-    return a2 / (PI * f * f);
+    return a2 * ONEOVERPI / (f * f);
 }
 
 vec3 F_Schlick(const float u, const vec3 f0, const float f90) {
@@ -44,7 +44,7 @@ float V_SmithGGXCorrelatedFast(const float NoV, const float NoL, const float a) 
     // const float a2 = a * a;
     const float first = 2. * NoL * NoV;
     const float second = NoL + NoV;
-    return mix(first, second, a);
+    return 0.5 / mix(first, second, a);
 }
 
 float Fd_Lambert(const float nDotL) {
@@ -53,7 +53,7 @@ float Fd_Lambert(const float nDotL) {
 
 vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float nDotL,
     const vec3 diffuseColor, const vec3 f0, const float f90, const float a) {
-    // const float a2 = a * a;
+    const float a2 = a * a;
     const float D = D_GGX(nDotH, a);
     const vec3 F = F_Schlick(lDotH, f0, f90);
     const float V = V_SmithGGXCorrelatedFast(nDotV, nDotL, a);
@@ -64,7 +64,7 @@ vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float n
     // diffuse BRDF
     const vec3 Fd = diffuseColor * Fd_Lambert(nDotL);
 
-    return Fd;
+    return Fd + Fr;
 }
 
 vec3 evaluate_directional_light(const Light light, const vec3 BSDF)
@@ -109,7 +109,7 @@ float pdf_microfacet_ggx_specular(const float ctheta, const float a2, const floa
     return pdf_h / (4. * vDotH);
 }
 
-void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const vec2 u, in const float a, out vec3 sampleDir, out float nDotL, out float vDotH, out float pdf)
+void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const vec2 u, in const float a, out vec3 sampleDir, out vec3 h, out float nDotL, out float vDotH, out float pdf)
 {
     // Sample phi and theta in the local normal frame
     const float phi = TWOPI * u[0];
@@ -121,13 +121,13 @@ void sample_microfacet_ggx_specular(in const mat3 S, in const vec3 v, in const v
     // Half vector in local frame
     const vec3 hLocal = vec3(stheta * cos(phi), stheta * sin(phi), ctheta);
     // Move to world frame
-    const vec3 hWorld = S * hLocal;
+    h = S * hLocal;
 
     // Reflect view direction around half-vector to get light direction
-    sampleDir = normalize(reflect(-v, hWorld));
+    sampleDir = reflect(-v, h);
 
     nDotL = dot(sampleDir, S[2]);
-    vDotH = dot(v, hWorld);
+    vDotH = dot(v, h);
     // ctheta = nDotH
     // if (nDotL < 1e-5 || vDotH < 1e-5 || ctheta < 1e-5)
     // {
