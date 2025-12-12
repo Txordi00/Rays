@@ -5,12 +5,15 @@
 #include "types.glsl"
 
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
+layout(constant_id = 0) const float BKGR = 0.;
+layout(constant_id = 1) const float BKGG = 0.;
+layout(constant_id = 2) const float BKGB = 0.;
 
-//push constants block
 layout(scalar, push_constant) uniform RayPushConstants
 {
     RayPush rayPush;
-} push;
+}
+push;
 
 void main()
 {

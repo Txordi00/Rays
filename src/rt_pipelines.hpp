@@ -26,10 +26,14 @@ public:
     vk::PipelineLayout buildPipelineLayout(
         const std::vector<vk::DescriptorSetLayout> &descSetLayouts);
 
-    vk::Pipeline buildPipeline(const vk::PipelineLayout &pipelineLayout);
+    vk::Pipeline buildPipeline(const vk::PipelineLayout &pipelineLayout,
+                               const SpecializationConstantsClosestHit &constantsCH);
+
+    void destroy();
 
 private:
     const vk::Device &device;
     std::array<vk::PipelineShaderStageCreateInfo, eShaderStageCount> shaderStages;
     std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups;
+    std::vector<vk::Pipeline> pipelineQueue;
 };

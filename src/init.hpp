@@ -5,10 +5,12 @@
 #include "lights.hpp"
 #include "loader.hpp"
 #include "presampling.hpp"
+#include "rt_pipelines.hpp"
 #include "shader_binding_tables.hpp"
 #include "types.hpp"
 #include <SDL3/SDL.h>
 #include <memory>
+#include <queue>
 #include <vk_mem_alloc.h>
 
 class Init
@@ -63,6 +65,7 @@ public:
     // Pipelines
     // SimplePipelineData simpleMeshGraphicsPipeline;
     SimplePipelineData simpleRtPipeline;
+    std::unique_ptr<RtPipelineBuilder> rtPipelineBuilder;
 
     // Imgui
     vk::DescriptorPool imguiPool;
@@ -86,6 +89,8 @@ public:
 
     bool isInitialized{false};
 
+    void rebuid_rt_pipeline(const SpecializationConstantsClosestHit &constantsCH);
+
 private:
     // Initialization calls
     void init_vulkan();
@@ -104,4 +109,7 @@ private:
     void create_as();
 
     void destroy_swapchain();
+
+    std::queue<vk::Pipeline> rtPipelineQueue;
+    std::queue<Buffer> rtSBTBufferQueue;
 };

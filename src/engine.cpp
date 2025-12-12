@@ -11,6 +11,7 @@ import vulkan_hpp;
 #include <glm/ext.hpp>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
+#include <print>
 #include <thread>
 
 Engine::Engine()
@@ -20,6 +21,8 @@ Engine::Engine()
     // Init push constants
     rayPush.clearColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.f);
     rayPush.nLights = I->lights.size();
+    // rayPush.random = 1;
+    // rayPush.presample = 0;
 }
 
 Engine::~Engine()
@@ -29,6 +32,11 @@ Engine::~Engine()
 
 void Engine::run()
 {
+    SpecializationConstantsClosestHit constants{};
+    bool random = constants.random, presample = constants.presampled;
+    int recursionDepth = constants.recursionDepth, numBounces = constants.numBounces;
+    // float backgroundColor[3] = {rayPush.clearColor.x, rayPush.clearColor.y, rayPush.clearColor.z};
+
     // Inform the shaders about the resources that we are going to use
     update_descriptors();
 
@@ -92,6 +100,36 @@ void Engine::run()
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
+        ImGui::Begin("Controls");
+
+        // Alternative: Color picker without label
+        ImGui::ColorEdit3("Background color", (float *) &rayPush.clearColor);
+
+        ImGui::Separator();
+
+        // Checkbox for boolean toggle
+        ImGui::Checkbox("Random", &random);
+        ImGui::Checkbox("Presample", &presample);
+
+        // Integer control with +/- buttons
+        ImGui::InputInt("Maximum recursion depth", &recursionDepth, 1, 1);
+        ImGui::InputInt("Bounces", &numBounces, 2, 4);
+
+        // Apply button
+        if (ImGui::Button("Apply Changes")) {
+            // Your action code here
+            SpecializationConstantsClosestHit constantsCH{};
+            constantsCH.recursionDepth = static_cast<uint32_t>(recursionDepth);
+            constantsCH.numBounces = static_cast<uint32_t>(numBounces);
+            constantsCH.random = static_cast<vk::Bool32>(random);
+            constantsCH.presampled = static_cast<vk::Bool32>(presample);
+            I->rebuid_rt_pipeline(constantsCH);
+        }
+
+        ImGui::ShowMetricsWindow();
+
+        ImGui::End();
+
         // if (ImGui::Begin("background")) {
         //     ComputePipelineData &currentPipeline
         //         = I->computePipelines[currentBackgroundPipelineIndex];
@@ -110,7 +148,6 @@ void Engine::run()
         // }
         // Imgui UI to test
         // ImGui::End();
-        ImGui::ShowDemoWindow();
 
         //make imgui calculate internal draw structures
         ImGui::Render();
@@ -170,7 +207,7 @@ void Engine::draw()
     // Wait max 1s until the gpu finished rendering the last frame
     vk::Result res = I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT);
     if (res != vk::Result::eSuccess) {
-        std::cout << "Skipping frame" << std::endl;
+        std::println("Skipping frame");
         return;
     }
     I->device.resetFences(frameFence);
@@ -400,6 +437,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     pushInfo.setStageFlags(vk::ShaderStageFlagBits::eRaygenKHR
                            | vk::ShaderStageFlagBits::eClosestHitKHR
                            | vk::ShaderStageFlagBits::eMissKHR);
+    pushInfo.setSize(sizeof(RayPush));
     pushInfo.setValues<RayPush>(rayPush);
     pushInfo.setOffset(0);
     cmd.pushConstants2(pushInfo);

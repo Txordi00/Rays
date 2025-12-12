@@ -72,8 +72,6 @@ glm::mat4 get_perspective_projection(const float fovy,
 
 uint32_t align_up(uint32_t x, uint32_t a);
 
-void normalize_material_factors(Material &material);
-
 void cmd_submit(const vk::Device &device,
                 const vk::Queue &queue,
                 const vk::Fence &fence,

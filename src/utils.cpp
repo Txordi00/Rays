@@ -190,16 +190,6 @@ void copy_to_buffer(const Buffer &buffer,
     vmaCopyMemoryToAllocation(allocator, data, buffer.allocation, offset, s);
 }
 
-void normalize_material_factors(Material &m)
-{
-    float normFactor = m.specularR + m.diffuseR + m.ambientR + m.reflectiveness + m.refractiveness;
-    m.specularR /= normFactor;
-    m.diffuseR /= normFactor;
-    m.ambientR /= normFactor;
-    m.reflectiveness /= normFactor;
-    m.refractiveness /= normFactor;
-}
-
 ImageData create_image(const vk::Device &device,
                        const VmaAllocator &allocator,
                        const vk::CommandBuffer &cmd,

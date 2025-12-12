@@ -1,5 +1,6 @@
 #include "rt_pipelines.hpp"
 #include "utils.hpp"
+#include <glm/gtc/packing.hpp>
 #include <print>
 
 void RtPipelineBuilder::create_shader_stages()
@@ -75,34 +76,48 @@ vk::PipelineLayout RtPipelineBuilder::buildPipelineLayout(
     return device.createPipelineLayout(pipelineLayoutCreateInfo);
 }
 
-vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipelineLayout)
+vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipelineLayout,
+                                              const SpecializationConstantsClosestHit &constantsCH)
 {
-    // Recursion depth parameter
-    vk::SpecializationMapEntry mapEntry{};
-    mapEntry.setConstantID(0);
-    mapEntry.setOffset(0);
-    mapEntry.setSize(sizeof(uint32_t));
-    vk::SpecializationInfo specInfo{};
-    specInfo.setMapEntries(mapEntry);
-    specInfo.setDataSize(sizeof(uint32_t));
-    specInfo.setData<uint32_t>(MAX_RT_RECURSION);
-    // attach specInfo to its shader stage
-    shaderStages[eClosestHit].setPSpecializationInfo(&specInfo);
+    std::array<vk::SpecializationMapEntry, 4> specMapEntriesCH
+        = {vk::SpecializationMapEntry{0,
+                                      offsetof(SpecializationConstantsClosestHit, recursionDepth),
+                                      sizeof(uint32_t)}, // constantID 0
+           vk::SpecializationMapEntry{1,
+                                      offsetof(SpecializationConstantsClosestHit, numBounces),
+                                      sizeof(uint32_t)},
+           vk::SpecializationMapEntry{2,
+                                      offsetof(SpecializationConstantsClosestHit, random),
+                                      sizeof(vk::Bool32)},
+           vk::SpecializationMapEntry{3,
+                                      offsetof(SpecializationConstantsClosestHit, presampled),
+                                      sizeof(vk::Bool32)}};
+    vk::SpecializationInfo specInfoCH{};
+    specInfoCH.setMapEntries(specMapEntriesCH);
+    specInfoCH.setDataSize(sizeof(SpecializationConstantsClosestHit));
+    specInfoCH.setPData(&constantsCH);
+
+    shaderStages[eClosestHit].setPSpecializationInfo(&specInfoCH);
+
     vk::RayTracingPipelineCreateInfoKHR rtPipelineInfo{};
     rtPipelineInfo.setStages(shaderStages); // Stages are shaders
     // In this case, shaderGroups.size() == 3: we have one raygen group,
     // one miss shader group, and one hit group.
     rtPipelineInfo.setGroups(shaderGroups);
 
-    rtPipelineInfo.setMaxPipelineRayRecursionDepth(MAX_RT_RECURSION
+    rtPipelineInfo.setMaxPipelineRayRecursionDepth(constantsCH.recursionDepth
                                                    + 1); // Ray depth. Add +1 just in case
 
     rtPipelineInfo.setLayout(pipelineLayout);
 
     auto [res, val] = device.createRayTracingPipelinesKHR(nullptr, nullptr, rtPipelineInfo);
     VK_CHECK_RES(res);
-    for (const auto &s : shaderStages)
-        device.destroyShaderModule(s.module);
 
     return val[0];
+}
+
+void RtPipelineBuilder::destroy()
+{
+    for (const auto &s : shaderStages)
+        device.destroyShaderModule(s.module);
 }

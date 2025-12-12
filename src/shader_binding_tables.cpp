@@ -1,6 +1,5 @@
 #include "shader_binding_tables.hpp"
 #include "utils.hpp"
-#include <iostream>
 
 //--------------------------------------------------------------------------------------------------
 // The Shader Binding Table (SBT)

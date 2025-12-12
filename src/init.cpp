@@ -51,7 +51,6 @@ void Init::clean()
         device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
-        utils::destroy_buffer(allocator, rtSBTBuffer);
         utils::destroy_buffer(allocator, tlas.buffer);
         device.destroyAccelerationStructureKHR(tlas.AS);
         asBuilder->destroy();
@@ -67,8 +66,17 @@ void Init::clean()
 
         // device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         // device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
+        rtPipelineBuilder->destroy();
         device.destroyPipelineLayout(simpleRtPipeline.pipelineLayout);
-        device.destroyPipeline(simpleRtPipeline.pipeline);
+        // device.destroyPipeline(simpleRtPipeline.pipeline);
+        while (!rtPipelineQueue.empty()) {
+            device.destroyPipeline(rtPipelineQueue.front());
+            rtPipelineQueue.pop();
+        }
+        while (!rtSBTBufferQueue.empty()) {
+            utils::destroy_buffer(allocator, rtSBTBufferQueue.front());
+            rtSBTBufferQueue.pop();
+        }
 
         device.destroyDescriptorPool(imguiPool);
         descHelperUAB->destroy();
@@ -444,19 +452,52 @@ void Init::init_descriptors()
 
 void Init::init_pipelines()
 {
-    RtPipelineBuilder rtPipelineBuilder{device};
-    rtPipelineBuilder.create_shader_stages();
-    rtPipelineBuilder.create_shader_groups();
+    rtPipelineBuilder = std::make_unique<RtPipelineBuilder>(device);
+    rtPipelineBuilder->create_shader_stages();
+    rtPipelineBuilder->create_shader_groups();
     std::vector<vk::DescriptorSetLayout> descLayouts = {rtDescriptorSetLayout,
                                                         descriptorSetLayoutUAB};
-    simpleRtPipeline.pipelineLayout = rtPipelineBuilder.buildPipelineLayout(descLayouts);
-    simpleRtPipeline.pipeline = rtPipelineBuilder.buildPipeline(simpleRtPipeline.pipelineLayout);
+    simpleRtPipeline.pipelineLayout = rtPipelineBuilder->buildPipelineLayout(descLayouts);
+    SpecializationConstantsClosestHit constantsCH{};
+    simpleRtPipeline.pipeline = rtPipelineBuilder->buildPipeline(simpleRtPipeline.pipelineLayout,
+                                                                 constantsCH);
+    rtPipelineQueue.push(simpleRtPipeline.pipeline);
+
+    if (rtProperties.maxRayRecursionDepth < constantsCH.recursionDepth)
+        throw std::runtime_error("Driver recursion depth not enough. Driver: "
+                                 + std::to_string(rtProperties.maxRayRecursionDepth)
+                                 + ". Required: " + std::to_string(constantsCH.recursionDepth));
+}
+
+void Init::rebuid_rt_pipeline(const SpecializationConstantsClosestHit &constantsCH)
+{
+    vk::Pipeline newPipeline = rtPipelineBuilder->buildPipeline(simpleRtPipeline.pipelineLayout,
+                                                                constantsCH);
+    simpleRtPipeline.pipeline = newPipeline;
+    rtSBTBuffer = sbtHelper->create_shader_binding_table(newPipeline);
+    rtPipelineQueue.push(newPipeline);
+    rtSBTBufferQueue.push(rtSBTBuffer);
+    assert(rtPipelineQueue.size() == rtSBTBufferQueue.size());
+    if (rtPipelineQueue.size() > 2) {
+        vk::Pipeline pipelineToDestroy = rtPipelineQueue.front();
+        Buffer bufferToDestroy = rtSBTBufferQueue.front();
+        device.destroyPipeline(pipelineToDestroy);
+        utils::destroy_buffer(allocator, bufferToDestroy);
+        rtPipelineQueue.pop();
+        rtSBTBufferQueue.pop();
+    }
+
+    if (rtProperties.maxRayRecursionDepth < constantsCH.recursionDepth)
+        throw std::runtime_error("Driver recursion depth not enough. Driver: "
+                                 + std::to_string(rtProperties.maxRayRecursionDepth)
+                                 + ". Required: " + std::to_string(constantsCH.recursionDepth + 1));
 }
 
 void Init::create_sbt()
 {
     sbtHelper = std::make_unique<SbtHelper>(device, allocator, rtProperties);
     rtSBTBuffer = sbtHelper->create_shader_binding_table(simpleRtPipeline.pipeline);
+    rtSBTBufferQueue.push(rtSBTBuffer);
 }
 
 void Init::init_imgui()
@@ -518,10 +559,6 @@ void Init::init_rt()
     vk::PhysicalDeviceProperties2 physDevProp2{};
     physDevProp2.pNext = &rtProperties;
     physicalDevice.getProperties2(&physDevProp2);
-    if (rtProperties.maxRayRecursionDepth < MAX_RT_RECURSION)
-        throw std::runtime_error("Driver recursion depth not enough. Driver: "
-                                 + std::to_string(rtProperties.maxRayRecursionDepth)
-                                 + ". Required: " + std::to_string(MAX_RT_RECURSION));
 }
 
 void Init::presample()

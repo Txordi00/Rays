@@ -39,7 +39,7 @@ const unsigned int API_VERSION[3] = {1, 4, 0};
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
 const unsigned int MINIMUM_FRAME_OVERLAP = 2;
 const uint64_t FENCE_TIMEOUT = 1000000000;
-const uint32_t MAX_RT_RECURSION = 3;
+// const uint32_t MAX_RT_RECURSION = 3;
 const size_t SAMPLING_DISCRETIZATION = 100;
 
 #define SIMPLE_MESH_FRAG_SHADER "shaders/simple_mesh.frag.spv"
@@ -103,15 +103,6 @@ struct Vertex
     glm::vec4 color;
 };
 
-// holds the resources needed for a mesh
-// struct MeshBuffer
-// {
-//     Buffer indexBuffer;
-//     Buffer vertexBuffer;
-//     // vk::DeviceAddress vertexBufferAddress;
-//     // vk::DeviceAddress indexBufferAddress;
-// };
-
 // push constants for our mesh object draws
 struct MeshPush
 {
@@ -122,42 +113,27 @@ struct RayPush
 {
     glm::vec4 clearColor;
     uint32_t nLights;
+    // uint32_t random;
+    // uint32_t presample;
 };
+
+struct SpecializationConstantsClosestHit
+{
+    uint32_t recursionDepth{3};
+    uint32_t numBounces{8};
+    vk::Bool32 random{vk::True};
+    vk::Bool32 presampled{vk::False};
+};
+
+// struct SpecializationConstantsMiss
+// {
+//     float bkgR, bkgG, bkgB;
+// };
 
 // Per-object uniform buffer data
 struct UniformData
 {
     glm::mat4 worldMatrix;
-};
-
-struct Material
-{
-    // Color
-    glm::vec3 color;
-    // specular reflectiveness
-    float specularR;
-    // Diffuse reflectiveness
-    float diffuseR;
-    // Ambient reflectiveness
-    float ambientR;
-    // Shininess factor N.
-    // From the approximation in https://en.wikipedia.org/wiki/Phong_reflection_model#Concepts
-    // with beta=1
-    int shininessN;
-    // Reflectiveness
-    float reflectiveness;
-    // Refractiveness
-    float refractiveness;
-    // Refractive index. n_2 in https://en.wikipedia.org/wiki/Snell's_law
-    float refractiveIndex;
-};
-
-// Per-object storage buffer data
-struct ObjectStorageData
-{
-    vk::DeviceAddress vertexBufferAddress;
-    vk::DeviceAddress indexBufferAddress;
-    Material material;
 };
 
 // camera data for the storage buffer
