@@ -77,7 +77,8 @@ vk::PipelineLayout RtPipelineBuilder::buildPipelineLayout(
 }
 
 vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipelineLayout,
-                                              const SpecializationConstantsClosestHit &constantsCH)
+                                              const SpecializationConstantsClosestHit &constantsCH,
+                                              const SpecializationConstantsMiss &constantsMiss)
 {
     std::array<vk::SpecializationMapEntry, 4> specMapEntriesCH
         = {vk::SpecializationMapEntry{0,
@@ -98,6 +99,17 @@ vk::Pipeline RtPipelineBuilder::buildPipeline(const vk::PipelineLayout &pipeline
     specInfoCH.setPData(&constantsCH);
 
     shaderStages[eClosestHit].setPSpecializationInfo(&specInfoCH);
+
+    std::array<vk::SpecializationMapEntry, 1> specMapEntriesMiss = {
+        vk::SpecializationMapEntry{0,
+                                   offsetof(SpecializationConstantsMiss, envMap),
+                                   sizeof(vk::Bool32)}}; // constantID 0
+    vk::SpecializationInfo specInfoMiss{};
+    specInfoMiss.setMapEntries(specMapEntriesMiss);
+    specInfoMiss.setDataSize(sizeof(SpecializationConstantsMiss));
+    specInfoMiss.setPData(&constantsMiss);
+
+    shaderStages[eMiss].setPSpecializationInfo(&specInfoMiss);
 
     vk::RayTracingPipelineCreateInfoKHR rtPipelineInfo{};
     rtPipelineInfo.setStages(shaderStages); // Stages are shaders

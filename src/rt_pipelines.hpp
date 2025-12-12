@@ -27,7 +27,8 @@ public:
         const std::vector<vk::DescriptorSetLayout> &descSetLayouts);
 
     vk::Pipeline buildPipeline(const vk::PipelineLayout &pipelineLayout,
-                               const SpecializationConstantsClosestHit &constantsCH);
+                               const SpecializationConstantsClosestHit &constantsCH = {},
+                               const SpecializationConstantsMiss &constantsMiss = {});
 
     void destroy();
 

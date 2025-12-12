@@ -5,9 +5,8 @@
 #include "types.glsl"
 
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
-layout(constant_id = 0) const float BKGR = 0.;
-layout(constant_id = 1) const float BKGG = 0.;
-layout(constant_id = 2) const float BKGB = 0.;
+layout(binding = 5, set = 0) uniform sampler2D backgroundTexture;
+layout(constant_id = 0) const bool USE_ENV_MAP = false;
 
 layout(scalar, push_constant) uniform RayPushConstants
 {
@@ -15,7 +14,17 @@ layout(scalar, push_constant) uniform RayPushConstants
 }
 push;
 
+vec2 directionToSphericalEnvmap(vec3 dir) {
+    float phi = atan(dir.z, dir.x);
+    float theta = asin(dir.y);
+    vec2 uv;
+    uv.x = (phi + PI) * ONEOVERTWOPI;
+    uv.y = theta * ONEOVERPI + 0.5;
+
+    return uv;
+}
+
 void main()
 {
-    rayPayload.hitValue = push.rayPush.clearColor.xyz;
+    rayPayload.hitValue = (USE_ENV_MAP) ? texture(backgroundTexture, directionToSphericalEnvmap(gl_WorldRayDirectionEXT)).xyz : push.rayPush.clearColor.xyz;
 }

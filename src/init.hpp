@@ -67,6 +67,9 @@ public:
     SimplePipelineData simpleRtPipeline;
     std::unique_ptr<RtPipelineBuilder> rtPipelineBuilder;
 
+    // Envmap
+    ImageData backgroundImage;
+
     // Imgui
     vk::DescriptorPool imguiPool;
 
@@ -89,7 +92,8 @@ public:
 
     bool isInitialized{false};
 
-    void rebuid_rt_pipeline(const SpecializationConstantsClosestHit &constantsCH);
+    void rebuid_rt_pipeline(const SpecializationConstantsClosestHit &constantsCH,
+                            const SpecializationConstantsMiss &constantsMiss);
 
 private:
     // Initialization calls
@@ -105,6 +109,7 @@ private:
     void create_sbt();
     void init_imgui();
     void load_meshes();
+    void load_background();
     void create_lights();
     void create_as();
 

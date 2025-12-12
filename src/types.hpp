@@ -113,8 +113,6 @@ struct RayPush
 {
     glm::vec4 clearColor;
     uint32_t nLights;
-    // uint32_t random;
-    // uint32_t presample;
 };
 
 struct SpecializationConstantsClosestHit
@@ -125,10 +123,10 @@ struct SpecializationConstantsClosestHit
     vk::Bool32 presampled{vk::False};
 };
 
-// struct SpecializationConstantsMiss
-// {
-//     float bkgR, bkgG, bkgB;
-// };
+struct SpecializationConstantsMiss
+{
+    vk::Bool32 envMap{vk::False};
+};
 
 // Per-object uniform buffer data
 struct UniformData

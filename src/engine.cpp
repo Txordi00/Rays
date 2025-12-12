@@ -32,9 +32,11 @@ Engine::~Engine()
 
 void Engine::run()
 {
-    SpecializationConstantsClosestHit constants{};
-    bool random = constants.random, presample = constants.presampled;
-    int recursionDepth = constants.recursionDepth, numBounces = constants.numBounces;
+    SpecializationConstantsClosestHit constantsCH{};
+    SpecializationConstantsMiss constantsMiss{};
+    bool random = constantsCH.random, presample = constantsCH.presampled,
+         envMap = constantsMiss.envMap;
+    int recursionDepth = constantsCH.recursionDepth, numBounces = constantsCH.numBounces;
     // float backgroundColor[3] = {rayPush.clearColor.x, rayPush.clearColor.y, rayPush.clearColor.z};
 
     // Inform the shaders about the resources that we are going to use
@@ -108,6 +110,7 @@ void Engine::run()
         ImGui::Separator();
 
         // Checkbox for boolean toggle
+        ImGui::Checkbox("EnvMap", &envMap);
         ImGui::Checkbox("Random", &random);
         ImGui::Checkbox("Presample", &presample);
 
@@ -118,12 +121,13 @@ void Engine::run()
         // Apply button
         if (ImGui::Button("Apply Changes")) {
             // Your action code here
-            SpecializationConstantsClosestHit constantsCH{};
             constantsCH.recursionDepth = static_cast<uint32_t>(recursionDepth);
             constantsCH.numBounces = static_cast<uint32_t>(numBounces);
             constantsCH.random = static_cast<vk::Bool32>(random);
             constantsCH.presampled = static_cast<vk::Bool32>(presample);
-            I->rebuid_rt_pipeline(constantsCH);
+
+            constantsMiss.envMap = static_cast<vk::Bool32>(envMap);
+            I->rebuid_rt_pipeline(constantsCH, constantsMiss);
         }
 
         ImGui::ShowMetricsWindow();
@@ -194,6 +198,7 @@ void Engine::update_descriptors()
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
         descUpdater.add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
         descUpdater.add_combined_image(descriptorSetRt, 4, {I->presampler->ggxImage});
+        descUpdater.add_combined_image(descriptorSetRt, 5, {I->backgroundImage});
         descUpdater.update();
     }
 }

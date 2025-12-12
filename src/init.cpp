@@ -16,6 +16,7 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
 #include <print>
+#include <stb_image.h>
 
 Init::Init()
 {
@@ -33,6 +34,7 @@ Init::Init()
     init_sync_structures();
     create_draw_data();
     load_meshes();
+    load_background();
     create_lights();
     create_as();
     init_descriptors();
@@ -98,11 +100,10 @@ void Init::clean()
             device.destroySemaphore(sem);
         destroy_swapchain();
         instance.destroySurfaceKHR(surface);
+        utils::destroy_image(device, allocator, backgroundImage);
         for (const auto &f : frames) {
-            device.destroyImageView(f.imageDraw.imageView);
-            vmaDestroyImage(allocator, f.imageDraw.image, f.imageDraw.allocation);
-            device.destroyImageView(f.imageDepth.imageView);
-            vmaDestroyImage(allocator, f.imageDepth.image, f.imageDepth.allocation);
+            utils::destroy_image(device, allocator, f.imageDraw);
+            utils::destroy_image(device, allocator, f.imageDepth);
         }
         vmaDestroyAllocator(allocator);
         device.destroy();
@@ -425,6 +426,9 @@ void Init::init_descriptors()
     descHelperRt
         ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1},
                              frameOverlap); // Presampling ggx
+    descHelperRt
+        ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1},
+                             frameOverlap); // Env map
     descHelperRt->create_descriptor_pool();
     descHelperRt->add_binding(
         Binding{vk::DescriptorType::eAccelerationStructureKHR,
@@ -442,6 +446,9 @@ void Init::init_descriptors()
     descHelperRt->add_binding(Binding{vk::DescriptorType::eCombinedImageSampler,
                                       vk::ShaderStageFlagBits::eClosestHitKHR,
                                       4}); // presampling ggx
+    descHelperRt->add_binding(Binding{vk::DescriptorType::eCombinedImageSampler,
+                                      vk::ShaderStageFlagBits::eMissKHR,
+                                      5}); // Env map
 
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt
@@ -458,21 +465,16 @@ void Init::init_pipelines()
     std::vector<vk::DescriptorSetLayout> descLayouts = {rtDescriptorSetLayout,
                                                         descriptorSetLayoutUAB};
     simpleRtPipeline.pipelineLayout = rtPipelineBuilder->buildPipelineLayout(descLayouts);
-    SpecializationConstantsClosestHit constantsCH{};
-    simpleRtPipeline.pipeline = rtPipelineBuilder->buildPipeline(simpleRtPipeline.pipelineLayout,
-                                                                 constantsCH);
+    simpleRtPipeline.pipeline = rtPipelineBuilder->buildPipeline(simpleRtPipeline.pipelineLayout);
     rtPipelineQueue.push(simpleRtPipeline.pipeline);
-
-    if (rtProperties.maxRayRecursionDepth < constantsCH.recursionDepth)
-        throw std::runtime_error("Driver recursion depth not enough. Driver: "
-                                 + std::to_string(rtProperties.maxRayRecursionDepth)
-                                 + ". Required: " + std::to_string(constantsCH.recursionDepth));
 }
 
-void Init::rebuid_rt_pipeline(const SpecializationConstantsClosestHit &constantsCH)
+void Init::rebuid_rt_pipeline(const SpecializationConstantsClosestHit &constantsCH,
+                              const SpecializationConstantsMiss &constantsMiss)
 {
     vk::Pipeline newPipeline = rtPipelineBuilder->buildPipeline(simpleRtPipeline.pipelineLayout,
-                                                                constantsCH);
+                                                                constantsCH,
+                                                                constantsMiss);
     simpleRtPipeline.pipeline = newPipeline;
     rtSBTBuffer = sbtHelper->create_shader_binding_table(newPipeline);
     rtPipelineQueue.push(newPipeline);
@@ -583,6 +585,38 @@ void Init::load_meshes()
     glm::mat4 T = glm::translate(glm::vec3(0.f, 2.f, 20.f));
     for (const auto &n : scene->topNodes)
         n->refreshTransform(T * R * S);
+}
+
+void Init::load_background()
+{
+    int w, h, c;
+    const std::filesystem::path fsPath{
+        "/home/jordi/Documents/lrt/assets/rogland_clear_night_4k.hdr"};
+    stbi_uc *imData = stbi_load(fsPath.c_str(), &w, &h, &c, 4);
+    vk::Extent3D imSize{};
+    imSize.setWidth(w);
+    imSize.setHeight(h);
+    imSize.setDepth(1);
+
+    backgroundImage = utils::create_image(device,
+                                          allocator,
+                                          cmdTransfer,
+                                          transferFence,
+                                          transferQueue,
+                                          vk::Format::eR8G8B8A8Unorm,
+                                          vk::ImageUsageFlagBits::eSampled,
+                                          imSize,
+                                          imData);
+
+    vk::SamplerCreateInfo samplerCreate{};
+    samplerCreate.setMaxLod(vk::LodClampNone);
+    samplerCreate.setMinLod(0.f);
+    samplerCreate.setMagFilter(vk::Filter::eLinear);
+    samplerCreate.setMinFilter(vk::Filter::eLinear);
+    samplerCreate.setMipmapMode(vk::SamplerMipmapMode::eLinear);
+    backgroundImage.sampler = device.createSampler(samplerCreate);
+
+    stbi_image_free(imData);
 }
 
 void Init::create_lights()
