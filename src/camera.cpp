@@ -6,6 +6,7 @@ void Camera::setProjMatrix(
     const float &fov, const float &w, const float &h, const float &near, const float &far)
 {
     projMatrix = glm::perspective(fov, w / h, near, far);
+    projInverse = glm::inverse(projMatrix);
 }
 
 void Camera::forward(const float &dx)
@@ -68,14 +69,17 @@ void Camera::update()
 {
     orientation = glm::normalize(orientation);
     viewMatrix = glm::lookAt(translation, translation + orientation, glm::vec3(0, 1, 0));
+    invView = glm::inverse(viewMatrix);
     if (cameraBuffer.buffer) {
         cameraData.origin = translation;
         cameraData.orientation = orientation;
+        // cameraData.projInverse = projInverse;
+        cameraData.viewInverse = invView;
         utils::copy_to_buffer(cameraBuffer, allocator, &cameraData);
     }
 }
 
-void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAllocator &allocator_)
+void Camera::create_camera_buffer(const vk::Device &device, const VmaAllocator &allocator_)
 {
     allocator = allocator_;
     cameraBuffer = utils::create_buffer(device,
@@ -88,11 +92,13 @@ void Camera::create_camera_storage_buffer(const vk::Device &device, const VmaAll
 
     cameraData.origin = translation;
     cameraData.orientation = glm::normalize(orientation);
+    cameraData.projInverse = projInverse;
+    cameraData.viewInverse = invView;
 
     utils::copy_to_buffer(cameraBuffer, allocator, &cameraData);
 }
 
-void Camera::destroy_camera_storage_buffer()
+void Camera::destroy_camera_buffer()
 {
     utils::destroy_buffer(allocator, cameraBuffer);
 }

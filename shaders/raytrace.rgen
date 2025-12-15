@@ -11,12 +11,13 @@
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 layout(location = 0) rayPayloadEXT HitPayload rayPayload;
-//layout(location = 1) rayPayloadEXT bool isShadowed;
 
-layout(scalar, binding = 2, set = 0) uniform CameraData
+layout(scalar, binding = 2, set = 0) readonly uniform CameraData
 {
     vec3 origin;
     vec3 orientation;
+    mat4 invView;
+    mat4 invProj;
 }
 camera;
 
@@ -26,39 +27,22 @@ layout(scalar, push_constant) uniform RayPushConstants
     RayPush rayPush;
 } push;
 
-// const vec3 origin = vec3(0., 0., -10.);
-const float Ft = 0.700207531;
-
 const uint rayFlags = gl_RayFlagsOpaqueEXT;
 const float tMin = 0.001;
 const float tMax = 10000.;
 
 void main()
 {
-    const float h = gl_LaunchSizeEXT.y;
-    const float w = gl_LaunchSizeEXT.x;
-    const float i = gl_LaunchIDEXT.y;
-    const float j = gl_LaunchIDEXT.x;
-    const float hm1 = h - 1.;
-    const float wm1 = w - 1.;
-    const float arFt = (w / h) * Ft;
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT) + vec2(0.5);
+    const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeEXT);
+    const vec2 d = inUV * 2. - 1.;
 
-    const float y = (-1. + 2. * (i + 0.5f) / hm1) * Ft;
-    const float x = (-1. + 2. * (j + 0.5f) / wm1) * arFt;
-
-    const vec3 forward = camera.orientation;
-    vec3 up = vec3(0.0, -1.0, 0.0);
-    const vec3 right = cross(forward, up);
-    up = cross(forward, right); // re-orthonormalize
-
-    vec3 pixelCam = normalize(vec3(x, y, 1.)); // camera-space ray
-    const vec3 direction = normalize(pixelCam.x * right + pixelCam.y * up + pixelCam.z * forward);
-
-    const vec3 origin = camera.origin;
+    const vec3 origin = camera.invView[3].xyz;
+    const vec3 target = (camera.invProj * vec4(d.x, d.y, 1, 1)).xyz;
+    const vec3 direction = (camera.invView * vec4(normalize(target.xyz), 0)).xyz;
 
     rayPayload.depth = 0;
     rayPayload.hitValue = vec3(0.);
-    // rayPayload.energyFactor = 1.;
     traceRayEXT(topLevelAS, // acceleration structure
         rayFlags, // rayFlags
         0xFF, // cullMask
@@ -72,5 +56,5 @@ void main()
         0 // payload (location = 0)
     );
 
-    imageStore(image, ivec2(j, i), vec4(rayPayload.hitValue, 1.));
+    imageStore(image, ivec2(gl_LaunchIDEXT), vec4(rayPayload.hitValue, 1.));
 }

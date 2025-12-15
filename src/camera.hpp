@@ -32,13 +32,15 @@ public:
 
     void update();
 
-    void create_camera_storage_buffer(const vk::Device &device, const VmaAllocator &allocator);
-    void destroy_camera_storage_buffer();
+    void create_camera_buffer(const vk::Device &device, const VmaAllocator &allocator);
+    void destroy_camera_buffer();
 
     glm::mat4 viewMatrix{1.f};
+    glm::mat4 invView{1.f};
     glm::vec3 orientation{0, 0, 1};
     glm::vec3 translation{0.f};
     glm::mat4 projMatrix{1.f};
+    glm::mat4 projInverse{1.f};
 
     Buffer cameraBuffer;
     CameraData cameraData{};

@@ -37,9 +37,8 @@ const float FOV = glm::radians(70.f);
 const unsigned int API_VERSION[3] = {1, 4, 0};
 
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
-const unsigned int MINIMUM_FRAME_OVERLAP = 2;
+const unsigned int FRAME_OVERLAP = 2;
 const uint64_t FENCE_TIMEOUT = 1000000000;
-// const uint32_t MAX_RT_RECURSION = 3;
 const size_t SAMPLING_DISCRETIZATION = 100;
 
 #define SIMPLE_MESH_FRAG_SHADER "shaders/simple_mesh.frag.spv"
@@ -137,8 +136,10 @@ struct UniformData
 // camera data for the storage buffer
 struct CameraData
 {
-    glm::vec3 origin = glm::vec3(0.f);     // origin
-    glm::vec3 orientation = glm::vec3(0.f, 0.f, 1.f);
+    glm::vec3 origin{glm::vec3(0.f)}; // origin
+    glm::vec3 orientation{glm::vec3(0.f, 0.f, 1.f)};
+    glm::mat4 viewInverse{1.f};
+    glm::mat4 projInverse{1.f};
 };
 
 struct ComputePipelineData

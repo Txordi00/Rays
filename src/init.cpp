@@ -87,7 +87,7 @@ void Init::clean()
         device.destroyDescriptorSetLayout(rtDescriptorSetLayout);
 
         // Destroy things created in this class from here:
-        camera.destroy_camera_storage_buffer();
+        camera.destroy_camera_buffer();
 
         device.destroyCommandPool(transferCmdPool);
         device.destroyFence(transferFence);
@@ -244,7 +244,7 @@ void Init::create_swapchain(uint32_t width, uint32_t height)
               .set_desired_format(
                   VkSurfaceFormatKHR{.format = VK_FORMAT_B8G8R8A8_UNORM,
                                      .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-              .set_desired_min_image_count(MINIMUM_FRAME_OVERLAP)
+              .set_desired_min_image_count(2)
               .build()
               .value();
 
@@ -265,7 +265,7 @@ void Init::create_swapchain(uint32_t width, uint32_t height)
     // Allocate the semaphores vector as well
     swapchainSemaphores.resize(swapchainImagesC.size());
     // Select the number of frames that we are going to process per thread
-    frameOverlap = MINIMUM_FRAME_OVERLAP;
+    frameOverlap = FRAME_OVERLAP;
     frames.resize(frameOverlap);
 }
 
@@ -314,7 +314,7 @@ void Init::create_camera()
                          static_cast<float>(swapchainExtent.height),
                          0.01f,
                          100.f);
-    camera.create_camera_storage_buffer(device, allocator);
+    camera.create_camera_buffer(device, allocator);
 }
 
 void Init::init_commands()
@@ -536,8 +536,8 @@ void Init::init_imgui()
     initInfo.Device = device;
     initInfo.Queue = graphicsQueue;
     initInfo.DescriptorPool = imguiPool;
-    initInfo.MinImageCount = MINIMUM_FRAME_OVERLAP;
-    initInfo.ImageCount = frameOverlap;
+    initInfo.MinImageCount = 2;
+    initInfo.ImageCount = swapchainImages.size();
     initInfo.UseDynamicRendering = true;
 
     //dynamic rendering parameters for imgui to use
@@ -576,7 +576,7 @@ void Init::presample()
 void Init::load_meshes()
 {
     gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
-    scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/ABeautifulGame.glb")
+    scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/CornellBox-Original.gltf")
                 .value();
     std::println("Asset loaded");
 
