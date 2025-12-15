@@ -49,12 +49,12 @@ struct SurfaceStorage
     IndexBuffer indexBuffer;
     VertexBuffer vertexBuffer;
     MaterialConstantsBuffer materialConstantsBuffer;
-    uint colorSamplerIndex;
-    uint colorImageIndex;
-    uint materialSamplerIndex;
-    uint materialImageIndex;
-    uint normalMapIndex;
-    uint normalSamplerIndex;
+    int colorSamplerIndex;
+    int colorImageIndex;
+    int materialSamplerIndex;
+    int materialImageIndex;
+    int normalMapIndex;
+    int normalSamplerIndex;
     uint startIndex;
     uint count;
 };

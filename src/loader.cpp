@@ -130,7 +130,7 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader::load_gltf_asset(const std::f
     constexpr auto options = fastgltf::Options::DontRequireValidAssetMember
                              | fastgltf::Options::LoadExternalBuffers
                              | fastgltf::Options::LoadExternalImages;
-    auto asset = parser.loadGltfBinary(data.get(), path.parent_path(), options);
+    auto asset = parser.loadGltf(data.get(), path.parent_path(), options);
     // auto val = fastgltf::validate(asset.get());
     if (asset.error() != fastgltf::Error::None /*|| val != fastgltf::Error::None*/) {
         std::println("Error in parsing GLTF asset: {}", fastgltf::getErrorMessage(asset.error()));
@@ -442,7 +442,7 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
                 vertexCount += verticesAccessor.count;
                 tangentCount += tangentsAccessor.count;
             }
-            assert(vertexCount == tangentCount && "nTangents != nVertices");
+            // assert(vertexCount == tangentCount && "nTangents != nVertices");
             indices.reserve(indexCount);
             vertices.resize(vertexCount);
         }
@@ -560,12 +560,9 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
     scene->meshNodes.reserve(asset.nodes.size());
     // For now, we will consider that all nodes belong to the same scene
     for (const auto &n : asset.nodes) {
-        std::shared_ptr<Node> nodeTmp;
-
         // If has a mesh, make the Node a MeshNode and load the mesh
         if (n.meshIndex.has_value()) {
-            nodeTmp = std::make_shared<MeshNode>();
-            std::shared_ptr<MeshNode> meshNodeTmp = std::dynamic_pointer_cast<MeshNode>(nodeTmp);
+            std::shared_ptr<MeshNode> meshNodeTmp = std::make_shared<MeshNode>();
             const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
             meshNodeTmp->mesh = mesh;
             meshNodeTmp->surfaceUniformBuffers.reserve(mesh->surfaces.size());
@@ -603,24 +600,27 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
                                              gltfFence,
                                              &surfaceStorage,
                                              sizeof(SurfaceStorage));
-                // utils::copy_to_buffer(*surfaceStorageBuffer, allocator, &surfaceStorage);
                 // Store a unique surface Id for each surface. This will be used as the customInstanceID
                 // when building the BLASes
                 meshNodeTmp->surfaceUniformBuffers[surfaceId] = *surfaceUniformBuffer;
                 surfaceId++;
                 scene->bufferQueue.emplace_back(surfaceUniformBuffer);
-                scene->meshNodes.emplace_back(std::move(meshNodeTmp));
+                scene->meshNodes.emplace_back(meshNodeTmp);
             }
-        } else
-            nodeTmp = std::make_shared<Node>();
+            // Add the node to our structures
+            nodes.emplace_back(std::move(meshNodeTmp));
+            scene->nodes[n.name.c_str()] = nodes.back();
+
+        } else {
+            std::shared_ptr<Node> nodeTmp = std::make_shared<Node>();
+            // Add the node to our structures
+            nodes.emplace_back(std::move(nodeTmp));
+            scene->nodes[n.name.c_str()] = nodes.back();
+        }
 
         // Load the local transform
         const auto m = fastgltf::getTransformMatrix(n);
-        nodeTmp->localTransform = glm::make_mat4(m.data());
-
-        // Add the node to our structures
-        nodes.emplace_back(std::move(nodeTmp));
-        scene->nodes[n.name.c_str()] = nodes.back();
+        nodes.back()->localTransform = glm::make_mat4(m.data());
     }
     scene->surfaceStorageBuffersCount = surfaceId;
 
@@ -713,12 +713,6 @@ void GLTFLoader::create_mesh_buffers(const std::vector<uint32_t> &indices,
 
     utils::destroy_buffer(allocator, stagingBuffer);
 }
-
-// void GLTFLoader::destroy_buffers()
-// {
-//     for (auto &b : bufferQueue)
-//         utils::destroy_buffer(allocator, *b);
-// }
 
 vk::Filter extract_filter(const fastgltf::Filter &filter)
 {

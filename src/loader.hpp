@@ -74,14 +74,14 @@ struct SurfaceStorage
     vk::DeviceAddress indexBufferAddress;
     vk::DeviceAddress vertexBufferAddress;
     vk::DeviceAddress materialConstantsBufferAddress;
-    uint32_t colorSamplerIndex;
-    uint32_t colorImageIndex;
-    uint32_t materialSamplerIndex;
-    uint32_t materialImageIndex;
-    uint32_t normalMapIndex;
-    uint32_t normalSamplerIndex;
-    uint32_t startIndex;
-    uint32_t count;
+    int colorSamplerIndex{-1};
+    int colorImageIndex{-1};
+    int materialSamplerIndex{-1};
+    int materialImageIndex{-1};
+    int normalMapIndex{-1};
+    int normalSamplerIndex{-1};
+    uint32_t startIndex{0};
+    uint32_t count{0};
 };
 
 struct MeshNode : Node

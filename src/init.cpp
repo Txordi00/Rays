@@ -578,6 +578,8 @@ void Init::load_meshes()
     gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
     scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/CornellBox-Original.gltf")
                 .value();
+    // scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/ABeautifulGame.glb")
+    //             .value();
     std::println("Asset loaded");
 
     glm::mat4 S = glm::scale(20.f * glm::vec3(1.f));
