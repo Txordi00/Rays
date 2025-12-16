@@ -17,8 +17,8 @@ layout(constant_id = 2) const bool RANDOM = true;
 layout(constant_id = 3) const bool PRESAMPLE = false;
 hitAttributeEXT vec2 attribs;
 layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
-layout(set = 1, binding = 1) uniform sampler samplers[];
-layout(set = 1, binding = 2) uniform texture2D textures[];
+// layout(set = 1, binding = 1) uniform sampler samplers[];
+// layout(set = 1, binding = 2) uniform texture2D textures[];
 
 layout(binding = 3, set = 0) uniform sampler2D presamplingHemisphere;
 layout(binding = 4, set = 0) uniform sampler3D presamplingGGX;
@@ -332,6 +332,10 @@ void main()
     const vec3 norm1 = v1.normal;
     const vec3 norm2 = v2.normal;
 
+    const vec4 colorVtx0 = v0.color;
+    const vec4 colorVtx1 = v1.color;
+    const vec4 colorVtx2 = v2.color;
+
     const vec2 uv0 = v0.uv;
     const vec2 uv1 = v1.uv;
     const vec2 uv2 = v2.uv;
@@ -350,40 +354,43 @@ void main()
 
     const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
 
-    const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y
-            + v2.tangent.xyz * barycentrics.z; // range [-1, 1]
-    const float handedness = v0.tangent.w; // All vi.tangent.w are the same
-    const vec3 tangent = gl_WorldToObjectEXT * vec4(tangentRaw, 0);
+    // const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y
+    //         + v2.tangent.xyz * barycentrics.z; // range [-1, 1]
+    // const float handedness = v0.tangent.w; // All vi.tangent.w are the same
+    // const vec3 tangent = gl_WorldToObjectEXT * vec4(tangentRaw, 0);
 
-    const vec3 bitangent = cross(normalVtx, tangent) * handedness;
+    // const vec3 bitangent = cross(normalVtx, tangent) * handedness;
 
-    const mat3 TBN = mat3(tangent, bitangent, normalVtx);
+    // const mat3 TBN = mat3(tangent, bitangent, normalVtx);
 
-    const vec4 normalTexRaw = 2.
-            * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
-                    samplers[nonuniformEXT(normalSamplerIndex)]),
-                uv) - 1.; // range [0, 1] -> [-1, 1]
+    // const vec4 normalTexRaw = 2.
+    //         * texture(sampler2D(textures[nonuniformEXT(normalMapIndex)],
+    //                 samplers[nonuniformEXT(normalSamplerIndex)]),
+    //             uv) - 1.; // range [0, 1] -> [-1, 1]
 
-    const vec3 normal = normalize(TBN * normalTexRaw.xyz);
+    // const vec3 normal = normalize(TBN * normalTexRaw.xyz);
     // print_val("n %f ", length(normal), 0.99, 1.);
-    // const vec3 normal = normalVtx;
+    const vec3 normal = normalVtx;
 
-    const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
-                samplers[nonuniformEXT(colorSamplerIndex)]),
-            uv)
-            * mConstants.baseColorFactor; // range [0, 1]
+    // const vec4 baseColor = texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
+    //             samplers[nonuniformEXT(colorSamplerIndex)]),
+    //         uv)
+    //         * mConstants.baseColorFactor; // range [0, 1]
+    const vec4 baseColor = colorVtx0 * barycentrics.x + colorVtx1 * barycentrics.y + colorVtx2 * barycentrics.z;
+
     //    const vec4 baseColor = vec4(1.);
 
-    const vec4 metallicRoughness = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
-                samplers[nonuniformEXT(materialSamplerIndex)]),
-            uv)
-            * vec4(0,
-                mConstants.roughnessFactor,
-                mConstants.metallicFactor,
-                0);
-    const float perceptualRoughness = metallicRoughness.y;
-    const float metallic = metallicRoughness.z;
-
+    // const vec4 metallicRoughness = texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
+    //             samplers[nonuniformEXT(materialSamplerIndex)]),
+    //         uv)
+    //         * vec4(0,
+    //             mConstants.roughnessFactor,
+    //             mConstants.metallicFactor,
+    //             0);
+    // const float perceptualRoughness = metallicRoughness.y;
+    // const float metallic = metallicRoughness.z;
+    const float perceptualRoughness = mConstants.roughnessFactor;
+    const float metallic = mConstants.metallicFactor;
     // Transforming the position to world space
     const vec3 worldPos = (gl_ObjectToWorldEXT * vec4(pos, 1.)).xyz;
 

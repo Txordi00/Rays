@@ -190,8 +190,8 @@ void Engine::update_descriptors()
         vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
         descUpdater.add_uniform(descriptorSetUAB, 0, surfaceStorageBuffers);
-        descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
-        descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
+        // descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
+        // descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
         descUpdater.add_uniform(descriptorSetUAB, 3, lightBuffers);
         descUpdater.add_as(descriptorSetRt, 0, tlas);
         descUpdater.add_storage_image(descriptorSetRt, 1, {frame.imageDraw});

@@ -565,7 +565,7 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
             std::shared_ptr<MeshNode> meshNodeTmp = std::make_shared<MeshNode>();
             const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
             meshNodeTmp->mesh = mesh;
-            meshNodeTmp->surfaceUniformBuffers.reserve(mesh->surfaces.size());
+            // meshNodeTmp->surfaceUniformBuffers.reserve(mesh->surfaces.size());
             // bufferQueue.reserve(mesh->surfaces.size());
             // Create a bound storage buffer for every surface with the device addresses
             // that will allow us access all the data from the shaders
@@ -605,9 +605,9 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
                 meshNodeTmp->surfaceUniformBuffers[surfaceId] = *surfaceUniformBuffer;
                 surfaceId++;
                 scene->bufferQueue.emplace_back(surfaceUniformBuffer);
-                scene->meshNodes.emplace_back(meshNodeTmp);
             }
             // Add the node to our structures
+            scene->meshNodes.emplace_back(meshNodeTmp);
             nodes.emplace_back(std::move(meshNodeTmp));
             scene->nodes[n.name.c_str()] = nodes.back();
 

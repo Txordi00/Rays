@@ -373,14 +373,14 @@ void Init::init_descriptors()
                                                              static_cast<uint32_t>(
                                                                  scene->surfaceStorageBuffersCount)},
                                       frameOverlap); // per-surface storage
-    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampler,
-                                                             static_cast<uint32_t>(
-                                                                 scene->samplers.size())},
-                                      frameOverlap); // samplers (usually only one)
-    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage,
-                                                             static_cast<uint32_t>(
-                                                                 scene->images.size())},
-                                      frameOverlap); // images to sample
+    // descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampler,
+    //                                                          static_cast<uint32_t>(
+    //                                                              scene->samplers.size())},
+    //                                   frameOverlap); // samplers (usually only one)
+    // descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage,
+    //                                                          static_cast<uint32_t>(
+    //                                                              scene->images.size())},
+    //                                   frameOverlap); // images to sample
     descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
                                                              static_cast<uint32_t>(lights.size())},
                                       frameOverlap); // Lights
@@ -389,15 +389,15 @@ void Init::init_descriptors()
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        0,
                                        scene->surfaceStorageBuffersCount}); // per-surface storage
-    descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
-                                       vk::ShaderStageFlagBits::eClosestHitKHR,
-                                       1,
-                                       static_cast<uint32_t>(scene->samplers.size())}); // samplers
-    descHelperUAB->add_binding(
-        Binding{vk::DescriptorType::eSampledImage,
-                vk::ShaderStageFlagBits::eClosestHitKHR,
-                2,
-                static_cast<uint32_t>(scene->images.size())}); // sampled images
+    // descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
+    //                                    vk::ShaderStageFlagBits::eClosestHitKHR,
+    //                                    1,
+    //                                    static_cast<uint32_t>(scene->samplers.size())}); // samplers
+    // descHelperUAB->add_binding(
+    //     Binding{vk::DescriptorType::eSampledImage,
+    //             vk::ShaderStageFlagBits::eClosestHitKHR,
+    //             2,
+    //             static_cast<uint32_t>(scene->images.size())}); // sampled images
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        3,

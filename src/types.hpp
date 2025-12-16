@@ -116,7 +116,7 @@ struct RayPush
 
 struct SpecializationConstantsClosestHit
 {
-    uint32_t recursionDepth{3};
+    uint32_t recursionDepth{2};
     uint32_t numBounces{8};
     vk::Bool32 random{vk::True};
     vk::Bool32 presampled{vk::False};
