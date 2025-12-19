@@ -15,15 +15,15 @@ struct GLTFMaterial
     struct MaterialResources
     {
         // ImageData colorImage;
-        size_t colorImageIndex;
+        int colorImageIndex{-1};
         // vk::Sampler colorSampler;
-        size_t colorSamplerIndex;
+        int colorSamplerIndex{-1};
         // ImageData metalRoughImage;
-        size_t materialImageIndex;
+        int materialImageIndex{-1};
         // vk::Sampler metalRoughSampler;
-        size_t materialSamplerIndex;
-        size_t normalMapIndex;
-        size_t normalSamplerIndex;
+        int materialSamplerIndex{-1};
+        int normalMapIndex{-1};
+        int normalSamplerIndex{-1};
         Buffer dataBuffer;
         // uint32_t dataBufferOffset; // I should not need offset if going bindless
     };
@@ -88,7 +88,7 @@ struct MeshNode : Node
 {
     std::shared_ptr<Mesh> mesh;
     // The key is going to be used as the customInstanceIndex when building the TLAS
-    std::unordered_map<uint32_t, Buffer> surfaceUniformBuffers;
+    std::vector<Buffer> surfaceUniformBuffers;
 };
 
 struct GLTFObj
@@ -105,7 +105,7 @@ struct GLTFObj
     std::vector<std::shared_ptr<Node>> topNodes;
     std::vector<std::shared_ptr<MeshNode>> meshNodes;
 
-    uint32_t surfaceStorageBuffersCount{0};
+    uint32_t surfaceUniformBuffersCount{0};
 
     std::vector<vk::Sampler> samplers;
     std::vector<ImageData> images;

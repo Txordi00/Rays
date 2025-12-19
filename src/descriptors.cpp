@@ -20,9 +20,11 @@ void DescHelper::destroy()
 void DescHelper::add_descriptor_set(const vk::DescriptorPoolSize &poolSize, const uint32_t numSets)
 {
     // uint32_t numUniformDescriptors = 0, numStorageImageDescriptors = 0, numASDescriptors = 0;
+    vk::DescriptorPoolSize actualPoolSize{poolSize};
+    actualPoolSize.setDescriptorCount(std::max<uint32_t>(poolSize.descriptorCount, 1));
     poolSizes.reserve(numSets);
     for (int i = 0; i < numSets; i++) {
-        poolSizes.emplace_back(poolSize);
+        poolSizes.emplace_back(actualPoolSize);
     }
 }
 
@@ -40,15 +42,10 @@ void DescHelper::create_descriptor_pool()
 
 void DescHelper::add_binding(const Binding &bind)
 {
-    // uint32_t maxDescriptors = 0;
-    // for (const auto &ps : poolSizes)
-    //     if (bind.type == ps.type)
-    //         maxDescriptors = std::max(maxDescriptors, ps.descriptorCount);
-
     vk::DescriptorSetLayoutBinding vkBinding{};
     vkBinding.setBinding(bind.binding);
     vkBinding.setDescriptorType(bind.type);
-    vkBinding.setDescriptorCount(bind.descriptorCount);
+    vkBinding.setDescriptorCount(std::max<uint32_t>(bind.descriptorCount, 1));
     vkBinding.setStageFlags(bind.shaderStageFlags);
 
     bindings.push_back(vkBinding);

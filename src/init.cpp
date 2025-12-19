@@ -371,16 +371,16 @@ void Init::init_descriptors()
                                                  true);
     descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
                                                              static_cast<uint32_t>(
-                                                                 scene->surfaceStorageBuffersCount)},
+                                                                 scene->surfaceUniformBuffersCount)},
                                       frameOverlap); // per-surface storage
-    // descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampler,
-    //                                                          static_cast<uint32_t>(
-    //                                                              scene->samplers.size())},
-    //                                   frameOverlap); // samplers (usually only one)
-    // descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage,
-    //                                                          static_cast<uint32_t>(
-    //                                                              scene->images.size())},
-    //                                   frameOverlap); // images to sample
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampler,
+                                                             static_cast<uint32_t>(
+                                                                 scene->samplers.size())},
+                                      frameOverlap); // samplers (usually only one)
+    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage,
+                                                             static_cast<uint32_t>(
+                                                                 scene->images.size())},
+                                      frameOverlap); // images to sample
     descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
                                                              static_cast<uint32_t>(lights.size())},
                                       frameOverlap); // Lights
@@ -388,16 +388,16 @@ void Init::init_descriptors()
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        0,
-                                       scene->surfaceStorageBuffersCount}); // per-surface storage
-    // descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
-    //                                    vk::ShaderStageFlagBits::eClosestHitKHR,
-    //                                    1,
-    //                                    static_cast<uint32_t>(scene->samplers.size())}); // samplers
-    // descHelperUAB->add_binding(
-    //     Binding{vk::DescriptorType::eSampledImage,
-    //             vk::ShaderStageFlagBits::eClosestHitKHR,
-    //             2,
-    //             static_cast<uint32_t>(scene->images.size())}); // sampled images
+                                       scene->surfaceUniformBuffersCount}); // per-surface storage
+    descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
+                                       vk::ShaderStageFlagBits::eClosestHitKHR,
+                                       1,
+                                       static_cast<uint32_t>(scene->samplers.size())}); // samplers
+    descHelperUAB->add_binding(
+        Binding{vk::DescriptorType::eSampledImage,
+                vk::ShaderStageFlagBits::eClosestHitKHR,
+                2,
+                static_cast<uint32_t>(scene->images.size())}); // sampled images
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        3,
@@ -582,7 +582,7 @@ void Init::load_meshes()
     //             .value();
     std::println("Asset loaded");
 
-    glm::mat4 S = glm::scale(20.f * glm::vec3(1.f));
+    glm::mat4 S = glm::scale(1.f * glm::vec3(1.f));
     glm::mat4 R = glm::rotate(glm::pi<float>(), glm::vec3(0.f, 0.f, 1.f));
     glm::mat4 T = glm::translate(glm::vec3(0.f, 2.f, 20.f));
     for (const auto &n : scene->topNodes)

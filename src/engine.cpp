@@ -174,10 +174,10 @@ void Engine::update_descriptors()
     DescriptorUpdater descUpdater{I->device};
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
     std::vector<Buffer> surfaceStorageBuffers;
-    surfaceStorageBuffers.reserve(I->scene->surfaceStorageBuffersCount);
+    surfaceStorageBuffers.reserve(I->scene->surfaceUniformBuffersCount);
     for (const auto &m : I->scene->meshNodes) {
         for (const auto &b : m->surfaceUniformBuffers)
-            surfaceStorageBuffers.emplace_back(b.second);
+            surfaceStorageBuffers.emplace_back(b);
     }
     std::vector<Buffer> lightBuffers;
     lightBuffers.reserve(I->lights.size());

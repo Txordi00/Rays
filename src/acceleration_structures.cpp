@@ -31,42 +31,56 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<MeshNode> &mesh
 {
     VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
     device.resetFences(asFence);
+
     // Geometry description (single triangle array)
-    const uint32_t numIndices = meshNode->mesh->indexBuffer->allocationInfo.size / sizeof(uint32_t);
+    // const uint32_t numIndices = meshNode->mesh->indexBuffer->allocationInfo.size / sizeof(uint32_t);
     const uint32_t numVertices = meshNode->mesh->vertexBuffer->allocationInfo.size / sizeof(Vertex);
-    vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
-    triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
-    triData.setVertexData(
-        vk::DeviceOrHostAddressConstKHR{meshNode->mesh->vertexBuffer->bufferAddress});
-    triData.setVertexStride(sizeof(Vertex));
-    triData.setMaxVertex(numVertices - 1);
-    triData.setIndexType(vk::IndexType::eUint32);
-    triData.setIndexData(
-        vk::DeviceOrHostAddressConstKHR{meshNode->mesh->indexBuffer->bufferAddress});
 
-    vk::AccelerationStructureGeometryKHR geom{};
-    geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
-    // geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
-    geom.setGeometry(triData);
+    const size_t numSurfaces = meshNode->mesh->surfaces.size();
+    std::vector<vk::AccelerationStructureGeometryKHR> geometries(numSurfaces);
+    std::vector<vk::AccelerationStructureBuildRangeInfoKHR> buildRanges(numSurfaces);
+    std::vector<uint32_t> primitiveCounts(numSurfaces);
+    for (size_t i = 0; i < numSurfaces; i++) {
+        const Surface &s = meshNode->mesh->surfaces[i];
 
-    // The entire array will be used to build the BLAS.
-    vk::AccelerationStructureBuildRangeInfoKHR offsets{};
-    offsets.setFirstVertex(0);
-    offsets.setPrimitiveCount(numIndices / 3);
-    offsets.setPrimitiveOffset(0);
-    offsets.setTransformOffset(0);
+        vk::AccelerationStructureGeometryTrianglesDataKHR triData{};
+        triData.setVertexFormat(vk::Format::eR32G32B32Sfloat);
+        triData.setVertexData(
+            vk::DeviceOrHostAddressConstKHR{meshNode->mesh->vertexBuffer->bufferAddress});
+        triData.setVertexStride(sizeof(Vertex));
+        triData.setMaxVertex(numVertices - 1);
+        triData.setIndexType(vk::IndexType::eUint32);
+        triData.setIndexData(
+            vk::DeviceOrHostAddressConstKHR{meshNode->mesh->indexBuffer->bufferAddress});
+
+        vk::AccelerationStructureGeometryKHR geom{};
+        geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
+        // geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
+        geom.setGeometry(triData);
+
+        // The entire array will be used to build the BLAS.
+        vk::AccelerationStructureBuildRangeInfoKHR offsets{};
+        offsets.setFirstVertex(0);
+        offsets.setPrimitiveCount(s.count / 3);
+        offsets.setPrimitiveOffset(s.startIndex * sizeof(uint32_t));
+        offsets.setTransformOffset(0);
+
+        geometries[i] = geom;
+        buildRanges[i] = offsets;
+        primitiveCounts[i] = s.count / 3;
+    }
 
     // Info necessary to get the vk::AccelerationStructureBuildSizesInfoKHR struct
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
     buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
     buildInfo.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
     buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
-    buildInfo.setGeometries(geom);
+    buildInfo.setGeometries(geometries);
 
     vk::AccelerationStructureBuildSizesInfoKHR buildSizes
         = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
                                                        buildInfo,
-                                                       offsets.primitiveCount);
+                                                       primitiveCounts);
 
     // Allocate scratch buffer
     Buffer scratchBuffer
@@ -107,10 +121,15 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<MeshNode> &mesh
     buildInfo.setSrcAccelerationStructure(nullptr);
     buildInfo.setDstAccelerationStructure(blas.AS);
     buildInfo.setScratchData(vk::DeviceOrHostAddressKHR{scratchBuffer.bufferAddress});
+    // vk::AccelerationStructureBuildRangeInfoKHR buildRange{};
+    // buildRange.setFirstVertex(0);
+    // buildRange.setPrimitiveCount(numIndices / 3);
+    // buildRange.setPrimitiveOffset(0);
+    // buildRange.setFirstVertex(0);
 
     // Record and submit the command buffer
     utils::cmd_submit(device, queue, asFence, asCmd, [&](const vk::CommandBuffer &cmd) {
-        cmd.buildAccelerationStructuresKHR(buildInfo, &offsets);
+        cmd.buildAccelerationStructuresKHR(buildInfo, buildRanges.data());
         // Barrier: BLAS build writes → TLAS read later
         vk::MemoryBarrier2 barrier{};
         barrier.setSrcAccessMask(vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
@@ -139,18 +158,24 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
     // The uint32 key is going to be the instanceCustomIndex, blases are
     // going to be repeated: one per Mesh.
     std::vector<std::tuple<uint32_t, AccelerationStructure, glm::mat4>> blases;
-    blases.reserve(scene->surfaceStorageBuffersCount);
-    for (auto it = meshNodes.begin(); it != meshNodes.end();) {
-        AccelerationStructure blas = buildBLAS(it->second);
-        // Get all the MeshNodes associated with a single mesh
-        const auto &[rangeFirst, rangeEnd] = meshNodes.equal_range(it->first);
-        for (auto r = rangeFirst; r != rangeEnd; ++r) {
-            for (const auto &[key, buffer] : r->second->surfaceUniformBuffers) {
-                blases.push_back({key, blas, glm::transpose(r->second->worldTransform)});
-            }
-        }
-        it = rangeEnd;
+    uint32_t i = 0;
+    for (const auto &mn : scene->meshNodes) {
+        AccelerationStructure blas = buildBLAS(mn);
+        blases.push_back({i, blas, mn->worldTransform});
+        i++;
     }
+    // blases.reserve(scene->surfaceStorageBuffersCount);
+    // for (auto it = meshNodes.begin(); it != meshNodes.end();) {
+    //     AccelerationStructure blas = buildBLAS(it->second);
+    //     // Get all the MeshNodes associated with a single mesh
+    //     const auto &[rangeFirst, rangeEnd] = meshNodes.equal_range(it->first);
+    //     for (auto r = rangeFirst; r != rangeEnd; ++r) {
+    //         for (const auto &[key, buffer] : r->second->surfaceUniformBuffers) {
+    //             blases.push_back({key, blas, glm::transpose(r->second->worldTransform)});
+    //         }
+    //     }
+    //     it = rangeEnd;
+    // }
 
     // Here starts the vulkan stuff for building the tlas
     VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
@@ -184,12 +209,19 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
                                allocator,
                                instancesSize,
                                vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR
-                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress
+                                   | vk::BufferUsageFlagBits::eTransferDst,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
 
     // Fill the buffer
-    utils::copy_to_buffer(instancesBuffer, allocator, instances.data());
+    utils::copy_to_device_buffer(instancesBuffer,
+                                 device,
+                                 allocator,
+                                 asCmd,
+                                 queue,
+                                 asFence,
+                                 instances.data(),
+                                 instancesSize);
 
     // Wraps a device pointer to the above uploaded instances.
     vk::AccelerationStructureGeometryInstancesDataKHR instancesData{};

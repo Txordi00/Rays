@@ -369,11 +369,6 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
                                    ? GLTFMaterial::MaterialPass::Transparent
                                    : GLTFMaterial::MaterialPass::MainColor;
         // Fill materials[i]:
-        // matTmp->materialResources.colorImage = whiteImage;
-        // matTmp->materialResources.colorSampler = samplerLinear;
-        // matTmp->materialResources.metalRoughImage = whiteImage;
-        // matTmp->materialResources.metalRoughSampler = samplerLinear;
-        // matTmp->materialResources.dataBuffer = scene->materialConstantsBuffer;
         if (m.pbrData.baseColorTexture.has_value()) {
             size_t imgIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
                                   .imageIndex.value();
@@ -403,7 +398,6 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
         }
         vMaterials.emplace_back(std::move(matTmp));
         scene->materials[m.name.c_str()] = vMaterials.back();
-        // WORK OUT THE DESCRIPTORS HERE?
     }
 }
 
@@ -453,6 +447,10 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
         for (const fastgltf::Primitive &p : m.primitives) {
             // We are going to fill the surface and the i&v buffers in this loop
             Surface surface;
+            const fastgltf::Accessor &indicesAccessor = asset.accessors[p.indicesAccessor.value()];
+
+            surface.startIndex = static_cast<uint32_t>(indices.size());
+            surface.count = static_cast<uint32_t>(indicesAccessor.count);
 
             // Load material by index
             if (p.materialIndex.has_value())
@@ -461,17 +459,8 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
                 surface.material = materials[0];
 
             // Reuse the previous
-            if (meshBuffersExist) {
-                const auto &sameMesh = scene->meshes.find(meshTmp->name)->second;
-                surface.startIndex = sameMesh->surfaces[0].startIndex;
-                surface.count = sameMesh->surfaces[0].count;
-            } else { // If not visited this mesh earlier, add the indices & vertices
+            if (!meshBuffersExist) {
                 // Load indices
-                const fastgltf::Accessor &indicesAccessor
-                    = asset.accessors[p.indicesAccessor.value()];
-
-                surface.startIndex = static_cast<uint32_t>(indices.size());
-                surface.count = static_cast<uint32_t>(indicesAccessor.count);
 
                 fastgltf::iterateAccessor<uint32_t>(asset, indicesAccessor, [&](uint32_t index) {
                     indices.emplace_back(index + initialVtx);
@@ -565,7 +554,7 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
             std::shared_ptr<MeshNode> meshNodeTmp = std::make_shared<MeshNode>();
             const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
             meshNodeTmp->mesh = mesh;
-            // meshNodeTmp->surfaceUniformBuffers.reserve(mesh->surfaces.size());
+            meshNodeTmp->surfaceUniformBuffers.reserve(mesh->surfaces.size());
             // bufferQueue.reserve(mesh->surfaces.size());
             // Create a bound storage buffer for every surface with the device addresses
             // that will allow us access all the data from the shaders
@@ -602,13 +591,13 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
                                              sizeof(SurfaceStorage));
                 // Store a unique surface Id for each surface. This will be used as the customInstanceID
                 // when building the BLASes
-                meshNodeTmp->surfaceUniformBuffers[surfaceId] = *surfaceUniformBuffer;
+                meshNodeTmp->surfaceUniformBuffers.emplace_back(*surfaceUniformBuffer);
                 surfaceId++;
                 scene->bufferQueue.emplace_back(surfaceUniformBuffer);
             }
             // Add the node to our structures
-            scene->meshNodes.emplace_back(meshNodeTmp);
-            nodes.emplace_back(std::move(meshNodeTmp));
+            scene->meshNodes.emplace_back(std::move(meshNodeTmp));
+            nodes.emplace_back(scene->meshNodes.back());
             scene->nodes[n.name.c_str()] = nodes.back();
 
         } else {
@@ -622,7 +611,7 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
         const auto m = fastgltf::getTransformMatrix(n);
         nodes.back()->localTransform = glm::make_mat4(m.data());
     }
-    scene->surfaceStorageBuffersCount = surfaceId;
+    scene->surfaceUniformBuffersCount = surfaceId;
 
     // Generate the node tree structure
     for (size_t i = 0; i < nodes.size(); i++) {
