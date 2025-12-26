@@ -1,6 +1,7 @@
 #include "acceleration_structures.hpp"
 #include "utils.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include <set>
 
 ASBuilder::ASBuilder(const vk::Device &device,
                      const VmaAllocator &allocator,
@@ -150,19 +151,37 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<MeshNode> &mesh
 
 AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene)
 {
+    // std::vector<uint32_t> bufferIds;
+    // bufferIds.reserve(scene->surfaceUniformBuffers.size());
+    // for (const auto &m : scene->meshNodes)
+    //     for (const auto &s : m->mesh->surfaces)
+    //         bufferIds.push_back(s.bufferIndex);
     // Classify all MeshNodes by uniqueness of their device address
-    std::unordered_multimap<vk::DeviceAddress, std::shared_ptr<MeshNode>> meshNodes;
-    for (const auto &mn : scene->meshNodes)
-        meshNodes.insert({mn->mesh->indexBuffer->bufferAddress, mn});
+    // std::unordered_multimap<vk::DeviceAddress, std::shared_ptr<MeshNode>> meshNodes;
+    // for (const auto &mn : scene->meshNodes)
+    //     meshNodes.insert({mn->mesh->indexBuffer->bufferAddress, mn});
 
     // The uint32 key is going to be the instanceCustomIndex, blases are
     // going to be repeated: one per Mesh.
-    std::vector<std::tuple<uint32_t, AccelerationStructure, glm::mat4>> blases;
-    uint32_t i = 0;
+    // std::vector<std::tuple<uint32_t, AccelerationStructure, glm::mat4>> blases;
+    // uint32_t i = 0;
+    // for (const auto &mn : scene->meshNodes) {
+    //     AccelerationStructure blas = buildBLAS(mn);
+    //     blases.push_back({i, blas, mn->worldTransform});
+    //     i++;
+    // }
+    std::set<vk::DeviceAddress> indexBufferAddresses;
+    std::unordered_map<vk::DeviceAddress, AccelerationStructure> uniqueBlases;
+    std::vector<std::pair<AccelerationStructure, glm::mat4>> blases;
+    blases.reserve(scene->surfaceCount);
     for (const auto &mn : scene->meshNodes) {
-        AccelerationStructure blas = buildBLAS(mn);
-        blases.push_back({i, blas, mn->worldTransform});
-        i++;
+        const vk::DeviceAddress indexBufferAddress = mn->mesh->indexBuffer->bufferAddress;
+        // Build BLAS for every unique mesh buffer
+        if (indexBufferAddresses.count(indexBufferAddress) == 0)
+            uniqueBlases[indexBufferAddress] = buildBLAS(mn);
+        indexBufferAddresses.insert(indexBufferAddress);
+        // Repeat blases each with its own transform matrix
+        blases.emplace_back(std::make_pair(uniqueBlases[indexBufferAddress], mn->worldTransform));
     }
     // blases.reserve(scene->surfaceStorageBuffersCount);
     // for (auto it = meshNodes.begin(); it != meshNodes.end();) {
@@ -183,15 +202,16 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
 
     std::vector<vk::AccelerationStructureInstanceKHR> instances;
     instances.reserve(blases.size());
+    uint32_t instanceIndex = 0;
     for (const auto &b : blases) {
-        const glm::mat3x4 transformGlm = glm::mat3x4(std::get<2>(b));
-        const AccelerationStructure blas = std::get<1>(b);
-        const uint32_t customIndex = std::get<0>(b);
+        const glm::mat3x4 transformGlm = glm::mat3x4(glm::transpose(b.second));
+        const AccelerationStructure blas = b.first;
         vk::AccelerationStructureInstanceKHR instance{};
         vk::TransformMatrixKHR transformVk;
         memcpy(&transformVk, glm::value_ptr(transformGlm), sizeof(vk::TransformMatrixKHR));
         instance.setTransform(transformVk);
-        instance.setInstanceCustomIndex(customIndex); // gl_InstanceCustomIndexEXT
+        instance.setInstanceCustomIndex(instanceIndex); // gl_InstanceCustomIndexEXT
+        instanceIndex++;
         instance.setAccelerationStructureReference(blas.addr);
         // instance.setFlags(vk::GeometryInstanceFlagBitsKHR::eForceOpaque);
         instance.setMask(0xFF); //  Only be hit if rayMask & instance.mask != 0

@@ -408,6 +408,7 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
 {
     std::vector<uint32_t> indices;
     std::vector<Vertex> vertices;
+    scene->surfaceCount = 0;
     meshes.reserve(asset.meshes.size());
     for (const fastgltf::Mesh &m : asset.meshes) {
         std::shared_ptr<Mesh> meshTmp = std::make_shared<Mesh>();
@@ -458,10 +459,12 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
             else
                 surface.material = materials[0];
 
+            meshTmp->surfaces.emplace_back(surface);
+            scene->surfaceCount++;
+
             // Reuse the previous
             if (!meshBuffersExist) {
                 // Load indices
-
                 fastgltf::iterateAccessor<uint32_t>(asset, indicesAccessor, [&](uint32_t index) {
                     indices.emplace_back(index + initialVtx);
                 });
@@ -519,7 +522,6 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
                 }
                 initialVtx += verticesAccessor.count;
             }
-            meshTmp->surfaces.emplace_back(surface);
         }
         // Fill meshTmp index and vertex buffers
         if (!meshBuffersExist) {
@@ -536,10 +538,56 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
         meshes.emplace_back(std::move(meshTmp));
         scene->meshes.insert({m.name.c_str(), meshes.back()});
     }
+
+    // Create the per-surface uniform buffers
+    scene->surfaceUniformBuffers.reserve(scene->surfaceCount);
+    uint32_t surfaceId = 0;
+    for (const auto &m : meshes) {
+        for (auto &s : m->surfaces) {
+            std::shared_ptr<Buffer> surfaceUniformBuffer = std::make_shared<Buffer>();
+            *surfaceUniformBuffer = create_surface_buffer(m, s);
+            scene->surfaceUniformBuffers.emplace_back(*surfaceUniformBuffer);
+            s.bufferIndex = surfaceId;
+            surfaceId++;
+            scene->bufferQueue.emplace_back(surfaceUniformBuffer);
+        }
+    }
+}
+
+Buffer GLTFLoader::create_surface_buffer(const std::shared_ptr<Mesh> &mesh, const Surface &surface)
+{
+    SurfaceStorage surfaceStorage;
+    surfaceStorage.indexBufferAddress = mesh->indexBuffer->bufferAddress;
+    surfaceStorage.vertexBufferAddress = mesh->vertexBuffer->bufferAddress;
+    surfaceStorage.materialConstantsBufferAddress = surface.material->materialResources.dataBuffer
+                                                        .bufferAddress;
+    surfaceStorage.colorImageIndex = surface.material->materialResources.colorImageIndex;
+    surfaceStorage.colorSamplerIndex = surface.material->materialResources.colorSamplerIndex;
+    surfaceStorage.materialImageIndex = surface.material->materialResources.materialImageIndex;
+    surfaceStorage.materialSamplerIndex = surface.material->materialResources.materialSamplerIndex;
+    surfaceStorage.normalMapIndex = surface.material->materialResources.normalMapIndex;
+    surfaceStorage.normalSamplerIndex = surface.material->materialResources.normalSamplerIndex;
+    surfaceStorage.startIndex = surface.startIndex;
+    surfaceStorage.count = surface.count;
+    Buffer surfaceUniformBuffer = utils::create_buffer(device,
+                                                       allocator,
+                                                       sizeof(SurfaceStorage),
+                                                       vk::BufferUsageFlagBits::eUniformBuffer
+                                                           | vk::BufferUsageFlagBits::eTransferDst,
+                                                       VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+    utils::copy_to_device_buffer(surfaceUniformBuffer,
+                                 device,
+                                 allocator,
+                                 gltfCmd,
+                                 queue,
+                                 gltfFence,
+                                 &surfaceStorage,
+                                 sizeof(SurfaceStorage));
+    return surfaceUniformBuffer;
 }
 
 void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
-                            const std::vector<std::shared_ptr<Mesh>> &meshes,
+                            std::vector<std::shared_ptr<Mesh>> &meshes,
                             std::shared_ptr<GLTFObj> &scene,
                             std::vector<std::shared_ptr<Node>> &nodes)
 {
@@ -547,6 +595,11 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
     // Define the lambda that will load the node and the local transform
     uint32_t surfaceId = 0;
     scene->meshNodes.reserve(asset.nodes.size());
+    std::vector<Buffer> surfaceBuffersTmp{scene->surfaceUniformBuffers};
+    scene->surfaceUniformBuffers.clear();
+    scene->surfaceUniformBuffers.reserve(scene->surfaceCount);
+    // scene->surfaceUniformBuffers.reserve()
+
     // For now, we will consider that all nodes belong to the same scene
     for (const auto &n : asset.nodes) {
         // If has a mesh, make the Node a MeshNode and load the mesh
@@ -554,47 +607,11 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
             std::shared_ptr<MeshNode> meshNodeTmp = std::make_shared<MeshNode>();
             const std::shared_ptr<Mesh> &mesh = meshes[n.meshIndex.value()];
             meshNodeTmp->mesh = mesh;
-            meshNodeTmp->surfaceUniformBuffers.reserve(mesh->surfaces.size());
-            // bufferQueue.reserve(mesh->surfaces.size());
-            // Create a bound storage buffer for every surface with the device addresses
-            // that will allow us access all the data from the shaders
-            for (const auto &s : mesh->surfaces) {
-                SurfaceStorage surfaceStorage;
-                surfaceStorage.indexBufferAddress = mesh->indexBuffer->bufferAddress;
-                surfaceStorage.vertexBufferAddress = mesh->vertexBuffer->bufferAddress;
-                surfaceStorage.materialConstantsBufferAddress = s.material->materialResources
-                                                                    .dataBuffer.bufferAddress;
-                surfaceStorage.colorImageIndex = s.material->materialResources.colorImageIndex;
-                surfaceStorage.colorSamplerIndex = s.material->materialResources.colorSamplerIndex;
-                surfaceStorage.materialImageIndex = s.material->materialResources.materialImageIndex;
-                surfaceStorage.materialSamplerIndex = s.material->materialResources
-                                                          .materialSamplerIndex;
-                surfaceStorage.normalMapIndex = s.material->materialResources.normalMapIndex;
-                surfaceStorage.normalSamplerIndex = s.material->materialResources.normalSamplerIndex;
-                surfaceStorage.startIndex = s.startIndex;
-                surfaceStorage.count = s.count;
-                std::shared_ptr<Buffer> surfaceUniformBuffer = std::make_shared<Buffer>();
-                *surfaceUniformBuffer
-                    = utils::create_buffer(device,
-                                           allocator,
-                                           sizeof(SurfaceStorage),
-                                           vk::BufferUsageFlagBits::eUniformBuffer
-                                               | vk::BufferUsageFlagBits::eTransferDst,
-                                           VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-                utils::copy_to_device_buffer(*surfaceUniformBuffer,
-                                             device,
-                                             allocator,
-                                             gltfCmd,
-                                             queue,
-                                             gltfFence,
-                                             &surfaceStorage,
-                                             sizeof(SurfaceStorage));
-                // Store a unique surface Id for each surface. This will be used as the customInstanceID
-                // when building the BLASes
-                meshNodeTmp->surfaceUniformBuffers.emplace_back(*surfaceUniformBuffer);
-                surfaceId++;
-                scene->bufferQueue.emplace_back(surfaceUniformBuffer);
-            }
+
+            // Set the correspondent buffer for every mesh surface
+            for (const auto &s : mesh->surfaces)
+                scene->surfaceUniformBuffers.emplace_back(surfaceBuffersTmp[s.bufferIndex]);
+
             // Add the node to our structures
             scene->meshNodes.emplace_back(std::move(meshNodeTmp));
             nodes.emplace_back(scene->meshNodes.back());
@@ -611,7 +628,7 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
         const auto m = fastgltf::getTransformMatrix(n);
         nodes.back()->localTransform = glm::make_mat4(m.data());
     }
-    scene->surfaceUniformBuffersCount = surfaceId;
+    // scene->surfaceUniformBuffersCount = surfaceId;
 
     // Generate the node tree structure
     for (size_t i = 0; i < nodes.size(); i++) {

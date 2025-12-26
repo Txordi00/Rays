@@ -369,10 +369,11 @@ void Init::init_descriptors()
                                                  physicalDeviceProperties,
                                                  asProperties,
                                                  true);
-    descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
-                                                             static_cast<uint32_t>(
-                                                                 scene->surfaceUniformBuffersCount)},
-                                      frameOverlap); // per-surface storage
+    descHelperUAB
+        ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
+                                                    static_cast<uint32_t>(
+                                                        scene->surfaceUniformBuffers.size())},
+                             frameOverlap); // per-surface storage
     descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eSampler,
                                                              static_cast<uint32_t>(
                                                                  scene->samplers.size())},
@@ -385,10 +386,11 @@ void Init::init_descriptors()
                                                              static_cast<uint32_t>(lights.size())},
                                       frameOverlap); // Lights
     descHelperUAB->create_descriptor_pool();
-    descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
-                                       vk::ShaderStageFlagBits::eClosestHitKHR,
-                                       0,
-                                       scene->surfaceUniformBuffersCount}); // per-surface storage
+    descHelperUAB->add_binding(
+        Binding{vk::DescriptorType::eUniformBuffer,
+                vk::ShaderStageFlagBits::eClosestHitKHR,
+                0,
+                static_cast<uint32_t>(scene->surfaceUniformBuffers.size())}); // per-surface storage
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eSampler,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        1,

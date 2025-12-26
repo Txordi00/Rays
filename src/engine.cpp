@@ -18,7 +18,7 @@ Engine::Engine()
 {
     I = std::make_unique<Init>();
 
-    // Init push constants
+    // Init push constants aaa
     rayPush.clearColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.f);
     rayPush.nLights = I->lights.size();
     // rayPush.random = 1;
@@ -173,13 +173,9 @@ void Engine::update_descriptors()
     vk::AccelerationStructureKHR tlas = I->tlas.AS;
     DescriptorUpdater descUpdater{I->device};
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
-    std::vector<Buffer> surfaceStorageBuffers;
-    surfaceStorageBuffers.reserve(I->scene->surfaceUniformBuffersCount);
-    for (const auto &m : I->scene->meshNodes) {
-        for (const auto &b : m->surfaceUniformBuffers)
-            surfaceStorageBuffers.emplace_back(b);
-    }
+    std::vector<Buffer> surfaceBuffers = I->scene->surfaceUniformBuffers;
     std::vector<Buffer> lightBuffers;
+    const bool withTextures = I->scene->samplers.size() > 0 && I->scene->images.size() > 0;
     lightBuffers.reserve(I->lights.size());
     for (const auto &l : I->lights)
         lightBuffers.emplace_back(l.ubo);
@@ -189,9 +185,11 @@ void Engine::update_descriptors()
         vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
         vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
-        descUpdater.add_uniform(descriptorSetUAB, 0, surfaceStorageBuffers);
-        // descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
-        // descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
+        descUpdater.add_uniform(descriptorSetUAB, 0, surfaceBuffers);
+        if (withTextures) {
+            descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
+            descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
+        }
         descUpdater.add_uniform(descriptorSetUAB, 3, lightBuffers);
         descUpdater.add_as(descriptorSetRt, 0, tlas);
         descUpdater.add_storage_image(descriptorSetRt, 1, {frame.imageDraw});

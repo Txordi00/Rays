@@ -40,6 +40,7 @@ struct Surface
 {
     uint32_t startIndex;
     uint32_t count;
+    uint32_t bufferIndex;
     std::shared_ptr<GLTFMaterial> material;
 };
 
@@ -88,7 +89,7 @@ struct MeshNode : Node
 {
     std::shared_ptr<Mesh> mesh;
     // The key is going to be used as the customInstanceIndex when building the TLAS
-    std::vector<Buffer> surfaceUniformBuffers;
+    // std::vector<Buffer> surfaceUniformBuffers;
 };
 
 struct GLTFObj
@@ -105,7 +106,9 @@ struct GLTFObj
     std::vector<std::shared_ptr<Node>> topNodes;
     std::vector<std::shared_ptr<MeshNode>> meshNodes;
 
-    uint32_t surfaceUniformBuffersCount{0};
+    std::vector<Buffer> surfaceUniformBuffers;
+
+    size_t surfaceCount{0};
 
     std::vector<vk::Sampler> samplers;
     std::vector<ImageData> images;
@@ -165,9 +168,11 @@ private:
                      std::shared_ptr<GLTFObj> &scene,
                      std::vector<std::shared_ptr<Mesh>> &meshes);
 
+    Buffer create_surface_buffer(const std::shared_ptr<Mesh> &mesh, const Surface &surface);
+
     // We will need to modify the meshes in order to accomodate each surface id.
     void load_nodes(const fastgltf::Asset &asset,
-                    const std::vector<std::shared_ptr<Mesh>> &meshes,
+                    std::vector<std::shared_ptr<Mesh>> &meshes,
                     std::shared_ptr<GLTFObj> &scene,
                     std::vector<std::shared_ptr<Node>> &nodes);
 
