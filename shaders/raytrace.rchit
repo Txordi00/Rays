@@ -376,13 +376,13 @@ void main()
         normal = normalize(TBN * normalTexRaw.xyz);
         // print_val("n %f ", length(normal), 0.99, 1.);
     }
-    // const vec4 baseColor = (colorImageIndex != -1) ? texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
-    //             samplers[nonuniformEXT(colorSamplerIndex)]),
-    //         uv)
-    //         * mConstants.baseColorFactor : mConstants.baseColorFactor; // range [0, 1]
+    const vec4 baseColor = (colorImageIndex != -1) ? texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
+                samplers[nonuniformEXT(colorSamplerIndex)]),
+            uv)
+            * mConstants.baseColorFactor : mConstants.baseColorFactor; // range [0, 1]
     // print_val("c %f ", baseColor.x, 0.2, 0.9);
 
-    const vec4 baseColor = vec4(1.);
+    // const vec4 baseColor = vec4(1.);
 
     const vec4 metallicRoughness = (materialImageIndex != -1) ? texture(sampler2D(textures[nonuniformEXT(materialImageIndex)],
                 samplers[nonuniformEXT(materialSamplerIndex)]),
@@ -399,8 +399,8 @@ void main()
     // -------------- BRDF --------------
 
     // Parametrization
-    // const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
-    const vec3 diffuseColor = vec3(1.);
+    const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
+    // const vec3 diffuseColor = vec3(1.);
     const float reflectance = 0.5;
     const vec3 f0 = mix(vec3(0.16 * reflectance * reflectance), baseColor.xyz, metallic);
     const float f90 = clamp(50.0 * f0.y, 0.0, 1.0);

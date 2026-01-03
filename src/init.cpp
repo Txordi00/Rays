@@ -53,8 +53,9 @@ void Init::clean()
         device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
-        utils::destroy_buffer(allocator, tlas.buffer);
-        device.destroyAccelerationStructureKHR(tlas.AS);
+        utils::destroy_buffer(allocator, tlas.as.buffer);
+        device.destroyAccelerationStructureKHR(tlas.as.AS);
+        utils::destroy_buffer(allocator, tlas.instancesBuffer);
         asBuilder->destroy();
 
         gltfLoader->destroy();

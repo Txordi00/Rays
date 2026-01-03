@@ -149,27 +149,8 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<MeshNode> &mesh
     return blas;
 }
 
-AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene)
+TopLevelAS ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene)
 {
-    // std::vector<uint32_t> bufferIds;
-    // bufferIds.reserve(scene->surfaceUniformBuffers.size());
-    // for (const auto &m : scene->meshNodes)
-    //     for (const auto &s : m->mesh->surfaces)
-    //         bufferIds.push_back(s.bufferIndex);
-    // Classify all MeshNodes by uniqueness of their device address
-    // std::unordered_multimap<vk::DeviceAddress, std::shared_ptr<MeshNode>> meshNodes;
-    // for (const auto &mn : scene->meshNodes)
-    //     meshNodes.insert({mn->mesh->indexBuffer->bufferAddress, mn});
-
-    // The uint32 key is going to be the instanceCustomIndex, blases are
-    // going to be repeated: one per Mesh.
-    // std::vector<std::tuple<uint32_t, AccelerationStructure, glm::mat4>> blases;
-    // uint32_t i = 0;
-    // for (const auto &mn : scene->meshNodes) {
-    //     AccelerationStructure blas = buildBLAS(mn);
-    //     blases.push_back({i, blas, mn->worldTransform});
-    //     i++;
-    // }
     std::set<vk::DeviceAddress> indexBufferAddresses;
     std::unordered_map<vk::DeviceAddress, AccelerationStructure> uniqueBlases;
     std::vector<std::pair<AccelerationStructure, glm::mat4>> blases;
@@ -183,18 +164,6 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
         // Repeat blases each with its own transform matrix
         blases.emplace_back(std::make_pair(uniqueBlases[indexBufferAddress], mn->worldTransform));
     }
-    // blases.reserve(scene->surfaceStorageBuffersCount);
-    // for (auto it = meshNodes.begin(); it != meshNodes.end();) {
-    //     AccelerationStructure blas = buildBLAS(it->second);
-    //     // Get all the MeshNodes associated with a single mesh
-    //     const auto &[rangeFirst, rangeEnd] = meshNodes.equal_range(it->first);
-    //     for (auto r = rangeFirst; r != rangeEnd; ++r) {
-    //         for (const auto &[key, buffer] : r->second->surfaceUniformBuffers) {
-    //             blases.push_back({key, blas, glm::transpose(r->second->worldTransform)});
-    //         }
-    //     }
-    //     it = rangeEnd;
-    // }
 
     // Here starts the vulkan stuff for building the tlas
     VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
@@ -208,7 +177,7 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
         const AccelerationStructure blas = b.first;
         vk::AccelerationStructureInstanceKHR instance{};
         vk::TransformMatrixKHR transformVk;
-        memcpy(&transformVk, glm::value_ptr(transformGlm), sizeof(vk::TransformMatrixKHR));
+        memcpy(&transformVk.matrix, glm::value_ptr(transformGlm), sizeof(transformVk.matrix));
         instance.setTransform(transformVk);
         instance.setInstanceCustomIndex(instanceIndex); // gl_InstanceCustomIndexEXT
         instanceIndex++;
@@ -255,7 +224,8 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
 
     // Find sizes
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
-    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace
+                       | vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
     buildInfo.setGeometries(topASGeometry);
     buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
     buildInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);
@@ -317,9 +287,90 @@ AccelerationStructure ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene
 
     // Scratch buffer can be destroyed after queue finishes
     utils::destroy_buffer(allocator, scratchBuffer);
-    utils::destroy_buffer(allocator, instancesBuffer);
+    // utils::destroy_buffer(allocator, instancesBuffer);
 
-    return tlas;
+    return TopLevelAS{.as = tlas, .instances = instances, .instancesBuffer = instancesBuffer};
+}
+
+void ASBuilder::updateTLAS(TopLevelAS &tlas, const glm::mat4 &transform)
+{
+    // Here starts the vulkan stuff for building the tlas
+    VK_CHECK_RES(device.waitForFences(asFence, vk::True, FENCE_TIMEOUT));
+    device.resetFences(asFence);
+
+    for (auto &i : tlas.instances) {
+        const glm::mat3x4 transform0 = glm::transpose(glm::make_mat4x3(&i.transform.matrix[0][0]));
+        const glm::mat4 transform4x4 = transform * glm::mat4(transform0);
+        const glm::mat3x4 transform3x4 = glm::mat3x4(glm::transpose(transform4x4));
+        vk::TransformMatrixKHR transformVk;
+        memcpy(&transformVk.matrix, glm::value_ptr(transform3x4), sizeof(transformVk.matrix));
+        i.setTransform(transformVk);
+    }
+
+    // Fill the buffer
+    const vk::DeviceSize instancesSize = static_cast<vk::DeviceSize>(
+        sizeof(vk::AccelerationStructureInstanceKHR) * tlas.instances.size());
+    utils::copy_to_device_buffer(tlas.instancesBuffer,
+                                 device,
+                                 allocator,
+                                 asCmd,
+                                 queue,
+                                 asFence,
+                                 tlas.instances.data(),
+                                 instancesSize);
+
+    // Wraps a device pointer to the above uploaded instances.
+    vk::AccelerationStructureGeometryInstancesDataKHR instancesData{};
+    instancesData.setData(vk::DeviceOrHostAddressConstKHR{tlas.instancesBuffer.bufferAddress});
+
+    // Put the above into a VkAccelerationStructureGeometryKHR. We need to put the instances struct in a union and label it as instance data.
+    vk::AccelerationStructureGeometryKHR topASGeometry{};
+    topASGeometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
+    topASGeometry.setGeometry(instancesData);
+    topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+
+    // Find sizes
+    vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
+    buildInfo.setFlags(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace
+                       | vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+    buildInfo.setGeometries(topASGeometry);
+    buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eUpdate);
+    buildInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);
+    buildInfo.setSrcAccelerationStructure(tlas.as.AS);
+    buildInfo.setDstAccelerationStructure(tlas.as.AS);
+
+    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo
+        = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
+                                                       buildInfo,
+                                                       tlas.instances.size());
+
+    // Allocate scratch buffer
+    Buffer scratchBuffer
+        = utils::create_buffer(device,
+                               allocator,
+                               sizeInfo.buildScratchSize,
+                               vk::BufferUsageFlagBits::eStorageBuffer
+                                   | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               0,
+                               asProperties.minAccelerationStructureScratchOffsetAlignment);
+
+    // Update build information
+    buildInfo.setScratchData(scratchBuffer.bufferAddress);
+
+    // Build Offsets info: n instances
+    vk::AccelerationStructureBuildRangeInfoKHR buildRangeInfo{};
+    buildRangeInfo.setPrimitiveCount(tlas.instances.size());
+
+    // Build the TLAS
+    // Record the next set of commands
+    // asCmd.reset();
+    utils::cmd_submit(device, queue, asFence, asCmd, [&](const vk::CommandBuffer &cmd) {
+        cmd.buildAccelerationStructuresKHR(buildInfo, &buildRangeInfo);
+    });
+
+    // Scratch buffer can be destroyed after queue finishes
+    utils::destroy_buffer(allocator, scratchBuffer);
 }
 
 void ASBuilder::init()

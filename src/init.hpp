@@ -76,7 +76,7 @@ public:
     // Ray tracing
     vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtProperties{};
     vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties{};
-    AccelerationStructure tlas;
+    TopLevelAS tlas;
     Buffer rtSBTBuffer;
     std::unique_ptr<SbtHelper> sbtHelper;
     std::unique_ptr<ASBuilder> asBuilder;

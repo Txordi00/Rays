@@ -8,6 +8,13 @@ struct AccelerationStructure
     VkDeviceAddress addr;
 };
 
+struct TopLevelAS
+{
+    AccelerationStructure as;
+    std::vector<vk::AccelerationStructureInstanceKHR> instances;
+    Buffer instancesBuffer;
+};
+
 class ASBuilder
 {
 
@@ -18,16 +25,11 @@ public:
               const vk::PhysicalDeviceAccelerationStructurePropertiesKHR &asProperties);
     ~ASBuilder() = default;
     void destroy();
-    // AccelerationStructure buildBLAS(const std::shared_ptr<Model> &model);
     AccelerationStructure buildBLAS(const std::shared_ptr<MeshNode> &meshNode);
 
-    // AccelerationStructure buildTLAS(const std::vector<std::shared_ptr<Model>> &models,
-    //                                 const std::vector<glm::mat3x4> &transforms);
+    TopLevelAS buildTLAS(const std::shared_ptr<GLTFObj> &scene);
 
-    AccelerationStructure buildTLAS(const std::shared_ptr<GLTFObj> &scene);
-
-    // AccelerationStructure buildTLAS(const std::vector<AccelerationStructure> &blases,
-    //                                 const std::vector<glm::mat3x4> &transforms);
+    void updateTLAS(TopLevelAS &tlas, const glm::mat4 &transform);
 
 private:
     const vk::Device &device;

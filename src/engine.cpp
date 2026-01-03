@@ -170,7 +170,7 @@ void Engine::update_descriptors()
 
     // Set all the resource descriptors at once. We don't need to update again if we don't change any
     // resources
-    vk::AccelerationStructureKHR tlas = I->tlas.AS;
+    vk::AccelerationStructureKHR tlas = I->tlas.as.AS;
     DescriptorUpdater descUpdater{I->device};
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
     std::vector<Buffer> surfaceBuffers = I->scene->surfaceUniformBuffers;
@@ -422,7 +422,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     vk::DescriptorSet descriptorSetUniform = get_current_frame().descriptorSetUAB;
     vk::DescriptorSet descriptorSetRt = get_current_frame().descriptorSetRt;
     vk::ImageView imageView = get_current_frame().imageDraw.imageView;
-    vk::AccelerationStructureKHR tlas = I->tlas.AS;
+    vk::AccelerationStructureKHR tlas = I->tlas.as.AS;
 
     std::vector<vk::DescriptorSet> descriptorSets = {descriptorSetRt, descriptorSetUniform};
     vk::BindDescriptorSetsInfo bindSetsInfo{};
