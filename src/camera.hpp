@@ -29,6 +29,7 @@ public:
     void lookDown(const float &dx);
     void lookRight(const float &dx);
     void lookLeft(const float &dx);
+    void lookAt(const glm::vec3 &point);
 
     void update();
 

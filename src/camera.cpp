@@ -65,6 +65,11 @@ void Camera::lookLeft(const float &dx)
     orientation = dr * orientation;
 }
 
+void Camera::lookAt(const glm::vec3 &point)
+{
+    orientation = glm::normalize(point - translation);
+}
+
 void Camera::update()
 {
     orientation = glm::normalize(orientation);

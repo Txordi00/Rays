@@ -299,11 +299,28 @@ void ASBuilder::updateTLAS(TopLevelAS &tlas, const glm::mat4 &transform)
     device.resetFences(asFence);
 
     for (auto &i : tlas.instances) {
-        const glm::mat3x4 transform0 = glm::transpose(glm::make_mat4x3(&i.transform.matrix[0][0]));
-        const glm::mat4 transform4x4 = transform * glm::mat4(transform0);
-        const glm::mat3x4 transform3x4 = glm::mat3x4(glm::transpose(transform4x4));
+        glm::mat4 currentTransform{1.f};
+        // VkTransformMatrixKHR is row-major 3x4, so we need to reconstruct it properly
+        for (size_t row = 0; row < 3; ++row) {
+            for (size_t col = 0; col < 4; ++col) {
+                currentTransform[col][row] = i.transform.matrix[row][col];
+            }
+        }
+        // Apply the new transform
+        glm::mat4 newTransform = transform * currentTransform;
+        // const glm::mat4x3 origTransform = glm::make_mat4x3((float *) i.transform.matrix.data());
+        // const glm::mat3x4 transform0 = glm::transpose(glm::make_mat4x3(&i.transform.matrix[0][0]));
+        // const glm::mat4 transform4x4 = transform * glm::mat4(origTransform);
+        // const glm::mat3x4 transform3x4 = glm::mat3x4(glm::transpose(transform4x4));
+        // const glm::mat3x4 transform3x4 = glm::mat3x4(glm::transpose(transform4x4));
+        // Convert back to VkTransformMatrixKHR format (row-major 3x4)
         vk::TransformMatrixKHR transformVk;
-        memcpy(&transformVk.matrix, glm::value_ptr(transform3x4), sizeof(transformVk.matrix));
+        for (size_t row = 0; row < 3; ++row) {
+            for (size_t col = 0; col < 4; ++col) {
+                transformVk.matrix[row][col] = newTransform[col][row];
+            }
+        }
+        // memcpy(&transformVk.matrix, glm::value_ptr(transform3x4), sizeof(transformVk.matrix));
         i.setTransform(transformVk);
     }
 

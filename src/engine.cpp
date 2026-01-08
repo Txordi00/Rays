@@ -32,11 +32,6 @@ Engine::~Engine()
 
 void Engine::run()
 {
-    SpecializationConstantsClosestHit constantsCH{};
-    SpecializationConstantsMiss constantsMiss{};
-    bool random = constantsCH.random, presample = constantsCH.presampled,
-         envMap = constantsMiss.envMap;
-    int recursionDepth = constantsCH.recursionDepth, numBounces = constantsCH.numBounces;
     // float backgroundColor[3] = {rayPush.clearColor.x, rayPush.clearColor.y, rayPush.clearColor.z};
 
     // Inform the shaders about the resources that we are going to use
@@ -97,67 +92,99 @@ void Engine::run()
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
-        // imgui new frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
 
-        ImGui::Begin("Controls");
+        // Run the UI elements
+        update_imgui();
 
-        // Alternative: Color picker without label
-        ImGui::ColorEdit3("Background color", (float *) &rayPush.clearColor);
-
-        ImGui::Separator();
-
-        // Checkbox for boolean toggle
-        ImGui::Checkbox("EnvMap", &envMap);
-        ImGui::Checkbox("Random", &random);
-        ImGui::Checkbox("Presample", &presample);
-
-        // Integer control with +/- buttons
-        ImGui::InputInt("Maximum recursion depth", &recursionDepth, 1, 1);
-        ImGui::InputInt("Bounces", &numBounces, 2, 4);
-
-        // Apply button
-        if (ImGui::Button("Apply Changes")) {
-            // Your action code here
-            constantsCH.recursionDepth = static_cast<uint32_t>(recursionDepth);
-            constantsCH.numBounces = static_cast<uint32_t>(numBounces);
-            constantsCH.random = static_cast<vk::Bool32>(random);
-            constantsCH.presampled = static_cast<vk::Bool32>(presample);
-
-            constantsMiss.envMap = static_cast<vk::Bool32>(envMap);
-            I->rebuid_rt_pipeline(constantsCH, constantsMiss);
-        }
-
-        ImGui::ShowMetricsWindow();
-
-        ImGui::End();
-
-        // if (ImGui::Begin("background")) {
-        //     ComputePipelineData &currentPipeline
-        //         = I->computePipelines[currentBackgroundPipelineIndex];
-        //     const std::string text = "Selected background compute shader: " + currentPipeline.name;
-        //     ImGui::Text("%s", text.c_str());
-        //     ImGui::SliderInt("Shader Index: ",
-        //                      &currentBackgroundPipelineIndex,
-        //                      0,
-        //                      I->computePipelines.size() - 1);
-        //     glm::vec4 *colorUp = (glm::vec4 *) I->computePipelines[0].pushData;
-        //     glm::vec4 *colorDown = (glm::vec4 *) ((char *) I->computePipelines[0].pushData
-        //                                           + sizeof(glm::vec4));
-        //     ImGui::InputFloat4("[ColorGradient] colorUp", (float *) colorUp);
-        //     ImGui::InputFloat4("[ColorGradient] colorDown", (float *) colorDown);
-        //     ImGui::InputFloat4("[Sky] colorW", (float *) I->computePipelines[1].pushData);
-        // }
-        // Imgui UI to test
-        // ImGui::End();
-
-        //make imgui calculate internal draw structures
-        ImGui::Render();
         // Draw if not minimized
         draw();
     }
+}
+
+void Engine::update_imgui()
+{
+    static SpecializationConstantsClosestHit constantsCH{};
+    static SpecializationConstantsMiss constantsMiss{};
+    static bool random{static_cast<bool>(constantsCH.random)},
+        presample{static_cast<bool>(constantsCH.presampled)},
+        envMap{static_cast<bool>(constantsMiss.envMap)};
+    static int recursionDepth = constantsCH.recursionDepth, numBounces = constantsCH.numBounces;
+    static float scale{1.f}, xRot{0.f}, yRot{0.f}, zRot{0.f};
+
+    // imgui new frame
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("Controls");
+
+    // Alternative: Color picker without label
+    ImGui::ColorEdit3("Background color", (float *) &rayPush.clearColor);
+
+    ImGui::Separator();
+
+    // Checkbox for boolean toggle
+    ImGui::Checkbox("EnvMap", &envMap);
+    ImGui::Checkbox("Random", &random);
+    ImGui::Checkbox("Presample", &presample);
+
+    // Integer control with +/- buttons
+    ImGui::InputInt("Maximum recursion depth", &recursionDepth, 1, 1);
+    recursionDepth = std::max(recursionDepth, 1);
+    ImGui::InputInt("Bounces", &numBounces, 2, 4);
+    numBounces = std::max(numBounces, 2);
+
+    // Apply button
+    if (ImGui::Button("Apply Changes")) {
+        // Your action code here
+        constantsCH.recursionDepth = static_cast<uint32_t>(recursionDepth);
+        constantsCH.numBounces = static_cast<uint32_t>(numBounces);
+        constantsCH.random = static_cast<vk::Bool32>(random);
+        constantsCH.presampled = static_cast<vk::Bool32>(presample);
+
+        constantsMiss.envMap = static_cast<vk::Bool32>(envMap);
+        I->rebuid_rt_pipeline(constantsCH, constantsMiss);
+    }
+
+    ImGui::Separator();
+
+    const float scaleOld{scale};
+    if (ImGui::InputFloat("Scale", &scale, 0.1f, 0.5f, "%.2f")) {
+        scale = std::max(scale, 0.01f);
+        const float ds = scale / scaleOld;
+        const glm::mat4 S = glm::scale(glm::mat4{1.f}, glm::vec3(ds));
+        I->asBuilder->updateTLAS(I->tlas, S);
+    }
+
+    const float xRotOld{xRot};
+    if (ImGui::SliderAngle("X-axis Rotation", &xRot, -180.f, 180.f)) {
+        const float dr = xRot - xRotOld;
+        const glm::mat4 R = glm::rotate(dr, glm::vec3(1.f, 0.f, 0.f));
+        I->asBuilder->updateTLAS(I->tlas, R);
+    }
+
+    const float yRotOld{yRot};
+    if (ImGui::SliderAngle("Y-axis Rotation", &yRot, -180.f, 180.f)) {
+        const float dr = yRot - yRotOld;
+        const glm::mat4 R = glm::rotate(dr, glm::vec3(0.f, -1.f, 0.f));
+        I->asBuilder->updateTLAS(I->tlas, R);
+    }
+
+    const float zRotOld{zRot};
+    if (ImGui::SliderAngle("Z-axis Rotation", &zRot, -180.f, 180.f)) {
+        const float dr = zRot - zRotOld;
+        const glm::mat4 R = glm::rotate(dr, glm::vec3(0.f, 0.f, 1.f));
+        I->asBuilder->updateTLAS(I->tlas, R);
+    }
+
+    ImGui::Separator();
+
+    ImGui::ShowMetricsWindow();
+
+    ImGui::End();
+
+    //make imgui calculate internal draw structures
+    ImGui::Render();
 }
 
 void Engine::update_descriptors()
@@ -190,7 +217,8 @@ void Engine::update_descriptors()
             descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
             descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
         }
-        descUpdater.add_uniform(descriptorSetUAB, 3, lightBuffers);
+        if (lightBuffers.size() > 0)
+            descUpdater.add_uniform(descriptorSetUAB, 3, lightBuffers);
         descUpdater.add_as(descriptorSetRt, 0, tlas);
         descUpdater.add_storage_image(descriptorSetRt, 1, {frame.imageDraw});
         descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);

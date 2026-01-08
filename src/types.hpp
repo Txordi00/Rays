@@ -41,6 +41,8 @@ const unsigned int FRAME_OVERLAP = 2;
 const uint64_t FENCE_TIMEOUT = 1000000000;
 const size_t SAMPLING_DISCRETIZATION = 100;
 
+const uint32_t MAX_LIGHTS = 10;
+
 #define SIMPLE_MESH_FRAG_SHADER "shaders/simple_mesh.frag.spv"
 #define SIMPLE_MESH_VERT_SHADER "shaders/simple_mesh.vert.spv"
 #define SIMPLE_RCHIT_SHADER "shaders/raytrace.rchit.spv"

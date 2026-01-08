@@ -24,6 +24,8 @@ private:
     // Return frame
     FrameData &get_current_frame() { return I->frames[frameNumber]; }
 
+    void update_imgui();
+
     // Inform to the shaders about the resources
     void update_descriptors();
 

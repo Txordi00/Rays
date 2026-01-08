@@ -35,7 +35,7 @@ Init::Init()
     create_draw_data();
     load_meshes();
     load_background();
-    create_lights();
+    // create_lights();
     create_as();
     init_descriptors();
     init_pipelines();
@@ -316,6 +316,9 @@ void Init::create_camera()
                          0.01f,
                          100.f);
     camera.create_camera_buffer(device, allocator);
+    camera.backwards(3.f);
+    camera.up(1.f);
+    camera.lookAt(glm::vec3(0.f));
 }
 
 void Init::init_commands()
@@ -384,7 +387,7 @@ void Init::init_descriptors()
                                                                  scene->images.size())},
                                       frameOverlap); // images to sample
     descHelperUAB->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
-                                                             static_cast<uint32_t>(lights.size())},
+                                                             MAX_LIGHTS},
                                       frameOverlap); // Lights
     descHelperUAB->create_descriptor_pool();
     descHelperUAB->add_binding(
@@ -404,7 +407,7 @@ void Init::init_descriptors()
     descHelperUAB->add_binding(Binding{vk::DescriptorType::eUniformBuffer,
                                        vk::ShaderStageFlagBits::eClosestHitKHR,
                                        3,
-                                       static_cast<uint32_t>(lights.size())}); // lights
+                                       MAX_LIGHTS}); // lights
     descriptorSetLayoutUAB = descHelperUAB->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsUAB
         = descHelperUAB->allocate_descriptor_sets(descriptorSetLayoutUAB, frameOverlap);
@@ -579,17 +582,17 @@ void Init::presample()
 void Init::load_meshes()
 {
     gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
-    scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/CornellBox-Original.gltf")
-                .value();
-    // scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/ABeautifulGame.glb")
+    // scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/CornellBox-Original.gltf")
     //             .value();
+    scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/ABeautifulGame.glb")
+                .value();
     std::println("Asset loaded");
 
     glm::mat4 S = glm::scale(1.f * glm::vec3(1.f));
     glm::mat4 R = glm::rotate(glm::pi<float>(), glm::vec3(0.f, 0.f, 1.f));
-    glm::mat4 T = glm::translate(glm::vec3(0.f, 2.f, 20.f));
+    // glm::mat4 T = glm::translate(glm::vec3(0.f, 2.f, 20.f));
     for (const auto &n : scene->topNodes)
-        n->refreshTransform(T * R * S);
+        n->refreshTransform(R * S);
 }
 
 void Init::load_background()
@@ -631,23 +634,23 @@ void Init::create_lights()
     directionalLight.lightData.intensity = 1.f;
     directionalLight.lightData.type = LightType::eDirectional;
     directionalLight.upload();
-    const glm::vec3 c{0.f, 0.f, 20.f};
-    const float r = 5.f;
-    const float y = -5.f;
-    const uint32_t n = 4;
-    lights.reserve(n + 1);
-    lights.emplace_back(directionalLight);
-    for (uint32_t i = 0; i < n; i++) {
-        const float in = static_cast<float>(i) / static_cast<float>(n);
-        const float x = r * cos(2.f * glm::pi<float>() * in);
-        const float z = r * sin(2.f * glm::pi<float>() * in);
-        Light pointLight{device, allocator};
-        pointLight.lightData.positionOrDirection = c + glm::vec3(x, y, z);
-        pointLight.lightData.intensity = 40.f;
-        pointLight.lightData.type = LightType::ePoint;
-        pointLight.upload();
-        lights.emplace_back(pointLight);
-    }
+    // const glm::vec3 c{0.f, 0.f, 20.f};
+    // const float r = 5.f;
+    // const float y = -5.f;
+    // const uint32_t n = 0;
+    // lights.reserve(n + 1);
+    lights.push_back(directionalLight);
+    // for (uint32_t i = 0; i < n; i++) {
+    //     const float in = static_cast<float>(i) / static_cast<float>(n);
+    //     const float x = r * cos(2.f * glm::pi<float>() * in);
+    //     const float z = r * sin(2.f * glm::pi<float>() * in);
+    //     Light pointLight{device, allocator};
+    //     pointLight.lightData.positionOrDirection = c + glm::vec3(x, y, z);
+    //     pointLight.lightData.intensity = 40.f;
+    //     pointLight.lightData.type = LightType::ePoint;
+    //     pointLight.upload();
+    //     lights.emplace_back(pointLight);
+    // }
 }
 
 void Init::create_as()
