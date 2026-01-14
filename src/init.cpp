@@ -64,8 +64,8 @@ void Init::clean()
         presampler->destroy();
 
         // Destroy lights
-        for (auto &l : lights)
-            l.destroy();
+        // for (auto &l : lights)
+        //     l.destroy();
 
         // device.destroyPipelineLayout(simpleMeshGraphicsPipeline.pipelineLayout);
         // device.destroyPipeline(simpleMeshGraphicsPipeline.pipeline);
@@ -627,31 +627,31 @@ void Init::load_background()
     stbi_image_free(imData);
 }
 
-void Init::create_lights()
-{
-    Light directionalLight{device, allocator};
-    directionalLight.lightData.positionOrDirection = glm::normalize(glm::vec3(1.f, 1.f, 1.f));
-    directionalLight.lightData.intensity = 1.f;
-    directionalLight.lightData.type = LightType::eDirectional;
-    directionalLight.upload();
-    // const glm::vec3 c{0.f, 0.f, 20.f};
-    // const float r = 5.f;
-    // const float y = -5.f;
-    // const uint32_t n = 0;
-    // lights.reserve(n + 1);
-    lights.push_back(directionalLight);
-    // for (uint32_t i = 0; i < n; i++) {
-    //     const float in = static_cast<float>(i) / static_cast<float>(n);
-    //     const float x = r * cos(2.f * glm::pi<float>() * in);
-    //     const float z = r * sin(2.f * glm::pi<float>() * in);
-    //     Light pointLight{device, allocator};
-    //     pointLight.lightData.positionOrDirection = c + glm::vec3(x, y, z);
-    //     pointLight.lightData.intensity = 40.f;
-    //     pointLight.lightData.type = LightType::ePoint;
-    //     pointLight.upload();
-    //     lights.emplace_back(pointLight);
-    // }
-}
+// void Init::create_lights()
+// {
+//     Light directionalLight{device, allocator};
+//     directionalLight.lightData.positionOrDirection = glm::normalize(glm::vec3(1.f, 1.f, 1.f));
+//     directionalLight.lightData.intensity = 1.f;
+//     directionalLight.lightData.type = LightType::eDirectional;
+//     directionalLight.upload();
+//     // const glm::vec3 c{0.f, 0.f, 20.f};
+//     // const float r = 5.f;
+//     // const float y = -5.f;
+//     // const uint32_t n = 0;
+//     // lights.reserve(n + 1);
+//     lights.push_back(directionalLight);
+//     // for (uint32_t i = 0; i < n; i++) {
+//     //     const float in = static_cast<float>(i) / static_cast<float>(n);
+//     //     const float x = r * cos(2.f * glm::pi<float>() * in);
+//     //     const float z = r * sin(2.f * glm::pi<float>() * in);
+//     //     Light pointLight{device, allocator};
+//     //     pointLight.lightData.positionOrDirection = c + glm::vec3(x, y, z);
+//     //     pointLight.lightData.intensity = 40.f;
+//     //     pointLight.lightData.type = LightType::ePoint;
+//     //     pointLight.upload();
+//     //     lights.emplace_back(pointLight);
+//     // }
+// }
 
 void Init::create_as()
 {

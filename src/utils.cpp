@@ -1,4 +1,5 @@
 #include "utils.hpp"
+#include "imgui.h"
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -426,6 +427,17 @@ void destroy_image(const vk::Device &device, const VmaAllocator &allocator, cons
     device.destroyImageView(image.imageView);
     if (image.sampler)
         device.destroySampler(image.sampler);
+}
+
+void imgui::InputFloat3(const char *label, float v[], float step)
+{
+    const char *components[] = {"X", "Y", "Z"};
+    for (int i = 0; i < 3; ++i) {
+        ImGui::SetNextItemWidth(80.0f);
+        ImGui::InputFloat(components[i], &v[i], step, step * 5, "%.2f");
+        ImGui::SameLine();
+    }
+    ImGui::Text("%s", label);
 }
 
 // namespace init

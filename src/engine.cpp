@@ -6,13 +6,13 @@ import vulkan_hpp;
 
 #include "acceleration_structures.hpp"
 #include "engine.hpp"
+#include "lights.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 #include <glm/ext.hpp>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
 #include <print>
-#include <thread>
 
 Engine::Engine()
 {
@@ -20,20 +20,22 @@ Engine::Engine()
 
     // Init push constants aaa
     rayPush.clearColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.f);
-    rayPush.nLights = I->lights.size();
-    // rayPush.random = 1;
-    // rayPush.presample = 0;
+    // rayPush.nLights = I->lights.size();
+    descUpdater = std::make_unique<DescriptorUpdater>(I->device);
+    lightsManager = std::make_unique<LightsManager>(I->device, I->allocator);
 }
 
 Engine::~Engine()
 {
     I->clean();
+
+    // Destroy all the remaining lights
+    for (Light &l : lightsManager->lights)
+        l.destroy();
 }
 
 void Engine::run()
 {
-    // float backgroundColor[3] = {rayPush.clearColor.x, rayPush.clearColor.y, rayPush.clearColor.z};
-
     // Inform the shaders about the resources that we are going to use
     update_descriptors();
 
@@ -54,12 +56,6 @@ void Engine::run()
             case SDL_EVENT_QUIT:
                 quit = true;
                 break;
-
-                // case SDL_EVENT_WINDOW_MINIMIZED:
-                //     stopRendering = true;
-
-                // case SDL_EVENT_WINDOW_RESTORED:
-                //     stopRendering = false;
 
             case SDL_EVENT_KEY_DOWN:
                 // key = e.key.key;
@@ -87,11 +83,6 @@ void Engine::run()
             //send SDL event to imgui for handling
             ImGui_ImplSDL3_ProcessEvent(&e);
         }
-        // Do not draw and throttle if we are minimized
-        if (stopRendering) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
 
         // Run the UI elements
         update_imgui();
@@ -107,9 +98,10 @@ void Engine::update_imgui()
     static SpecializationConstantsMiss constantsMiss{};
     static bool random{static_cast<bool>(constantsCH.random)},
         presample{static_cast<bool>(constantsCH.presampled)},
-        envMap{static_cast<bool>(constantsMiss.envMap)};
+        envMap{static_cast<bool>(constantsMiss.envMap)}, dirLightOn{false};
     static int recursionDepth = constantsCH.recursionDepth, numBounces = constantsCH.numBounces;
     static float scale{1.f}, xRot{0.f}, yRot{0.f}, zRot{0.f};
+    static size_t lightsCount{0};
 
     // imgui new frame
     ImGui_ImplVulkan_NewFrame();
@@ -177,7 +169,16 @@ void Engine::update_imgui()
         I->asBuilder->updateTLAS(I->tlas, R);
     }
 
-    ImGui::Separator();
+    lightsManager->run();
+    const size_t newLightsCount = lightsManager->lightBuffers.size();
+    if (newLightsCount - lightsCount != 0) {
+        lightsCount = newLightsCount;
+        for (const auto &f : I->frames) {
+            rayPush.nLights = static_cast<uint32_t>(newLightsCount);
+            descUpdater->add_uniform(f.descriptorSetUAB, 3, lightsManager->lightBuffers);
+            descUpdater->update();
+        }
+    }
 
     ImGui::ShowMetricsWindow();
 
@@ -198,34 +199,33 @@ void Engine::update_descriptors()
     // Set all the resource descriptors at once. We don't need to update again if we don't change any
     // resources
     vk::AccelerationStructureKHR tlas = I->tlas.as.AS;
-    DescriptorUpdater descUpdater{I->device};
     std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
     std::vector<Buffer> surfaceBuffers = I->scene->surfaceUniformBuffers;
-    std::vector<Buffer> lightBuffers;
     const bool withTextures = I->scene->samplers.size() > 0 && I->scene->images.size() > 0;
-    lightBuffers.reserve(I->lights.size());
-    for (const auto &l : I->lights)
-        lightBuffers.emplace_back(l.ubo);
+    // std::vector<Buffer> lightBuffers;
+    // lightBuffers.reserve(lights);
+    // for (const auto &l : I->lights)
+    //     lightBuffers.emplace_back(l.ubo);
 
     for (const auto &frame : I->frames) {
         // Inform the shaders about all the different descriptors
         vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
         vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
-        descUpdater.add_uniform(descriptorSetUAB, 0, surfaceBuffers);
+        descUpdater->add_uniform(descriptorSetUAB, 0, surfaceBuffers);
         if (withTextures) {
-            descUpdater.add_sampler(descriptorSetUAB, 1, I->scene->samplers);
-            descUpdater.add_sampled_image(descriptorSetUAB, 2, I->scene->images);
+            descUpdater->add_sampler(descriptorSetUAB, 1, I->scene->samplers);
+            descUpdater->add_sampled_image(descriptorSetUAB, 2, I->scene->images);
         }
-        if (lightBuffers.size() > 0)
-            descUpdater.add_uniform(descriptorSetUAB, 3, lightBuffers);
-        descUpdater.add_as(descriptorSetRt, 0, tlas);
-        descUpdater.add_storage_image(descriptorSetRt, 1, {frame.imageDraw});
-        descUpdater.add_uniform(descriptorSetRt, 2, cameraBuffer);
-        descUpdater.add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
-        descUpdater.add_combined_image(descriptorSetRt, 4, {I->presampler->ggxImage});
-        descUpdater.add_combined_image(descriptorSetRt, 5, {I->backgroundImage});
-        descUpdater.update();
+        // if (lightBuffers.size() > 0)
+        //     descUpdater->add_uniform(descriptorSetUAB, 3, lightBuffers);
+        descUpdater->add_as(descriptorSetRt, 0, tlas);
+        descUpdater->add_storage_image(descriptorSetRt, 1, {frame.imageDraw});
+        descUpdater->add_uniform(descriptorSetRt, 2, cameraBuffer);
+        descUpdater->add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
+        descUpdater->add_combined_image(descriptorSetRt, 4, {I->presampler->ggxImage});
+        descUpdater->add_combined_image(descriptorSetRt, 5, {I->backgroundImage});
+        descUpdater->update();
     }
 }
 

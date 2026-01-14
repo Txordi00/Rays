@@ -16,21 +16,43 @@ public:
         uint32_t type{LightType::ePoint};
     };
 
-    Light(const vk::Device &device, const VmaAllocator &allocator)
-        : device{device}
-        , allocator{allocator}
+    Light()
+        : id_{nextId++}
     {}
     ~Light() = default;
 
-    void upload();
+    void upload(const vk::Device &device, const VmaAllocator &allocator);
     void update();
     void destroy();
+
+    uint32_t id() const { return id_; }
 
     LightData lightData{};
 
     Buffer ubo{};
 
 private:
+    uint32_t id_;
+    static uint32_t nextId;
+    VmaAllocator allocator;
+};
+
+class LightsManager
+{
+public:
+    LightsManager(const vk::Device &device, const VmaAllocator &allocator)
+        : device{device}
+        , allocator{allocator}
+    {}
+
+    void run();
+
+    std::vector<Light> lights;
+    std::vector<Buffer> lightBuffers;
+
+private:
     const vk::Device &device;
     const VmaAllocator &allocator;
+
+    uint32_t nextId{0};
 };

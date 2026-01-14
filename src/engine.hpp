@@ -27,6 +27,7 @@ private:
     void update_imgui();
 
     // Inform to the shaders about the resources
+    std::unique_ptr<DescriptorUpdater> descUpdater;
     void update_descriptors();
 
     // draw loop
@@ -51,4 +52,7 @@ private:
 
     // RT push constants
     RayPush rayPush{};
+
+    // Lights manager
+    std::unique_ptr<LightsManager> lightsManager;
 };

@@ -98,4 +98,8 @@ vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
 
 } // namespace init
 
+namespace imgui {
+void InputFloat3(const char *label, float v[3], float step = 0.1f);
+}
+
 } // namespace utils

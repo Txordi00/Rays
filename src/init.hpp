@@ -88,7 +88,7 @@ public:
     std::shared_ptr<GLTFObj> scene;
 
     // Lights
-    std::vector<Light> lights;
+    // std::vector<Light> lights;
 
     bool isInitialized{false};
 
@@ -110,7 +110,7 @@ private:
     void init_imgui();
     void load_meshes();
     void load_background();
-    void create_lights();
+    // void create_lights();
     void create_as();
 
     void destroy_swapchain();
