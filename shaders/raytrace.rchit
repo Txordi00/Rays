@@ -188,7 +188,7 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
 
     // Start sampling
     vec3 indirectLuminance = vec3(0.);
-    const uint samplesPerStrategy = BOUNCES; // Split samples between hemisphere and microfacet ggx sampling
+    const uint samplesPerStrategy = BOUNCES / 2; // Split samples between hemisphere and microfacet ggx sampling
     uint samples = BOUNCES;
 
     // Sample hemisphere
@@ -211,9 +211,9 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
         const float pdf_specular = pdf_microfacet_ggx_specular(NoH, a * a, VoH);
 
         // Balance heuristic MIS weight
-        // const float weight = (pdf_diffuse * pdf_diffuse) /
-        //         (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
-        const float weight = 1.;
+        const float weight = (pdf_diffuse * pdf_diffuse) /
+                (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
+        // const float weight = 1.;
 
         const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
                 diffuseColor, f0, f90, a);
@@ -237,52 +237,52 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
     }
 
     // Sample microfacet GGX specular
-    // for (uint s = 0; s < samplesPerStrategy; s++)
-    // {
-    //     vec2 u = (RANDOM) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
-    //     // vec2 u = vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState));
-    //     // u = min(round(u * 100.) / 100., 0.99);
-    //     // float aa = min(round(a * 100.) / 100., 0.99);
-    //     vec3 l, h;
-    //     float pdf_specular, NoL, VoH;
-    //     (PRESAMPLE) ? sample_microfacet_ggx_specular_cached(S, v, u, a, l, h, NoL, VoH, pdf_specular) :
-    //     sample_microfacet_ggx_specular(S, v, u, a, l, h, NoL, VoH, pdf_specular);
+    for (uint s = 0; s < samplesPerStrategy; s++)
+    {
+        vec2 u = (RANDOM) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
+        // vec2 u = vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState));
+        // u = min(round(u * 100.) / 100., 0.99);
+        // float aa = min(round(a * 100.) / 100., 0.99);
+        vec3 l, h;
+        float pdf_specular, NoL, VoH;
+        (PRESAMPLE) ? sample_microfacet_ggx_specular_cached(S, v, u, a, l, h, NoL, VoH, pdf_specular) :
+        sample_microfacet_ggx_specular(S, v, u, a, l, h, NoL, VoH, pdf_specular);
 
-    //     if (pdf_specular < 1e-5) {
-    //         samples--;
-    //         continue;
-    //     }
-    //     const float pdf_diffuse = pdf_cosine_sample_hemisphere(NoL);
+        if (pdf_specular < 1e-5) {
+            samples--;
+            continue;
+        }
+        const float pdf_diffuse = pdf_cosine_sample_hemisphere(NoL);
 
-    //     // const vec3 h = normalize(l + v);
-    //     const float NoH = dot(normal, h);
-    //     const float LoH = dot(l, h);
+        // const vec3 h = normalize(l + v);
+        const float NoH = dot(normal, h);
+        const float LoH = dot(l, h);
 
-    //     // Balance heuristic MIS weight
-    //     const float weight = (pdf_specular * pdf_specular) /
-    //             (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
-    //     // const float weight = 1.;
+        // Balance heuristic MIS weight
+        const float weight = (pdf_specular * pdf_specular) /
+                (pdf_diffuse * pdf_diffuse + pdf_specular * pdf_specular);
+        // const float weight = 1.;
 
-    //     const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
-    //             diffuseColor, f0, f90, a);
+        const vec3 BSDF = BSDF(NoH, LoH, NoV, NoL,
+                diffuseColor, f0, f90, a);
 
-    //     recursivePayload.hitValue = vec3(0.);
-    //     recursivePayload.depth = rayPayload.depth;
-    //     traceRayEXT(topLevelAS, // acceleration structure
-    //         gl_IncomingRayFlagsEXT, // rayFlags
-    //         0xFF, // cullMask
-    //         0, // sbtRecordOffset
-    //         0, // sbtRecordStride
-    //         0, // missIndex
-    //         worldPos, // ray origin
-    //         tMin, // ray min range
-    //         l, // ray direction
-    //         tMax, // ray max range
-    //         1 // payload
-    //     );
-    //     // Accumulate indirect lighting
-    //     indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_specular;
-    // }
+        recursivePayload.hitValue = vec3(0.);
+        recursivePayload.depth = rayPayload.depth;
+        traceRayEXT(topLevelAS, // acceleration structure
+            gl_IncomingRayFlagsEXT, // rayFlags
+            0xFF, // cullMask
+            0, // sbtRecordOffset
+            0, // sbtRecordStride
+            0, // missIndex
+            worldPos, // ray origin
+            tMin, // ray min range
+            l, // ray direction
+            tMax, // ray max range
+            1 // payload
+        );
+        // Accumulate indirect lighting
+        indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_specular;
+    }
 
     indirectLuminance /= float(BOUNCES);
     return indirectLuminance;
@@ -415,8 +415,8 @@ void main()
     const vec3 indirectLuminance = indirect_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
 
     // DIRECT LIGHTING
-    // const vec3 directLuminance = direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
-    const vec3 directLuminance = vec3(0.);
+    const vec3 directLuminance = direct_lighting(worldPos, normal, v, diffuseColor, f0, f90, a, NoV);
+    // const vec3 directLuminance = vec3(0.);
 
     rayPayload.hitValue = directLuminance + indirectLuminance;
     // rayPayload.hitValue = baseColor.xyz;

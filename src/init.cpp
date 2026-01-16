@@ -148,6 +148,7 @@ void Init::init_vulkan()
     features12.descriptorBindingStorageBufferUpdateAfterBind = vk::True;
     features12.descriptorBindingStorageImageUpdateAfterBind = vk::True;
     features12.descriptorBindingSampledImageUpdateAfterBind = vk::True;
+    features12.descriptorBindingUpdateUnusedWhilePending = vk::True;
     features12.shaderSampledImageArrayNonUniformIndexing = vk::True;
     features12.shaderUniformBufferArrayNonUniformIndexing = vk::True;
     features12.shaderStorageBufferArrayNonUniformIndexing = vk::True;
@@ -588,11 +589,11 @@ void Init::load_meshes()
                 .value();
     std::println("Asset loaded");
 
-    glm::mat4 S = glm::scale(1.f * glm::vec3(1.f));
+    // glm::mat4 S = glm::scale(1.f * glm::vec3(1.f));
     glm::mat4 R = glm::rotate(glm::pi<float>(), glm::vec3(0.f, 0.f, 1.f));
     // glm::mat4 T = glm::translate(glm::vec3(0.f, 2.f, 20.f));
     for (const auto &n : scene->topNodes)
-        n->refreshTransform(R * S);
+        n->refreshTransform(R);
 }
 
 void Init::load_background()

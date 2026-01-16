@@ -59,16 +59,24 @@ vk::DescriptorSetLayout DescHelper::create_descriptor_set_layout()
 
     std::vector<vk::DescriptorBindingFlags>
         bindlessBindingFlags{bindings.size(),
-                             vk::DescriptorBindingFlags{
-                                 vk::DescriptorBindingFlagBits::ePartiallyBound
-                                 | vk::DescriptorBindingFlagBits::eUpdateAfterBind}};
+                             vk::DescriptorBindingFlagBits::ePartiallyBound
+                                 | vk::DescriptorBindingFlagBits::eUpdateAfterBind};
     vk::DescriptorSetLayoutBindingFlagsCreateInfo bindlessBindingFlagsInfo{};
     bindlessBindingFlagsInfo.setBindingFlags(bindlessBindingFlags);
+
+    // std::vector<vk::DescriptorBindingFlags>
+    //     boundBindingFlags{bindings.size(), vk::DescriptorBindingFlagBits::eUpdateUnusedWhilePending};
+    // vk::DescriptorSetLayoutBindingFlagsCreateInfo boundBindingFlagsInfo{};
+    // boundBindingFlagsInfo.setBindingFlags(boundBindingFlags);
+
     if (updateAfterBind) {
         descriptorSetLayoutInfo.setFlags(
             vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool);
         descriptorSetLayoutInfo.setPNext(&bindlessBindingFlagsInfo);
     }
+    // else {
+    //     descriptorSetLayoutInfo.setPNext(&boundBindingFlagsInfo);
+    // }
 
     return device.createDescriptorSetLayout(descriptorSetLayoutInfo);
 }
@@ -272,7 +280,7 @@ void DescriptorUpdater::update()
         descriptorWrites.emplace_back(tlasWrite);
     }
     device.updateDescriptorSets(descriptorWrites, nullptr);
-    clean();
+    // clean();
 }
 
 void DescriptorUpdater::clean()
@@ -281,6 +289,7 @@ void DescriptorUpdater::clean()
     storageInfos = {};
     imageStorageInfos = {};
     imageSampledInfos = {};
+    combinedImageInfos = {};
     samplerInfos = {};
     tlasWritesKHR = {};
     descriptorCount = 0;

@@ -1,6 +1,9 @@
 #include "lights.hpp"
 #include "imgui.h"
 #include "utils.hpp"
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/norm.hpp>
+#include <print>
 
 uint32_t Light::nextId = 0;
 
@@ -35,9 +38,12 @@ void Light::destroy()
 
 void LightsManager::run()
 {
+    static std::vector<float> positionOrDirection = {0.f, 0.f, 0.f};
+
     ImGui::Begin("Lights Manager");
 
-    if (ImGui::Button("Add Light")) {
+    if (ImGui::Button("Add Light") && lights.size() < static_cast<size_t>(MAX_LIGHTS)) {
+        positionOrDirection = {0.f, 0.f, 0.f};
         Light light{};
         light.upload(device, allocator);
         lights.push_back(light);
@@ -55,20 +61,30 @@ void LightsManager::run()
         const std::string header = "Light " + std::to_string(i);
         if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::Indent();
+            bool update{false}, resetPositionOrDirection{false};
 
-            ImGui::RadioButton("Point light", (int *) &lights[i].lightData.type, LightType::ePoint);
+            update = update
+                     || ImGui::RadioButton("Point light",
+                                           (int *) &lights[i].lightData.type,
+                                           LightType::ePoint);
             ImGui::SameLine();
-            ImGui::RadioButton("Directional light",
-                               (int *) &lights[i].lightData.type,
-                               LightType::eDirectional);
+            update = update
+                     || ImGui::RadioButton("Directional light",
+                                           (int *) &lights[i].lightData.type,
+                                           LightType::eDirectional);
+            resetPositionOrDirection = update;
 
-            bool update{false};
             update = update
                      || ImGui::DragFloat3("Position/Direction",
-                                          (float *) &lights[i].lightData.positionOrDirection,
+                                          positionOrDirection.data(),
                                           0.1f,
                                           0.f,
                                           0.f);
+            const glm::vec3 posDirTmp = glm::make_vec3(positionOrDirection.data());
+            lights[i].lightData.positionOrDirection = (lights[i].lightData.type == LightType::ePoint
+                                                       || glm::length2(posDirTmp) == 0.f)
+                                                          ? posDirTmp
+                                                          : glm::normalize(posDirTmp);
             update = update || ImGui::ColorEdit3("Color", (float *) &lights[i].lightData.color);
             update = update
                      || ImGui::InputFloat("Intensity",
@@ -81,8 +97,18 @@ void LightsManager::run()
             if (ImGui::Button("Remove"))
                 lightToRemove = i;
 
-            if (update)
+            if (resetPositionOrDirection) {
+                Light::LightData defaultLightData{};
+                lights[i].lightData.positionOrDirection = defaultLightData.positionOrDirection;
+                lights[i].lightData.intensity = defaultLightData.intensity;
+                positionOrDirection
+                    = std::vector<float>(glm::value_ptr(defaultLightData.positionOrDirection),
+                                         glm::value_ptr(defaultLightData.positionOrDirection) + 3);
+            }
+            if (update) {
                 lights[i].update();
+                // std::println("Update light {}", i);
+            }
 
             ImGui::Unindent();
             ImGui::Spacing();

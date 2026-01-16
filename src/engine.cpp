@@ -27,11 +27,10 @@ Engine::Engine()
 
 Engine::~Engine()
 {
-    I->clean();
-
     // Destroy all the remaining lights
     for (Light &l : lightsManager->lights)
         l.destroy();
+    I->clean();
 }
 
 void Engine::run()
@@ -101,7 +100,7 @@ void Engine::update_imgui()
         envMap{static_cast<bool>(constantsMiss.envMap)}, dirLightOn{false};
     static int recursionDepth = constantsCH.recursionDepth, numBounces = constantsCH.numBounces;
     static float scale{1.f}, xRot{0.f}, yRot{0.f}, zRot{0.f};
-    static size_t lightsCount{0};
+    // static size_t lightsCount{0};
 
     // imgui new frame
     ImGui_ImplVulkan_NewFrame();
@@ -170,15 +169,23 @@ void Engine::update_imgui()
     }
 
     lightsManager->run();
-    const size_t newLightsCount = lightsManager->lightBuffers.size();
-    if (newLightsCount - lightsCount != 0) {
-        lightsCount = newLightsCount;
-        for (const auto &f : I->frames) {
-            rayPush.nLights = static_cast<uint32_t>(newLightsCount);
-            descUpdater->add_uniform(f.descriptorSetUAB, 3, lightsManager->lightBuffers);
-            descUpdater->update();
-        }
+    assert(lightsManager->lightBuffers.size() == lightsManager->lights.size());
+    bool updateDescriptors = false;
+    for (auto &f : I->frames) {
+        updateDescriptors = updateDescriptors || (f.lightsCount != lightsManager->lights.size());
+        f.lightsCount = lightsManager->lights.size();
     }
+    // if (updateDescriptors)
+    //     std::println("updateDescriptors {}", updateDescriptors);
+    if (updateDescriptors && lightsManager->lightBuffers.size() > 0) {
+        descUpdater->clean();
+        for (const auto &f : I->frames) {
+            descUpdater->add_uniform(f.descriptorSetUAB, 3, lightsManager->lightBuffers);
+        }
+        descUpdater->update();
+    }
+
+    rayPush.nLights = static_cast<uint32_t>(lightsManager->lights.size());
 
     ImGui::ShowMetricsWindow();
 
@@ -190,18 +197,10 @@ void Engine::update_imgui()
 
 void Engine::update_descriptors()
 {
-    // Create vector of buffers in an efficient way
-    // uniformBuffers.reserve(I->models.size());
-    // std::ranges::transform(I->models,
-    //                        std::back_inserter(uniformBuffers),
-    //                        [](const std::shared_ptr<Model> &m) { return m->uniformBuffer; });
-
+    descUpdater->clean();
     // Set all the resource descriptors at once. We don't need to update again if we don't change any
     // resources
-    vk::AccelerationStructureKHR tlas = I->tlas.as.AS;
-    std::vector<Buffer> cameraBuffer = {I->camera.cameraBuffer};
-    std::vector<Buffer> surfaceBuffers = I->scene->surfaceUniformBuffers;
-    const bool withTextures = I->scene->samplers.size() > 0 && I->scene->images.size() > 0;
+    const static bool withTextures = I->scene->samplers.size() > 0 && I->scene->images.size() > 0;
     // std::vector<Buffer> lightBuffers;
     // lightBuffers.reserve(lights);
     // for (const auto &l : I->lights)
@@ -209,19 +208,19 @@ void Engine::update_descriptors()
 
     for (const auto &frame : I->frames) {
         // Inform the shaders about all the different descriptors
-        vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
-        vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
+        const vk::DescriptorSet descriptorSetUAB = frame.descriptorSetUAB;
+        const vk::DescriptorSet descriptorSetRt = frame.descriptorSetRt;
 
-        descUpdater->add_uniform(descriptorSetUAB, 0, surfaceBuffers);
+        descUpdater->add_uniform(descriptorSetUAB, 0, I->scene->surfaceUniformBuffers);
         if (withTextures) {
             descUpdater->add_sampler(descriptorSetUAB, 1, I->scene->samplers);
             descUpdater->add_sampled_image(descriptorSetUAB, 2, I->scene->images);
         }
-        // if (lightBuffers.size() > 0)
-        //     descUpdater->add_uniform(descriptorSetUAB, 3, lightBuffers);
-        descUpdater->add_as(descriptorSetRt, 0, tlas);
+        if (lightsManager->lightBuffers.size() > 0)
+            descUpdater->add_uniform(descriptorSetUAB, 3, lightsManager->lightBuffers);
+        descUpdater->add_as(descriptorSetRt, 0, I->tlas.as.AS);
         descUpdater->add_storage_image(descriptorSetRt, 1, {frame.imageDraw});
-        descUpdater->add_uniform(descriptorSetRt, 2, cameraBuffer);
+        descUpdater->add_uniform(descriptorSetRt, 2, {I->camera.cameraBuffer});
         descUpdater->add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
         descUpdater->add_combined_image(descriptorSetRt, 4, {I->presampler->ggxImage});
         descUpdater->add_combined_image(descriptorSetRt, 5, {I->backgroundImage});
@@ -242,6 +241,15 @@ void Engine::draw()
         return;
     }
     I->device.resetFences(frameFence);
+
+    // Update light uniform descriptors
+    // if (lightsManager->lightBuffers.size() != get_current_frame().lightsCount) {
+    //     get_current_frame().lightsCount = lightsManager->lightBuffers.size();
+    //     descUpdater->add_uniform(get_current_frame().descriptorSetUAB,
+    //                              3,
+    //                              lightsManager->lightBuffers);
+    //     descUpdater->update();
+    // }
 
     // Request image from the swapchain
     vk::AcquireNextImageInfoKHR acquireImageInfo{};
@@ -264,6 +272,8 @@ void Engine::draw()
     // Thanks to the fence, we are sure now (NOT ANYMORE!?)
     // that we can safely reset cmd and start recording again.
     cmd.reset();
+
+    // update_descriptors();
 
     // Record the next set of commands
     vk::CommandBufferBeginInfo commandBufferBeginInfo{};
@@ -358,90 +368,6 @@ void Engine::draw()
 
     frameNumber = (frameNumber + 1) % I->frameOverlap;
 }
-
-// void Engine::raster(const vk::CommandBuffer &cmd)
-// {
-//     ImageData imageDraw = get_current_frame().imageDraw;
-//     ImageData imageDepth = get_current_frame().imageDepth;
-
-//     vk::RenderingAttachmentInfo colorAttachmentInfo{};
-//     colorAttachmentInfo.setImageView(imageDraw.imageView);
-//     colorAttachmentInfo.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-//     colorAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eLoad);
-//     colorAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
-
-//     vk::RenderingAttachmentInfo depthAttachmentInfo{};
-//     depthAttachmentInfo.setImageView(imageDepth.imageView);
-//     depthAttachmentInfo.setImageLayout(vk::ImageLayout::eDepthAttachmentOptimal);
-//     depthAttachmentInfo.setLoadOp(vk::AttachmentLoadOp::eClear);
-//     depthAttachmentInfo.setStoreOp(vk::AttachmentStoreOp::eStore);
-//     depthAttachmentInfo.setClearValue(vk::ClearValue{vk::ClearDepthStencilValue{1.f}});
-
-//     vk::RenderingInfo renderInfo{};
-//     renderInfo.setColorAttachments(colorAttachmentInfo);
-//     renderInfo.setPDepthAttachment(&depthAttachmentInfo);
-//     renderInfo.setLayerCount(1);
-//     renderInfo.setRenderArea(vk::Rect2D{vk::Offset2D{0, 0}, I->swapchainExtent});
-
-//     //set dynamic viewport and scissor
-//     vk::Viewport viewport{};
-//     viewport.setX(0.f);
-//     viewport.setY(0.f);
-//     viewport.setWidth(I->swapchainExtent.width);
-//     viewport.setHeight(I->swapchainExtent.height);
-//     viewport.setMinDepth(0.f);
-//     viewport.setMaxDepth(1.f);
-
-//     vk::Rect2D scissor{};
-//     scissor.setExtent(vk::Extent2D{I->swapchainExtent.width, I->swapchainExtent.height});
-//     scissor.setOffset(vk::Offset2D{0, 0});
-
-//     try {
-//         cmd.beginRendering(renderInfo);
-//         cmd.setViewport(0, viewport);
-//         cmd.setScissor(0, scissor);
-
-//         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, I->simpleMeshGraphicsPipeline.pipeline);
-
-//         vk::DescriptorSet descriptorSet = get_current_frame().descriptorSetUAB;
-
-//         vk::BindDescriptorSetsInfo descSetsInfo{};
-//         descSetsInfo.setDescriptorSets(descriptorSet);
-//         descSetsInfo.setStageFlags(vk::ShaderStageFlagBits::eVertex);
-//         descSetsInfo.setLayout(I->simpleMeshGraphicsPipeline.pipelineLayout);
-//         cmd.bindDescriptorSets2(descSetsInfo);
-
-//         I->camera.update();
-
-//         for (int objId = 0; objId < I->models.size(); objId++) {
-//             glm::mat4 mvpMatrix = I->camera.projMatrix * I->camera.viewMatrix
-//                                   * I->models[objId]->modelMatrix;
-
-//             UniformData uboData;
-//             uboData.worldMatrix = mvpMatrix;
-
-//             utils::copy_to_buffer(I->models[objId]->uniformBuffer, I->allocator, &uboData);
-//         }
-
-//         for (int objId = 0; objId < I->models.size(); objId++) {
-//             MeshPush pushConstants;
-//             pushConstants.objId = objId;
-//             cmd.pushConstants(I->simpleMeshGraphicsPipeline.pipelineLayout,
-//                               vk::ShaderStageFlagBits::eVertex,
-//                               0,
-//                               sizeof(MeshPush),
-//                               &pushConstants);
-
-//             cmd.draw(I->models[objId]->surfaces[0].count,
-//                      1,
-//                      I->models[objId]->surfaces[0].startIndex,
-//                      0);
-//         }
-//         cmd.endRendering();
-//     } catch (const std::exception &e) {
-//         VK_CHECK_EXC(e);
-//     }
-// }
 
 void Engine::raytrace(const vk::CommandBuffer &cmd)
 {

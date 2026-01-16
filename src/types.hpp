@@ -84,6 +84,7 @@ struct FrameData
     vk::DescriptorSet descriptorSetRt;
     ImageData imageDraw;
     ImageData imageDepth;
+    size_t lightsCount{0};
 };
 
 struct Buffer
