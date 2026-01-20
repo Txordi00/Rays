@@ -100,34 +100,50 @@ void Engine::update_imgui()
         envMap{static_cast<bool>(constantsMiss.envMap)}, dirLightOn{false};
     static int recursionDepth = constantsCH.recursionDepth, numBounces = constantsCH.numBounces;
     static float scale{1.f}, xRot{0.f}, yRot{0.f}, zRot{0.f};
-    // static size_t lightsCount{0};
 
     // imgui new frame
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
+    const float framerate = ImGui::GetIO().DeltaTime * 1000.f, fps = 1000.0f / framerate;
+
+    ImGuiViewport *viewport = ImGui::GetMainViewport();
+    ImVec2 workPos = viewport->WorkPos;
+    ImVec2 workSize = viewport->WorkSize;
+    ImVec2 windowPos = ImVec2(workPos.x + workSize.x - 10, workPos.y + 10);
+
+    ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.35f);
+
+    static constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration
+                                              | ImGuiWindowFlags_AlwaysAutoResize
+                                              | ImGuiWindowFlags_NoSavedSettings
+                                              | ImGuiWindowFlags_NoFocusOnAppearing
+                                              | ImGuiWindowFlags_NoNav;
+
+    if (ImGui::Begin("Performance", nullptr, flags)) {
+        ImGui::Text("%.1f FPS", fps);
+        ImGui::Text("%.2f ms", framerate);
+    }
+    ImGui::End();
+
     ImGui::Begin("Controls");
 
-    // Alternative: Color picker without label
     ImGui::ColorEdit3("Background color", (float *) &rayPush.clearColor);
 
     ImGui::Separator();
 
-    // Checkbox for boolean toggle
     ImGui::Checkbox("EnvMap", &envMap);
     ImGui::Checkbox("Random", &random);
     ImGui::Checkbox("Presample", &presample);
 
-    // Integer control with +/- buttons
     ImGui::InputInt("Maximum recursion depth", &recursionDepth, 1, 1);
     recursionDepth = std::max(recursionDepth, 1);
     ImGui::InputInt("Bounces", &numBounces, 2, 4);
     numBounces = std::max(numBounces, 2);
 
-    // Apply button
     if (ImGui::Button("Apply Changes")) {
-        // Your action code here
         constantsCH.recursionDepth = static_cast<uint32_t>(recursionDepth);
         constantsCH.numBounces = static_cast<uint32_t>(numBounces);
         constantsCH.random = static_cast<vk::Bool32>(random);
@@ -175,8 +191,6 @@ void Engine::update_imgui()
         updateDescriptors = updateDescriptors || (f.lightsCount != lightsManager->lights.size());
         f.lightsCount = lightsManager->lights.size();
     }
-    // if (updateDescriptors)
-    //     std::println("updateDescriptors {}", updateDescriptors);
     if (updateDescriptors && lightsManager->lightBuffers.size() > 0) {
         descUpdater->clean();
         for (const auto &f : I->frames) {
@@ -187,11 +201,8 @@ void Engine::update_imgui()
 
     rayPush.nLights = static_cast<uint32_t>(lightsManager->lights.size());
 
-    ImGui::ShowMetricsWindow();
-
     ImGui::End();
 
-    //make imgui calculate internal draw structures
     ImGui::Render();
 }
 

@@ -25,8 +25,12 @@ void Light::upload(const vk::Device &device, const VmaAllocator &allocator)
 
 void Light::update()
 {
+    LightData uploadData{lightData};
     assert(ubo.buffer && allocator);
-    utils::copy_to_buffer(ubo, allocator, &lightData);
+    if (lightData.type == LightType::eDirectional
+        && glm::length2(lightData.positionOrDirection) > 0.f)
+        uploadData.positionOrDirection = glm::normalize(lightData.positionOrDirection);
+    utils::copy_to_buffer(ubo, allocator, &uploadData);
 }
 
 void Light::destroy()
@@ -38,12 +42,10 @@ void Light::destroy()
 
 void LightsManager::run()
 {
-    static std::vector<float> positionOrDirection = {0.f, 0.f, 0.f};
-
     ImGui::Begin("Lights Manager");
 
     if (ImGui::Button("Add Light") && lights.size() < static_cast<size_t>(MAX_LIGHTS)) {
-        positionOrDirection = {0.f, 0.f, 0.f};
+        // positionOrDirection = {0.f, 0.f, 0.f};
         Light light{};
         light.upload(device, allocator);
         lights.push_back(light);
@@ -76,15 +78,10 @@ void LightsManager::run()
 
             update = update
                      || ImGui::DragFloat3("Position/Direction",
-                                          positionOrDirection.data(),
+                                          (float *) &lights[i].lightData.positionOrDirection,
                                           0.1f,
                                           0.f,
                                           0.f);
-            const glm::vec3 posDirTmp = glm::make_vec3(positionOrDirection.data());
-            lights[i].lightData.positionOrDirection = (lights[i].lightData.type == LightType::ePoint
-                                                       || glm::length2(posDirTmp) == 0.f)
-                                                          ? posDirTmp
-                                                          : glm::normalize(posDirTmp);
             update = update || ImGui::ColorEdit3("Color", (float *) &lights[i].lightData.color);
             update = update
                      || ImGui::InputFloat("Intensity",
@@ -101,9 +98,6 @@ void LightsManager::run()
                 Light::LightData defaultLightData{};
                 lights[i].lightData.positionOrDirection = defaultLightData.positionOrDirection;
                 lights[i].lightData.intensity = defaultLightData.intensity;
-                positionOrDirection
-                    = std::vector<float>(glm::value_ptr(defaultLightData.positionOrDirection),
-                                         glm::value_ptr(defaultLightData.positionOrDirection) + 3);
             }
             if (update) {
                 lights[i].update();
