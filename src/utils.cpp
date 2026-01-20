@@ -1,5 +1,4 @@
 #include "utils.hpp"
-#include "imgui.h"
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -429,16 +428,38 @@ void destroy_image(const vk::Device &device, const VmaAllocator &allocator, cons
         device.destroySampler(image.sampler);
 }
 
-void imgui::InputFloat3(const char *label, float v[], float step)
+std::filesystem::path load_file_from_window(const std::vector<nfdu8filteritem_t> &filters)
 {
-    const char *components[] = {"X", "Y", "Z"};
-    for (int i = 0; i < 3; ++i) {
-        ImGui::SetNextItemWidth(80.0f);
-        ImGui::InputFloat(components[i], &v[i], step, step * 5, "%.2f");
-        ImGui::SameLine();
+    NFD_Init();
+    nfdu8char_t *outPath;
+    nfdopendialogu8args_t args = {0};
+    args.filterList = filters.data();
+    args.filterCount = filters.size();
+    nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+    NFD_Quit();
+
+    if (result == NFD_OKAY) {
+        std::filesystem::path outPathStd = std::filesystem::path{outPath};
+        NFD_FreePathU8(outPath);
+        std::println("Loaded file from {}", outPathStd.c_str());
+        return outPathStd;
+    } else if (result == NFD_CANCEL) {
+        return std::filesystem::path{};
+    } else {
+        throw std::runtime_error(std::string("File picking error: ") + std::string(NFD_GetError()));
     }
-    ImGui::Text("%s", label);
 }
+
+// void imgui::InputFloat3(const char *label, float v[], float step)
+// {
+//     const char *components[] = {"X", "Y", "Z"};
+//     for (int i = 0; i < 3; ++i) {
+//         ImGui::SetNextItemWidth(80.0f);
+//         ImGui::InputFloat(components[i], &v[i], step, step * 5, "%.2f");
+//         ImGui::SameLine();
+//     }
+//     ImGui::Text("%s", label);
+// }
 
 // namespace init
 

@@ -95,6 +95,10 @@ public:
     void rebuid_rt_pipeline(const SpecializationConstantsClosestHit &constantsCH,
                             const SpecializationConstantsMiss &constantsMiss);
 
+    void load_background(const std::filesystem::path &imPath = std::filesystem::path(
+                             std::string(PROJECT_DIR)
+                             + std::string("/assets/rogland_clear_night_4k.hdr")));
+
 private:
     // Initialization calls
     void init_vulkan();
@@ -109,7 +113,6 @@ private:
     void create_sbt();
     void init_imgui();
     void load_meshes();
-    void load_background();
     // void create_lights();
     void create_as();
 

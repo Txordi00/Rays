@@ -596,12 +596,10 @@ void Init::load_meshes()
         n->refreshTransform(R);
 }
 
-void Init::load_background()
+void Init::load_background(const std::filesystem::path &imPath)
 {
     int w, h, c;
-    const std::filesystem::path fsPath{
-        "/home/jordi/Documents/lrt/assets/rogland_clear_night_4k.hdr"};
-    stbi_uc *imData = stbi_load(fsPath.c_str(), &w, &h, &c, 4);
+    stbi_uc *imData = stbi_load(imPath.c_str(), &w, &h, &c, 4);
     vk::Extent3D imSize{};
     imSize.setWidth(w);
     imSize.setHeight(h);
@@ -617,6 +615,7 @@ void Init::load_background()
                                           imSize,
                                           imData);
 
+    // if (!backgroundImage.sampler) {
     vk::SamplerCreateInfo samplerCreate{};
     samplerCreate.setMaxLod(vk::LodClampNone);
     samplerCreate.setMinLod(0.f);
@@ -624,6 +623,7 @@ void Init::load_background()
     samplerCreate.setMinFilter(vk::Filter::eLinear);
     samplerCreate.setMipmapMode(vk::SamplerMipmapMode::eLinear);
     backgroundImage.sampler = device.createSampler(samplerCreate);
+    // }
 
     stbi_image_free(imData);
 }

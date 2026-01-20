@@ -100,6 +100,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(stb)
 
+# nativefiledialog-extended
+FetchContent_Declare(
+    nfd
+    GIT_REPOSITORY "https://github.com/btzy/nativefiledialog-extended.git"
+    GIT_TAG "v1.3.0"
+)
+FetchContent_MakeAvailable(nfd)
+
+
 # Add all folders with code (with or without their own CMakeLists.txt)
 add_executable(${PROJECT_NAME} "src/main.cpp")
 add_subdirectory("src")
@@ -112,6 +121,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE vk-bootstrap::vk-bootstrap)
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE fastgltf::fastgltf)
+target_link_libraries(${PROJECT_NAME} PRIVATE nfd)
+
+# Compile definitions to be used from the C++ source files
+target_compile_definitions(${PROJECT_NAME} PRIVATE PROJECT_DIR="${PROJECT_SOURCE_DIR}")
+
 
 # Link either vulkan either the vulkan_hpp module
 if(USE_VULKANHPP_CPP20_MODULE)

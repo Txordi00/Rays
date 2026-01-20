@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+#include <nfd.h>
 #ifndef USE_CXX20_MODULES
 #include <vulkan/vulkan.hpp>
 #else
@@ -88,6 +90,8 @@ void copy_to_device_buffer(const Buffer &buffer,
                            const vk::DeviceSize size = vk::WholeSize,
                            const vk::DeviceSize offset = 0);
 
+std::filesystem::path load_file_from_window(const std::vector<nfdu8filteritem_t> &filters);
+
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
@@ -98,8 +102,8 @@ vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
 
 } // namespace init
 
-namespace imgui {
-void InputFloat3(const char *label, float v[3], float step = 0.1f);
-}
+// namespace imgui {
+// void InputFloat3(const char *label, float v[3], float step = 0.1f);
+// }
 
 } // namespace utils

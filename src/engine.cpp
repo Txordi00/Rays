@@ -100,6 +100,8 @@ void Engine::update_imgui()
         envMap{static_cast<bool>(constantsMiss.envMap)}, dirLightOn{false};
     static int recursionDepth = constantsCH.recursionDepth, numBounces = constantsCH.numBounces;
     static float scale{1.f}, xRot{0.f}, yRot{0.f}, zRot{0.f};
+    static std::filesystem::path imPath{std::string(PROJECT_DIR)
+                                        + std::string("/assets/rogland_clear_night_4k.hdr")};
 
     // imgui new frame
     ImGui_ImplVulkan_NewFrame();
@@ -135,6 +137,23 @@ void Engine::update_imgui()
     ImGui::Separator();
 
     ImGui::Checkbox("EnvMap", &envMap);
+    ImGui::SameLine();
+    if (ImGui::Button("Load from file")) {
+        const std::filesystem::path newImPath = utils::load_file_from_window({{"HDRI", "hdr"}});
+        I->device.waitIdle();
+        utils::destroy_image(I->device, I->allocator, I->backgroundImage);
+        I->load_background(newImPath);
+        descUpdater->clean();
+        for (const auto &f : I->frames) {
+            descUpdater->add_combined_image(f.descriptorSetRt, 5, {I->backgroundImage});
+        }
+        descUpdater->update();
+        imPath = newImPath;
+    }
+    if (envMap) {
+        ImGui::SameLine();
+        ImGui::Text("%s", imPath.c_str());
+    }
     ImGui::Checkbox("Random", &random);
     ImGui::Checkbox("Presample", &presample);
 
@@ -212,10 +231,6 @@ void Engine::update_descriptors()
     // Set all the resource descriptors at once. We don't need to update again if we don't change any
     // resources
     const static bool withTextures = I->scene->samplers.size() > 0 && I->scene->images.size() > 0;
-    // std::vector<Buffer> lightBuffers;
-    // lightBuffers.reserve(lights);
-    // for (const auto &l : I->lights)
-    //     lightBuffers.emplace_back(l.ubo);
 
     for (const auto &frame : I->frames) {
         // Inform the shaders about all the different descriptors
