@@ -20,15 +20,10 @@
 
 Init::Init()
 {
-    // We initialize SDL and create a window with it.
-    SDL_Init(SDL_INIT_VIDEO);
-
-    window = SDL_CreateWindow(PROJNAME, W, H, SDL_WINDOW_VULKAN);
-
+    init_sdl();
     init_vulkan();
-
     init_rt();
-    create_swapchain(W, H);
+    recreate_swapchain();
     create_camera();
     init_commands();
     init_sync_structures();
@@ -233,15 +228,30 @@ void Init::init_vulkan()
     vmaCreateAllocator(&allocatorInfo, &allocator);
 }
 
-void Init::create_swapchain(uint32_t width, uint32_t height)
+void Init::recreate_swapchain()
 {
+    // device.waitIdle();
+    // graphicsQueue.waitIdle();
+    // transferQueue.waitIdle();
+    // Get new window size
+    int w, h;
+    SDL_GetWindowSizeInPixels(window, &w, &h);
+
+    if (swapchain) {
+        for (const auto &sci : swapchainImages) {
+            device.destroyImageView(sci.imageView);
+        }
+        swapchainImages.clear();
+    }
+
     vkb::SwapchainBuilder swapchainBuilder(physicalDevice, device, surface);
 
     vkb::Swapchain vkbSwapchain
         = swapchainBuilder
               //use vsync present mode
               .set_desired_present_mode(static_cast<VkPresentModeKHR>(PRESENT_MODE))
-              .set_desired_extent(width, height)
+              .set_desired_extent(w, h)
+              .set_old_swapchain(swapchain)
               .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
               .set_desired_format(
                   VkSurfaceFormatKHR{.format = VK_FORMAT_B8G8R8A8_UNORM,
@@ -265,10 +275,10 @@ void Init::create_swapchain(uint32_t width, uint32_t height)
     }
 
     // Allocate the semaphores vector as well
-    swapchainSemaphores.resize(swapchainImagesC.size());
+    // swapchainSemaphores.resize(swapchainImagesC.size());
     // Select the number of frames that we are going to process per thread
     frameOverlap = FRAME_OVERLAP;
-    frames.resize(frameOverlap);
+    // frames.resize(frameOverlap);
 }
 
 void Init::create_draw_data()
@@ -283,7 +293,6 @@ void Init::create_draw_data()
                                                    | vk::ImageUsageFlagBits::eColorAttachment;
     constexpr vk::ImageUsageFlags depthUsageFlags = vk::ImageUsageFlagBits::eDepthStencilAttachment;
 
-    // Overkill format
     for (auto &f : frames) {
         f.imageDraw.format = vk::Format::eR32G32B32A32Sfloat;
         f.imageDraw.extent = drawExtent;
@@ -327,6 +336,8 @@ void Init::init_commands()
     vk::CommandPoolCreateInfo commandPoolCreateInfo{};
     commandPoolCreateInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
     commandPoolCreateInfo.setQueueFamilyIndex(graphicsQueueFamilyIndex);
+
+    frames.resize(frameOverlap);
     for (int i = 0; i < frameOverlap; i++) {
         // Create a command pool per thread
         frames[i].commandPool = device.createCommandPool(commandPoolCreateInfo);
@@ -361,6 +372,7 @@ void Init::init_sync_structures()
         frames[i].renderSemaphore = device.createSemaphore(semaphoreCreateInfo);
     }
     // gpu->gpu. will make the render commands wait until the swapchain requests the next image
+    swapchainSemaphores.resize(swapchainImages.size());
     for (int i = 0; i < swapchainSemaphores.size(); i++) {
         swapchainSemaphores[i] = device.createSemaphore(semaphoreCreateInfo);
     }
@@ -626,6 +638,14 @@ void Init::load_background(const std::filesystem::path &imPath)
     // }
 
     stbi_image_free(imData);
+}
+
+void Init::init_sdl()
+{
+    // We initialize SDL and create a window with it.
+    SDL_Init(SDL_INIT_VIDEO);
+
+    window = SDL_CreateWindow(PROJNAME, W, H, SDL_WINDOW_VULKAN);
 }
 
 // void Init::create_lights()

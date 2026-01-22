@@ -83,6 +83,9 @@ void Engine::run()
             ImGui_ImplSDL3_ProcessEvent(&e);
         }
 
+        if (recreateSwapchain)
+            recreate_swapchain();
+
         // Run the UI elements
         update_imgui();
 
@@ -131,6 +134,10 @@ void Engine::update_imgui()
     ImGui::End();
 
     ImGui::Begin("Controls");
+
+    if (ImGui::Button("Recreate sc")) {
+        recreateSwapchain = true;
+    }
 
     ImGui::ColorEdit3("Background color", (float *) &rayPush.clearColor);
 
@@ -261,22 +268,11 @@ void Engine::draw()
     ImageData imageDraw = get_current_frame().imageDraw;
 
     // Wait max 1s until the gpu finished rendering the last frame
-    vk::Result res = I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT);
-    if (res != vk::Result::eSuccess) {
+    vk::Result resFence = I->device.waitForFences(frameFence, vk::True, FENCE_TIMEOUT);
+    if (resFence != vk::Result::eSuccess) {
         std::println("Skipping frame");
         return;
     }
-    I->device.resetFences(frameFence);
-
-    // Update light uniform descriptors
-    // if (lightsManager->lightBuffers.size() != get_current_frame().lightsCount) {
-    //     get_current_frame().lightsCount = lightsManager->lightBuffers.size();
-    //     descUpdater->add_uniform(get_current_frame().descriptorSetUAB,
-    //                              3,
-    //                              lightsManager->lightBuffers);
-    //     descUpdater->update();
-    // }
-
     // Request image from the swapchain
     vk::AcquireNextImageInfoKHR acquireImageInfo{};
     acquireImageInfo.setSwapchain(I->swapchain);
@@ -286,7 +282,12 @@ void Engine::draw()
     acquireImageInfo.setDeviceMask(1); // First and only device in the group
 
     // std::cout << "acquire" << std::endl;
-    VK_CHECK_RES(I->device.acquireNextImage2KHR(&acquireImageInfo, &swapchainImageIndex));
+    vk::Result resAcquire = I->device.acquireNextImage2KHR(&acquireImageInfo, &swapchainImageIndex);
+    VK_CHECK_RES(resAcquire);
+    if (resAcquire == vk::Result::eErrorOutOfDateKHR)
+        return;
+
+    I->device.resetFences(frameFence);
 
     vk::Semaphore submitSemaphore = I->swapchainSemaphores[swapchainImageIndex];
 
@@ -298,8 +299,6 @@ void Engine::draw()
     // Thanks to the fence, we are sure now (NOT ANYMORE!?)
     // that we can safely reset cmd and start recording again.
     cmd.reset();
-
-    // update_descriptors();
 
     // Record the next set of commands
     vk::CommandBufferBeginInfo commandBufferBeginInfo{};
@@ -373,7 +372,7 @@ void Engine::draw()
     // submit command buffer to the queue and execute it.
     // BEFORE: frameFence will now block until the graphic commands finish execution
     // NOW: We pass over submit2 and will wait on present to finish during the next draw() execution
-    I->graphicsQueue.submit2(submitInfo, frameFence);
+    I->graphicsQueue.submit2(submitInfo, nullptr);
     // I->graphicsQueue.submit2(submitInfo, frameFence);
 
     // prepare present
@@ -381,16 +380,19 @@ void Engine::draw()
     // we want to wait on the submitSemaphore for that,
     // as its necessary that drawing commands have finished before the image is displayed to the user
     // We signal the frame fence in order for the next execution to know when it's safe to start
-    // vk::SwapchainPresentFenceInfoKHR swapchainPresentInfo{};
-    // swapchainPresentInfo.setFences(frameFence);
-    // swapchainPresentInfo.setSwapchainCount(1);
+    vk::SwapchainPresentFenceInfoKHR swapchainPresentInfo{};
+    swapchainPresentInfo.setFences(frameFence);
+    swapchainPresentInfo.setSwapchainCount(1);
     vk::PresentInfoKHR presentInfo{};
     presentInfo.setSwapchains(I->swapchain);
     presentInfo.setWaitSemaphores(submitSemaphore);
     presentInfo.setImageIndices(swapchainImageIndex);
-    // presentInfo.setPNext(&swapchainPresentInfo);
+    presentInfo.setPNext(&swapchainPresentInfo);
 
-    VK_CHECK_RES(I->graphicsQueue.presentKHR(presentInfo));
+    vk::Result resPresent = I->graphicsQueue.presentKHR(presentInfo);
+    VK_CHECK_RES(resPresent);
+    // if (resPresent == vk::Result::eErrorOutOfDateKHR)
+    //     recreateSwapchain = true;
 
     frameNumber = (frameNumber + 1) % I->frameOverlap;
 }
@@ -454,4 +456,14 @@ void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &image
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 
     cmd.endRendering();
+}
+
+void Engine::recreate_swapchain()
+{
+    I->device.waitIdle();
+    // I->graphicsQueue.waitIdle();
+    // I->transferQueue.waitIdle();
+    I->recreate_swapchain();
+    recreateSwapchain = false;
+    std::println("Swapchain recreated");
 }

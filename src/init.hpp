@@ -24,7 +24,7 @@ public:
     void clean();
 
     // First init() calls
-    void create_swapchain(uint32_t width, uint32_t height);
+    void recreate_swapchain();
 
     SDL_Window *window{nullptr};
     // Strucutres gotten at init time
@@ -101,6 +101,7 @@ public:
 
 private:
     // Initialization calls
+    void init_sdl();
     void init_vulkan();
     void init_rt();
     void presample();
