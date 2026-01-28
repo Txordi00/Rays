@@ -24,10 +24,10 @@ Init::Init()
     init_vulkan();
     init_rt();
     recreate_swapchain();
-    create_camera();
+    recreate_camera();
     init_commands();
     init_sync_structures();
-    create_draw_data();
+    recreate_draw_data();
     load_meshes();
     load_background();
     // create_lights();
@@ -92,9 +92,7 @@ void Init::clean()
             device.destroyFence(frames[i].renderFence);
             device.destroySemaphore(frames[i].renderSemaphore);
         }
-        for (const auto &sem : swapchainSemaphores)
-            device.destroySemaphore(sem);
-        destroy_swapchain();
+        utils::destroy_swapchain(device, swapchain, swapchainImages);
         instance.destroySurfaceKHR(surface);
         utils::destroy_image(device, allocator, backgroundImage);
         for (const auto &f : frames) {
@@ -230,19 +228,12 @@ void Init::init_vulkan()
 
 void Init::recreate_swapchain()
 {
-    // device.waitIdle();
-    // graphicsQueue.waitIdle();
-    // transferQueue.waitIdle();
     // Get new window size
     int w, h;
     SDL_GetWindowSizeInPixels(window, &w, &h);
 
-    if (swapchain) {
-        for (const auto &sci : swapchainImages) {
-            device.destroyImageView(sci.imageView);
-        }
-        swapchainImages.clear();
-    }
+    vk::SwapchainKHR oldSwapchain = swapchain;
+    std::vector<ImageData> oldSwapchainImages = swapchainImages;
 
     vkb::SwapchainBuilder swapchainBuilder(physicalDevice, device, surface);
 
@@ -275,13 +266,15 @@ void Init::recreate_swapchain()
     }
 
     // Allocate the semaphores vector as well
-    // swapchainSemaphores.resize(swapchainImagesC.size());
     // Select the number of frames that we are going to process per thread
     frameOverlap = FRAME_OVERLAP;
-    // frames.resize(frameOverlap);
+
+    // Destroy old swapchain
+    if (oldSwapchain)
+        utils::destroy_swapchain(device, oldSwapchain, oldSwapchainImages);
 }
 
-void Init::create_draw_data()
+void Init::recreate_draw_data()
 {
     // Same extent as the window
     vk::Extent3D drawExtent{swapchainExtent, 1};
@@ -297,6 +290,9 @@ void Init::create_draw_data()
         f.imageDraw.format = vk::Format::eR32G32B32A32Sfloat;
         f.imageDraw.extent = drawExtent;
 
+        if (f.imageDraw.image)
+            utils::destroy_image(device, allocator, f.imageDraw);
+
         f.imageDraw = utils::create_image(device,
                                           allocator,
                                           f.mainCommandBuffer,
@@ -305,6 +301,9 @@ void Init::create_draw_data()
                                           vk::Format::eR32G32B32A32Sfloat,
                                           drawUsageFlags,
                                           drawExtent);
+
+        if (f.imageDepth.image)
+            utils::destroy_image(device, allocator, f.imageDepth);
 
         f.imageDepth = utils::create_image(device,
                                            allocator,
@@ -317,18 +316,20 @@ void Init::create_draw_data()
     }
 }
 
-void Init::create_camera()
+void Init::recreate_camera()
 {
-    camera = Camera{};
     camera.setProjMatrix(FOV,
                          static_cast<float>(swapchainExtent.width),
                          static_cast<float>(swapchainExtent.height),
                          0.01f,
                          100.f);
-    camera.create_camera_buffer(device, allocator);
-    camera.backwards(3.f);
-    camera.up(1.f);
-    camera.lookAt(glm::vec3(0.f));
+    if (!camera.cameraBuffer.buffer) {
+        camera.create_camera_buffer(device, allocator);
+        camera.backwards(3.f);
+        camera.up(1.f);
+        camera.lookAt(glm::vec3(0.f));
+    }
+    camera.update();
 }
 
 void Init::init_commands()
@@ -370,11 +371,6 @@ void Init::init_sync_structures()
         frames[i].renderFence = device.createFence(fenceCreateInfo);
         // gpu->gpu. will control presenting the image to the OS once the drawing finishes
         frames[i].renderSemaphore = device.createSemaphore(semaphoreCreateInfo);
-    }
-    // gpu->gpu. will make the render commands wait until the swapchain requests the next image
-    swapchainSemaphores.resize(swapchainImages.size());
-    for (int i = 0; i < swapchainSemaphores.size(); i++) {
-        swapchainSemaphores[i] = device.createSemaphore(semaphoreCreateInfo);
     }
 
     transferFence = device.createFence(fenceCreateInfo);
@@ -645,34 +641,8 @@ void Init::init_sdl()
     // We initialize SDL and create a window with it.
     SDL_Init(SDL_INIT_VIDEO);
 
-    window = SDL_CreateWindow(PROJNAME, W, H, SDL_WINDOW_VULKAN);
+    window = SDL_CreateWindow(PROJNAME, W, H, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 }
-
-// void Init::create_lights()
-// {
-//     Light directionalLight{device, allocator};
-//     directionalLight.lightData.positionOrDirection = glm::normalize(glm::vec3(1.f, 1.f, 1.f));
-//     directionalLight.lightData.intensity = 1.f;
-//     directionalLight.lightData.type = LightType::eDirectional;
-//     directionalLight.upload();
-//     // const glm::vec3 c{0.f, 0.f, 20.f};
-//     // const float r = 5.f;
-//     // const float y = -5.f;
-//     // const uint32_t n = 0;
-//     // lights.reserve(n + 1);
-//     lights.push_back(directionalLight);
-//     // for (uint32_t i = 0; i < n; i++) {
-//     //     const float in = static_cast<float>(i) / static_cast<float>(n);
-//     //     const float x = r * cos(2.f * glm::pi<float>() * in);
-//     //     const float z = r * sin(2.f * glm::pi<float>() * in);
-//     //     Light pointLight{device, allocator};
-//     //     pointLight.lightData.positionOrDirection = c + glm::vec3(x, y, z);
-//     //     pointLight.lightData.intensity = 40.f;
-//     //     pointLight.lightData.type = LightType::ePoint;
-//     //     pointLight.upload();
-//     //     lights.emplace_back(pointLight);
-//     // }
-// }
 
 void Init::create_as()
 {
@@ -681,13 +651,4 @@ void Init::create_as()
                                             graphicsQueueFamilyIndex,
                                             asProperties);
     tlas = asBuilder->buildTLAS(scene);
-}
-
-void Init::destroy_swapchain()
-{
-    device.destroySwapchainKHR(swapchain);
-    for (const auto &sc : swapchainImages) {
-        device.destroyImageView(sc.imageView);
-    }
-    swapchainImages.clear();
 }

@@ -59,6 +59,10 @@ void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
 
 void destroy_image(const vk::Device &device, const VmaAllocator &allocator, const ImageData &image);
 
+void destroy_swapchain(const vk::Device &device,
+                       const vk::SwapchainKHR &swapchain,
+                       std::vector<ImageData> &swapchainImages);
+
 void copy_to_buffer(const Buffer &buffer,
                    const VmaAllocator &allocator,
                    const void *data,

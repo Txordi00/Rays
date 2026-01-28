@@ -23,8 +23,10 @@ public:
     // Shuts down the engine
     void clean();
 
-    // First init() calls
+    // Public init calls
     void recreate_swapchain();
+    void recreate_camera();
+    void recreate_draw_data();
 
     SDL_Window *window{nullptr};
     // Strucutres gotten at init time
@@ -52,10 +54,9 @@ public:
     vk::Format swapchainImageFormat;
     vk::Extent2D swapchainExtent;
     std::vector<ImageData> swapchainImages;
-    std::vector<vk::Semaphore> swapchainSemaphores;
 
     // Camera
-    Camera camera;
+    Camera camera{};
 
     // Вescriptors
     std::unique_ptr<DescHelper> descHelperUAB, descHelperRt;
@@ -105,8 +106,6 @@ private:
     void init_vulkan();
     void init_rt();
     void presample();
-    void create_draw_data();
-    void create_camera();
     void init_commands();
     void init_sync_structures();
     void init_descriptors();
@@ -117,7 +116,7 @@ private:
     // void create_lights();
     void create_as();
 
-    void destroy_swapchain();
+    // void destroy_swapchain();
 
     std::queue<vk::Pipeline> rtPipelineQueue;
     std::queue<Buffer> rtSBTBufferQueue;

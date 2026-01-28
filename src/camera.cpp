@@ -78,7 +78,7 @@ void Camera::update()
     if (cameraBuffer.buffer) {
         cameraData.origin = translation;
         cameraData.orientation = orientation;
-        // cameraData.projInverse = projInverse;
+        cameraData.projInverse = projInverse;
         cameraData.viewInverse = invView;
         utils::copy_to_buffer(cameraBuffer, allocator, &cameraData);
     }

@@ -450,6 +450,17 @@ std::filesystem::path load_file_from_window(const std::vector<nfdu8filteritem_t>
     }
 }
 
+void destroy_swapchain(const vk::Device &device,
+                       const vk::SwapchainKHR &swapchain,
+                       std::vector<ImageData> &swapchainImages)
+{
+    device.destroySwapchainKHR(swapchain);
+    for (const auto &sc : swapchainImages) {
+        device.destroyImageView(sc.imageView);
+    }
+    swapchainImages.clear();
+}
+
 // void imgui::InputFloat3(const char *label, float v[], float step)
 // {
 //     const char *components[] = {"X", "Y", "Z"};

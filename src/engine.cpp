@@ -56,6 +56,11 @@ void Engine::run()
                 quit = true;
                 break;
 
+            case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+            case SDL_EVENT_WINDOW_RESIZED:
+            case SDL_EVENT_WINDOW_MAXIMIZED:
+                shouldResize = true;
+
             case SDL_EVENT_KEY_DOWN:
                 // key = e.key.key;
                 if (keyStates[SDL_SCANCODE_W])
@@ -83,8 +88,8 @@ void Engine::run()
             ImGui_ImplSDL3_ProcessEvent(&e);
         }
 
-        if (recreateSwapchain)
-            recreate_swapchain();
+        if (shouldResize)
+            resize();
 
         // Run the UI elements
         update_imgui();
@@ -127,16 +132,15 @@ void Engine::update_imgui()
                                               | ImGuiWindowFlags_NoFocusOnAppearing
                                               | ImGuiWindowFlags_NoNav;
 
-    if (ImGui::Begin("Performance", nullptr, flags)) {
-        ImGui::Text("%.1f FPS", fps);
-        ImGui::Text("%.2f ms", framerate);
-    }
+    ImGui::Begin("Performance", nullptr, flags);
+    ImGui::Text("%.1f FPS", fps);
+    ImGui::Text("%.2f ms", framerate);
     ImGui::End();
 
     ImGui::Begin("Controls");
 
     if (ImGui::Button("Recreate sc")) {
-        recreateSwapchain = true;
+        shouldResize = true;
     }
 
     ImGui::ColorEdit3("Background color", (float *) &rayPush.clearColor);
@@ -257,8 +261,8 @@ void Engine::update_descriptors()
         descUpdater->add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
         descUpdater->add_combined_image(descriptorSetRt, 4, {I->presampler->ggxImage});
         descUpdater->add_combined_image(descriptorSetRt, 5, {I->backgroundImage});
-        descUpdater->update();
     }
+    descUpdater->update();
 }
 
 void Engine::draw()
@@ -284,12 +288,14 @@ void Engine::draw()
     // std::cout << "acquire" << std::endl;
     vk::Result resAcquire = I->device.acquireNextImage2KHR(&acquireImageInfo, &swapchainImageIndex);
     VK_CHECK_RES(resAcquire);
-    if (resAcquire == vk::Result::eErrorOutOfDateKHR)
+    if (resAcquire == vk::Result::eErrorOutOfDateKHR) {
+        shouldResize = true;
         return;
+    }
 
     I->device.resetFences(frameFence);
 
-    vk::Semaphore submitSemaphore = I->swapchainSemaphores[swapchainImageIndex];
+    vk::Semaphore submitSemaphore = acquireSemaphore; //I->swapchainSemaphores[swapchainImageIndex];
 
     vk::MemoryBarrier2 barrier{};
     vk::DependencyInfo depInfo{};
@@ -391,8 +397,8 @@ void Engine::draw()
 
     vk::Result resPresent = I->graphicsQueue.presentKHR(presentInfo);
     VK_CHECK_RES(resPresent);
-    // if (resPresent == vk::Result::eErrorOutOfDateKHR)
-    //     recreateSwapchain = true;
+    if (resPresent == vk::Result::eErrorOutOfDateKHR)
+        shouldResize = true;
 
     frameNumber = (frameNumber + 1) % I->frameOverlap;
 }
@@ -458,12 +464,21 @@ void Engine::draw_imgui(const vk::CommandBuffer &cmd, const vk::ImageView &image
     cmd.endRendering();
 }
 
-void Engine::recreate_swapchain()
+void Engine::resize()
 {
     I->device.waitIdle();
-    // I->graphicsQueue.waitIdle();
-    // I->transferQueue.waitIdle();
+
     I->recreate_swapchain();
-    recreateSwapchain = false;
-    std::println("Swapchain recreated");
+
+    I->recreate_draw_data();
+    descUpdater->clean();
+    for (const auto &f : I->frames)
+        descUpdater->add_storage_image(f.descriptorSetRt, 1, {f.imageDraw});
+    descUpdater->update();
+
+    I->recreate_camera();
+
+    std::println("Swapchain, draw data and camera recreated");
+
+    shouldResize = false;
 }
