@@ -41,15 +41,19 @@ void Engine::run()
     SDL_Event e;
     bool quit = false;
 
-    const float dx = 0.5f;
-    const float dt = glm::radians(2.f);
-
     int numKeys;
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);
 
     // Main loop
+    float dt, dx, dtheta;
+    uint64_t currentTime{0}, lastTime{0};
     while (!quit) {
-        // SDL_Keycode key = 0;
+        currentTime = SDL_GetTicks();
+        dt = static_cast<float>(currentTime - lastTime) / 1000.f;
+        lastTime = currentTime;
+        dx = std::min(5.f * dt, 0.2f);
+        dtheta = std::min(2.f * dt, glm::radians(4.f));
+
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
             case SDL_EVENT_QUIT:
@@ -57,8 +61,6 @@ void Engine::run()
                 break;
 
             case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-            case SDL_EVENT_WINDOW_RESIZED:
-            case SDL_EVENT_WINDOW_MAXIMIZED:
                 shouldResize = true;
 
             case SDL_EVENT_KEY_DOWN:
@@ -76,13 +78,13 @@ void Engine::run()
                 if (keyStates[SDL_SCANCODE_E])
                     I->camera.up(dx);
                 if (keyStates[SDL_SCANCODE_UP])
-                    I->camera.lookUp(dt);
+                    I->camera.lookUp(dtheta);
                 if (keyStates[SDL_SCANCODE_DOWN])
-                    I->camera.lookDown(dt);
+                    I->camera.lookDown(dtheta);
                 if (keyStates[SDL_SCANCODE_LEFT])
-                    I->camera.lookLeft(dt);
+                    I->camera.lookLeft(dtheta);
                 if (keyStates[SDL_SCANCODE_RIGHT])
-                    I->camera.lookRight(dt);
+                    I->camera.lookRight(dtheta);
             }
             //send SDL event to imgui for handling
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -138,10 +140,6 @@ void Engine::update_imgui()
     ImGui::End();
 
     ImGui::Begin("Controls");
-
-    if (ImGui::Button("Recreate sc")) {
-        shouldResize = true;
-    }
 
     ImGui::ColorEdit3("Background color", (float *) &rayPush.clearColor);
 
@@ -295,6 +293,7 @@ void Engine::draw()
 
     I->device.resetFences(frameFence);
 
+    // Swapchain Maintenance 1 allows us to work with a single per-frame semaphore
     vk::Semaphore submitSemaphore = acquireSemaphore; //I->swapchainSemaphores[swapchainImageIndex];
 
     vk::MemoryBarrier2 barrier{};

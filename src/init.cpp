@@ -141,7 +141,7 @@ void Init::init_vulkan()
     features12.descriptorBindingStorageBufferUpdateAfterBind = vk::True;
     features12.descriptorBindingStorageImageUpdateAfterBind = vk::True;
     features12.descriptorBindingSampledImageUpdateAfterBind = vk::True;
-    features12.descriptorBindingUpdateUnusedWhilePending = vk::True;
+    // features12.descriptorBindingUpdateUnusedWhilePending = vk::True;
     features12.shaderSampledImageArrayNonUniformIndexing = vk::True;
     features12.shaderUniformBufferArrayNonUniformIndexing = vk::True;
     features12.shaderStorageBufferArrayNonUniformIndexing = vk::True;
@@ -154,7 +154,6 @@ void Init::init_vulkan()
     // NOT SUPPORTED YET! ENABLE AS IT GETS SUPPORTED
     vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR unifiedImageLayoutsFeatures{};
     unifiedImageLayoutsFeatures.setUnifiedImageLayouts(vk::True);
-    // unifiedImageLayoutsFeatures.setUnifiedImageLayoutsVideo(vk::True);
 
     std::vector<const char *> rtExtensions = {VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
                                               VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -623,7 +622,6 @@ void Init::load_background(const std::filesystem::path &imPath)
                                           imSize,
                                           imData);
 
-    // if (!backgroundImage.sampler) {
     vk::SamplerCreateInfo samplerCreate{};
     samplerCreate.setMaxLod(vk::LodClampNone);
     samplerCreate.setMinLod(0.f);
@@ -631,7 +629,6 @@ void Init::load_background(const std::filesystem::path &imPath)
     samplerCreate.setMinFilter(vk::Filter::eLinear);
     samplerCreate.setMipmapMode(vk::SamplerMipmapMode::eLinear);
     backgroundImage.sampler = device.createSampler(samplerCreate);
-    // }
 
     stbi_image_free(imData);
 }

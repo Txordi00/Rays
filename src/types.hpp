@@ -105,7 +105,7 @@ struct Vertex
     glm::vec4 color;
 };
 
-// push constants for our mesh object draws
+// push constants for the raster pipeline
 struct MeshPush
 {
     uint32_t objId;
@@ -143,15 +143,6 @@ struct CameraData
     glm::vec3 orientation{glm::vec3(0.f, 0.f, 1.f)};
     glm::mat4 viewInverse{1.f};
     glm::mat4 projInverse{1.f};
-};
-
-struct ComputePipelineData
-{
-    std::string name;
-    vk::Pipeline pipeline;
-    vk::PipelineLayout pipelineLayout;
-    void *pushData;
-    uint32_t pushDataSize;
 };
 
 #ifdef NDEBUG

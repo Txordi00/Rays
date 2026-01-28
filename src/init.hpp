@@ -29,6 +29,7 @@ public:
     void recreate_draw_data();
 
     SDL_Window *window{nullptr};
+
     // Strucutres gotten at init time
     vk::Instance instance;
     vk::DebugUtilsMessengerEXT debugMessenger;
@@ -64,7 +65,6 @@ public:
     vk::DescriptorSetLayout rtDescriptorSetLayout;
 
     // Pipelines
-    // SimplePipelineData simpleMeshGraphicsPipeline;
     SimplePipelineData simpleRtPipeline;
     std::unique_ptr<RtPipelineBuilder> rtPipelineBuilder;
 
@@ -84,12 +84,8 @@ public:
     std::unique_ptr<Presampler> presampler;
 
     // Meshes
-    // std::vector<std::shared_ptr<Model>> models;
     std::unique_ptr<GLTFLoader> gltfLoader;
     std::shared_ptr<GLTFObj> scene;
-
-    // Lights
-    // std::vector<Light> lights;
 
     bool isInitialized{false};
 
@@ -113,10 +109,7 @@ private:
     void create_sbt();
     void init_imgui();
     void load_meshes();
-    // void create_lights();
     void create_as();
-
-    // void destroy_swapchain();
 
     std::queue<vk::Pipeline> rtPipelineQueue;
     std::queue<Buffer> rtSBTBufferQueue;
