@@ -5,6 +5,8 @@
 #define GLM_FORCE_LEFT_HANDED
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "types.hpp"
+#include <SDL3/SDL.h>
+#include <functional>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
@@ -12,7 +14,7 @@
 class Camera
 {
 public:
-    Camera() = default;
+    Camera();
     ~Camera() = default;
 
     void setProjMatrix(
@@ -36,6 +38,8 @@ public:
     void create_camera_buffer(const vk::Device &device, const VmaAllocator &allocator);
     void destroy_camera_buffer();
 
+    void process_event(const bool *keyStates, const float dt);
+
     glm::mat4 viewMatrix{1.f};
     glm::mat4 invView{1.f};
     glm::vec3 orientation{0, 0, 1};
@@ -48,4 +52,6 @@ public:
 
 private:
     VmaAllocator allocator;
+
+    std::array<std::function<void(Camera *, const float, const float)>, SDL_SCANCODE_COUNT> actionMap;
 };

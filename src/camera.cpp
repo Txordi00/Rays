@@ -1,5 +1,6 @@
 #include "camera.hpp"
 #include "utils.hpp"
+#include <SDL3/SDL.h>
 #include <glm/ext.hpp>
 
 void Camera::setProjMatrix(
@@ -106,4 +107,45 @@ void Camera::create_camera_buffer(const vk::Device &device, const VmaAllocator &
 void Camera::destroy_camera_buffer()
 {
     utils::destroy_buffer(allocator, cameraBuffer);
+}
+
+Camera::Camera()
+{
+    // Initialize action map in order to avoid many if statements
+    // The 0 function is defined in order to gracefully avoid ifs
+    actionMap[0] = [](Camera *c, const float dx, const float dtheta) {};
+    actionMap[SDL_SCANCODE_W] = [](Camera *c, const float dx, const float dtheta) {
+        c->forward(dx);
+    };
+    actionMap[SDL_SCANCODE_S] = [](Camera *c, const float dx, const float dtheta) {
+        c->backwards(dx);
+    };
+    actionMap[SDL_SCANCODE_A] = [](Camera *c, const float dx, const float dtheta) { c->left(dx); };
+    actionMap[SDL_SCANCODE_D] = [](Camera *c, const float dx, const float dtheta) { c->right(dx); };
+    actionMap[SDL_SCANCODE_Q] = [](Camera *c, const float dx, const float dtheta) { c->down(dx); };
+    actionMap[SDL_SCANCODE_E] = [](Camera *c, const float dx, const float dtheta) { c->up(dx); };
+    actionMap[SDL_SCANCODE_UP] = [](Camera *c, const float dx, const float dtheta) {
+        c->lookUp(dtheta);
+    };
+    actionMap[SDL_SCANCODE_DOWN] = [](Camera *c, const float dx, const float dtheta) {
+        c->lookDown(dtheta);
+    };
+    actionMap[SDL_SCANCODE_LEFT] = [](Camera *c, const float dx, const float dtheta) {
+        c->lookLeft(dtheta);
+    };
+    actionMap[SDL_SCANCODE_RIGHT] = [](Camera *c, const float dx, const float dtheta) {
+        c->lookRight(dtheta);
+    };
+}
+
+void Camera::process_event(const bool *keyStates, const float dt)
+{
+    const float dx = std::min(5.f * dt, 0.1f);
+    const float dtheta = std::min(2.f * dt, glm::radians(4.f));
+    for (uint32_t i = 0; i < SDL_SCANCODE_COUNT; i++) {
+        // Get the function position in actionMap without using any if statement
+        uint32_t code = static_cast<uint32_t>(keyStates[i] && (actionMap[i] != nullptr)) * i;
+        // Execute the appropriate function depending on the pressed key
+        actionMap[code](this, dx, dtheta);
+    }
 }

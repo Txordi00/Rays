@@ -45,14 +45,13 @@ void Engine::run()
     const bool *keyStates = SDL_GetKeyboardState(&numKeys);
 
     // Main loop
-    float dt, dx, dtheta;
-    uint64_t currentTime{0}, lastTime{0};
+    float dt;
+    uint64_t currentTime, lastTime{SDL_GetPerformanceCounter()};
+    const float freq = static_cast<float>(SDL_GetPerformanceFrequency());
     while (!quit) {
-        currentTime = SDL_GetTicks();
-        dt = static_cast<float>(currentTime - lastTime) / 1000.f;
+        currentTime = SDL_GetPerformanceCounter();
+        dt = static_cast<float>(currentTime - lastTime) / freq;
         lastTime = currentTime;
-        dx = std::min(5.f * dt, 0.2f);
-        dtheta = std::min(2.f * dt, glm::radians(4.f));
 
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
@@ -64,27 +63,7 @@ void Engine::run()
                 shouldResize = true;
 
             case SDL_EVENT_KEY_DOWN:
-                // key = e.key.key;
-                if (keyStates[SDL_SCANCODE_W])
-                    I->camera.forward(dx);
-                if (keyStates[SDL_SCANCODE_S])
-                    I->camera.backwards(dx);
-                if (keyStates[SDL_SCANCODE_A])
-                    I->camera.left(dx);
-                if (keyStates[SDL_SCANCODE_D])
-                    I->camera.right(dx);
-                if (keyStates[SDL_SCANCODE_Q])
-                    I->camera.down(dx);
-                if (keyStates[SDL_SCANCODE_E])
-                    I->camera.up(dx);
-                if (keyStates[SDL_SCANCODE_UP])
-                    I->camera.lookUp(dtheta);
-                if (keyStates[SDL_SCANCODE_DOWN])
-                    I->camera.lookDown(dtheta);
-                if (keyStates[SDL_SCANCODE_LEFT])
-                    I->camera.lookLeft(dtheta);
-                if (keyStates[SDL_SCANCODE_RIGHT])
-                    I->camera.lookRight(dtheta);
+                I->camera.process_event(keyStates, dt);
             }
             //send SDL event to imgui for handling
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -477,7 +456,7 @@ void Engine::resize()
 
     I->recreate_camera();
 
-    std::println("Swapchain, draw data and camera recreated");
+    // std::println("Swapchain, draw data and camera recreated");
 
     shouldResize = false;
 }
