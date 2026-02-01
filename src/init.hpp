@@ -17,7 +17,7 @@ class Init
 {
 public:
     // Initializes everything in the engine
-    Init();
+    Init(const std::filesystem::path &gltfPath);
     ~Init() = default;
 
     // Shuts down the engine
@@ -108,7 +108,7 @@ private:
     void init_pipelines();
     void create_sbt();
     void init_imgui();
-    void load_meshes();
+    void load_meshes(const std::filesystem::path &gltfPath);
     void create_as();
 
     std::queue<vk::Pipeline> rtPipelineQueue;

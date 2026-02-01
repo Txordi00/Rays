@@ -3,17 +3,24 @@
 #include <vulkan/vulkan.hpp>
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #else
-import vulkan_hpp;
+import vulkan;
 #include <vulkan/vulkan_hpp_macros.hpp>
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #endif
 
 #include "engine.hpp"
-// #include <memory>
-// #include <print>
+#include <print>
 
 int main(int argc, char *argv[])
 {
+    std::filesystem::path gltfPath{std::string{PROJECT_DIR}
+                                   + std::string{"/assets/ABeautifulGame.glb"}};
+    if (argc == 2) {
+        gltfPath = std::filesystem::path(argv[1]);
+    } else {
+        std::println("Correct usage: \'lrt <GLTF filepath>\'. Using default file {}",
+                     gltfPath.c_str());
+    }
     // Load the basic functionality of the dynamic dispatcher
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 #ifndef USE_CXX20_MODULES
@@ -24,7 +31,7 @@ int main(int argc, char *argv[])
     VULKAN_HPP_DEFAULT_DISPATCHER.init(getInstanceProcAddr);
 #endif
 
-    std::unique_ptr<Engine> engine = std::make_unique<Engine>();
+    std::unique_ptr<Engine> engine = std::make_unique<Engine>(gltfPath);
     engine->run();
 
     return 0;

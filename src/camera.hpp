@@ -6,7 +6,6 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "types.hpp"
 #include <SDL3/SDL.h>
-#include <functional>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
@@ -14,7 +13,7 @@
 class Camera
 {
 public:
-    Camera();
+    Camera() = default;
     ~Camera() = default;
 
     void setProjMatrix(
@@ -53,5 +52,6 @@ public:
 private:
     VmaAllocator allocator;
 
-    std::array<std::function<void(Camera *, const float, const float)>, SDL_SCANCODE_COUNT> actionMap;
+    // void create_dispatch_table();
+    // std::array<std::function<void(Camera *, const float, const float)>, SDL_SCANCODE_COUNT> actionMap;
 };

@@ -2,7 +2,7 @@
 
 // #ifndef USE_CXX20_MODULES
 // #else
-// import vulkan_hpp;
+// import vulkan;
 // #endif
 #include "init.hpp"
 #include <memory>
@@ -10,7 +10,7 @@
 class Engine
 {
 public:
-    Engine();
+    Engine(const std::filesystem::path &gltfPath);
     ~Engine();
 
     // run main loop

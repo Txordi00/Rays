@@ -2,7 +2,7 @@
 #ifndef USE_CXX20_MODULES
 #include <vulkan/vulkan.hpp>
 #else
-import vulkan_hpp;
+import vulkan;
 #endif
 #include "types.hpp"
 

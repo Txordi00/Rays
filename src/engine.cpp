@@ -1,6 +1,6 @@
 #ifndef USE_CXX20_MODULES
 #else
-import vulkan_hpp;
+import vulkan;
 #include <vulkan/vulkan_hpp_macros.hpp>
 #endif
 
@@ -14,9 +14,9 @@ import vulkan_hpp;
 #include <imgui_impl_vulkan.h>
 #include <print>
 
-Engine::Engine()
+Engine::Engine(const std::filesystem::path &gltfPath)
 {
-    I = std::make_unique<Init>();
+    I = std::make_unique<Init>(gltfPath);
 
     // Init push constants aaa
     rayPush.clearColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.f);

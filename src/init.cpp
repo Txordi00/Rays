@@ -18,7 +18,7 @@
 #include <print>
 #include <stb_image.h>
 
-Init::Init()
+Init::Init(const std::filesystem::path &gltfPath)
 {
     init_sdl();
     init_vulkan();
@@ -28,7 +28,7 @@ Init::Init()
     init_commands();
     init_sync_structures();
     recreate_draw_data();
-    load_meshes();
+    load_meshes(gltfPath);
     load_background();
     // create_lights();
     create_as();
@@ -587,13 +587,12 @@ void Init::presample()
     presampler->run();
 }
 
-void Init::load_meshes()
+void Init::load_meshes(const std::filesystem::path &gltfPath)
 {
     gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
     // scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/CornellBox-Original.gltf")
     //             .value();
-    scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/ABeautifulGame.glb")
-                .value();
+    scene = gltfLoader->load_gltf_asset(gltfPath).value();
     std::println("Asset loaded");
 
     // glm::mat4 S = glm::scale(1.f * glm::vec3(1.f));

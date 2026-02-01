@@ -109,43 +109,91 @@ void Camera::destroy_camera_buffer()
     utils::destroy_buffer(allocator, cameraBuffer);
 }
 
-Camera::Camera()
-{
-    // Initialize action map in order to avoid many if statements
-    // The 0 function is defined in order to gracefully avoid ifs
-    actionMap[0] = [](Camera *c, const float dx, const float dtheta) {};
-    actionMap[SDL_SCANCODE_W] = [](Camera *c, const float dx, const float dtheta) {
-        c->forward(dx);
-    };
-    actionMap[SDL_SCANCODE_S] = [](Camera *c, const float dx, const float dtheta) {
-        c->backwards(dx);
-    };
-    actionMap[SDL_SCANCODE_A] = [](Camera *c, const float dx, const float dtheta) { c->left(dx); };
-    actionMap[SDL_SCANCODE_D] = [](Camera *c, const float dx, const float dtheta) { c->right(dx); };
-    actionMap[SDL_SCANCODE_Q] = [](Camera *c, const float dx, const float dtheta) { c->down(dx); };
-    actionMap[SDL_SCANCODE_E] = [](Camera *c, const float dx, const float dtheta) { c->up(dx); };
-    actionMap[SDL_SCANCODE_UP] = [](Camera *c, const float dx, const float dtheta) {
-        c->lookUp(dtheta);
-    };
-    actionMap[SDL_SCANCODE_DOWN] = [](Camera *c, const float dx, const float dtheta) {
-        c->lookDown(dtheta);
-    };
-    actionMap[SDL_SCANCODE_LEFT] = [](Camera *c, const float dx, const float dtheta) {
-        c->lookLeft(dtheta);
-    };
-    actionMap[SDL_SCANCODE_RIGHT] = [](Camera *c, const float dx, const float dtheta) {
-        c->lookRight(dtheta);
-    };
-}
+// Camera::Camera()
+// {
+//     create_dispatch_table();
+// }
+
+// void Camera::create_dispatch_table()
+// {
+//     // Initialize action map in order to avoid many if statements
+//     // The 0 function is defined in order to handle undefined key presses or no key press at all
+//     actionMap[0] = [](Camera *c, const float dx, const float dtheta) {};
+//     actionMap[SDL_SCANCODE_W] = [](Camera *c, const float dx, const float dtheta) {
+//         c->forward(dx);
+//     };
+//     actionMap[SDL_SCANCODE_S] = [](Camera *c, const float dx, const float dtheta) {
+//         c->backwards(dx);
+//     };
+//     actionMap[SDL_SCANCODE_A] = [](Camera *c, const float dx, const float dtheta) { c->left(dx); };
+//     actionMap[SDL_SCANCODE_D] = [](Camera *c, const float dx, const float dtheta) { c->right(dx); };
+//     actionMap[SDL_SCANCODE_Q] = [](Camera *c, const float dx, const float dtheta) { c->down(dx); };
+//     actionMap[SDL_SCANCODE_E] = [](Camera *c, const float dx, const float dtheta) { c->up(dx); };
+//     actionMap[SDL_SCANCODE_UP] = [](Camera *c, const float dx, const float dtheta) {
+//         c->lookUp(dtheta);
+//     };
+//     actionMap[SDL_SCANCODE_DOWN] = [](Camera *c, const float dx, const float dtheta) {
+//         c->lookDown(dtheta);
+//     };
+//     actionMap[SDL_SCANCODE_LEFT] = [](Camera *c, const float dx, const float dtheta) {
+//         c->lookLeft(dtheta);
+//     };
+//     actionMap[SDL_SCANCODE_RIGHT] = [](Camera *c, const float dx, const float dtheta) {
+//         c->lookRight(dtheta);
+//     };
+// }
 
 void Camera::process_event(const bool *keyStates, const float dt)
 {
     const float dx = std::min(5.f * dt, 0.1f);
     const float dtheta = std::min(2.f * dt, glm::radians(4.f));
-    for (uint32_t i = 0; i < SDL_SCANCODE_COUNT; i++) {
-        // Get the function position in actionMap without using any if statement
-        uint32_t code = static_cast<uint32_t>(keyStates[i] && (actionMap[i] != nullptr)) * i;
-        // Execute the appropriate function depending on the pressed key
-        actionMap[code](this, dx, dtheta);
+    const static std::vector<uint32_t> codes{SDL_SCANCODE_W,
+                                             SDL_SCANCODE_S,
+                                             SDL_SCANCODE_A,
+                                             SDL_SCANCODE_D,
+                                             SDL_SCANCODE_Q,
+                                             SDL_SCANCODE_E,
+                                             SDL_SCANCODE_UP,
+                                             SDL_SCANCODE_DOWN,
+                                             SDL_SCANCODE_LEFT,
+                                             SDL_SCANCODE_RIGHT};
+
+    // I decided to go for a simple switch instead of a dispatch table. Simpler and probably faster
+    for (const uint32_t c : codes) {
+        uint32_t code = static_cast<uint32_t>(keyStates[c]) * c; // c if pressed, 0 if not
+        switch (code) {
+        case 0:
+            break;
+        case SDL_SCANCODE_W:
+            forward(dx);
+            break;
+        case SDL_SCANCODE_S:
+            backwards(dx);
+            break;
+        case SDL_SCANCODE_A:
+            left(dx);
+            break;
+        case SDL_SCANCODE_D:
+            right(dx);
+            break;
+        case SDL_SCANCODE_Q:
+            down(dx);
+            break;
+        case SDL_SCANCODE_E:
+            up(dx);
+            break;
+        case SDL_SCANCODE_UP:
+            lookUp(dtheta);
+            break;
+        case SDL_SCANCODE_DOWN:
+            lookDown(dtheta);
+            break;
+        case SDL_SCANCODE_LEFT:
+            lookLeft(dtheta);
+            break;
+        case SDL_SCANCODE_RIGHT:
+            lookRight(dtheta);
+            break;
+        }
     }
 }
