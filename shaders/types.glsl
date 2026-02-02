@@ -2,6 +2,7 @@ const float PI = 3.1415926535897932384626433832795f;
 const float TWOPI = 2. * PI;
 const float ONEOVERPI = 1. / PI;
 const float ONEOVERTWOPI = 1. / TWOPI;
+const float ONEOVERFOURPI = 1. / (4. * PI);
 const vec2[32] UV = vec2[32](
         vec2(0.80918866, 0.73555427),
         vec2(0.31952403, 0.46541552),

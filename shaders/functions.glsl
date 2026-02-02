@@ -152,12 +152,31 @@ vec2 concentric_sample_disk(const vec2 u) {
     return r * vec2(cos(theta), sin(theta));
 }
 
+vec2 concentric_sample_disk_branchless(const vec2 u) {
+    const vec2 uOffset = 2. * u - vec2(1.);
+
+    // Check if we're at the origin
+    const float isOrigin = step(dot(uOffset, uOffset), 1e-5);
+
+    // Determine quadrant
+    const float useX = step(abs(uOffset.y), abs(uOffset.x));
+
+    // Calculate both possible r and theta values
+    const float thetaX = ONEOVERFOURPI * (uOffset.y / (uOffset.x + 1e-5)); // add epsilon to avoid division by zero
+    const float thetaY = ONEOVERFOURPI * (2. - uOffset.x / (uOffset.y + 1e-5));
+    const float r = mix(uOffset.y, uOffset.x, useX);
+    const float theta = mix(thetaY, thetaX, useX);
+
+    // Return zero if at origin
+    return mix(r * vec2(cos(theta), sin(theta)), vec2(0.), isOrigin);
+}
+
 float pdf_cosine_sample_hemisphere(const float nDotL) {
     return nDotL * ONEOVERPI;
 }
 
 void cosine_sample_hemisphere(in const mat3 S, in const vec2 u, out vec3 sampleDir, out float pdf, out float nDotL) {
-    const vec2 d = concentric_sample_disk(u);
+    const vec2 d = concentric_sample_disk_branchless(u);
     const float d2 = dot(d, d);
     const float z = sqrt(max(0., 1. - d2));
     const vec3 sampleInNormalFrame = normalize(vec3(d.x, d.y, z));

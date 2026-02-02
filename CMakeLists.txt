@@ -1,15 +1,23 @@
 cmake_minimum_required(VERSION 3.25)
-project(lrt LANGUAGES CXX)
-# set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 # The user can set this to ON or OFF
+# WARING: ON is very experimental, and it currently breaks everywhere due to the forced import
+# of the std module in the vulkan module
 set(USE_VULKANHPP_CPP20_MODULE OFF)
 
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+if(USE_VULKANHPP_CPP20_MODULE)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+  set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+  set(CMAKE_CXX_MODULE_STD ON)
+endif()
 add_compile_options(-Wno-nullability-completeness -Wno-deprecated-literal-operator)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math")
+
+# set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+project(lrt LANGUAGES CXX)
+
 
 find_package(Vulkan REQUIRED)
 
@@ -26,9 +34,11 @@ if(USE_VULKANHPP_CPP20_MODULE)
     target_sources( VulkanHppModule PUBLIC
     FILE_SET CXX_MODULES
     BASE_DIRS ${Vulkan_INCLUDE_DIR}
-    FILES ${Vulkan_INCLUDE_DIR}/vulkan/vulkan.cppm)
+    FILES
+    ${Vulkan_INCLUDE_DIR}/vulkan/vulkan_video.cppm # Need to rename vulkan_hpp:video -> vulkan:video in this file
+    ${Vulkan_INCLUDE_DIR}/vulkan/vulkan.cppm)
     target_compile_features(VulkanHppModule PUBLIC cxx_std_23)
-    target_compile_definitions(VulkanHppModule PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+    target_compile_definitions(VulkanHppModule PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1 VULKAN_HPP_NO_STD_MODULE=1)
     target_link_libraries(VulkanHppModule PUBLIC Vulkan::Headers)
 endif()
 

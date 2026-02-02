@@ -1,4 +1,10 @@
 #pragma once
+#ifndef USE_CXX20_MODULES
+#include <vulkan/vulkan.hpp>
+#else
+import vulkan;
+#endif
+
 #include "types.hpp"
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>

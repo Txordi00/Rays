@@ -1,9 +1,3 @@
-#ifndef USE_CXX20_MODULES
-#else
-import vulkan;
-#include <vulkan/vulkan_hpp_macros.hpp>
-#endif
-
 #include "acceleration_structures.hpp"
 #include "engine.hpp"
 #include "lights.hpp"

@@ -4,6 +4,7 @@
 #else
 import vulkan;
 #endif
+
 #include "types.hpp"
 
 struct Binding

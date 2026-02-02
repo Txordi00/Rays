@@ -74,8 +74,9 @@ push;
 
 const float tMin = 0.01;
 const float tMax = 10000.;
-// const uint maxDepth = 3;
-// const uint numSamples = 8;
+const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
+        | gl_RayFlagsSkipClosestHitShaderEXT;
+
 uint rngState = gl_LaunchSizeEXT.x * gl_LaunchIDEXT.y + gl_LaunchIDEXT.x; // Initial seed
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
@@ -86,21 +87,22 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
         vec3 l;
         float distanceSquared = 1.;
         // Vector to the light
-        if (light.type == 0) { // Point
+        switch (light.type)
+        {
+            case 0: // Point
             l = light.positionOrDirection - worldPos;
             distanceSquared = dot(l, l);
             l /= sqrt(distanceSquared);
-        } else if (light.type == 1) // Directional
-        {
+            break;
+            case 1: // Directional
             l = -light.positionOrDirection; // Already normalized from Host
+            break;
         }
         // Skip light if light or camera not looking to the hit point
         const float NoL = clamp(dot(normal, l), 0., 1.);
         if (NoL < 1e-5 || NoV < 1e-5)
             continue;
         // SHADOWS
-        const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
-                | gl_RayFlagsSkipClosestHitShaderEXT;
         // We initialize to true, if the miss shader is called it sets it to false
         isShadowed = true;
         traceRayEXT(topLevelAS, // acceleration structure
@@ -128,10 +130,13 @@ vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const
 
         // DIRECT LUMINANCE
         vec3 luminance = vec3(0.);
-        if (light.type == 0) { // Point light
+        switch (light.type) {
+            case 0: // Point light
             luminance = evaluate_point_light(light, distanceSquared, BSDF);
-        } else if (light.type == 1) { // Directional light
+            break;
+            case 1: // Directional light
             luminance = evaluate_directional_light(light, BSDF);
+            break;
         }
         directLuminance += luminance;
     }
@@ -166,12 +171,6 @@ void sample_microfacet_ggx_specular_cached(in const mat3 S, in const vec3 v, in 
 
     nDotL = dot(sampleDir, S[2]);
     vDotH = dot(v, h);
-    // ctheta = nDotH
-    // if (nDotL < 1e-5 || vDotH < 1e-5 || ctheta < 1e-5)
-    // {
-    //     pdf = -1.; // If pdf negative, the sample will be skipped
-    //     return;
-    // }
     pdf = pdf_microfacet_ggx_specular(ctheta, a2, vDotH);
 }
 

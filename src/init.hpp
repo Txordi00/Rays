@@ -1,4 +1,10 @@
 #pragma once
+#ifndef USE_CXX20_MODULES
+#include <vulkan/vulkan.hpp>
+#else
+import vulkan;
+#endif
+
 #include "acceleration_structures.hpp"
 #include "camera.hpp"
 #include "descriptors.hpp"

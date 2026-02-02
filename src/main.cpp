@@ -13,6 +13,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 int main(int argc, char *argv[])
 {
+    // Read gltf filepath
     std::filesystem::path gltfPath{std::string{PROJECT_DIR}
                                    + std::string{"/assets/ABeautifulGame.glb"}};
     if (argc == 2) {
