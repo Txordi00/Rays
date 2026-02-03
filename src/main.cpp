@@ -13,15 +13,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 int main(int argc, char *argv[])
 {
-    // Read gltf filepath
-    std::filesystem::path gltfPath{std::string{PROJECT_DIR}
-                                   + std::string{"/assets/ABeautifulGame.glb"}};
-    if (argc == 2) {
-        gltfPath = std::filesystem::path(argv[1]);
-    } else {
-        std::println("Correct usage: \'lrt <GLTF filepath>\'. Using default file {}",
-                     gltfPath.c_str());
-    }
     // Load the basic functionality of the dynamic dispatcher
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 #ifndef USE_CXX20_MODULES
@@ -31,6 +22,16 @@ int main(int argc, char *argv[])
         "vkGetInstanceProcAddr");
     VULKAN_HPP_DEFAULT_DISPATCHER.init(getInstanceProcAddr);
 #endif
+
+    // Read gltf filepath
+    std::filesystem::path gltfPath{std::string{PROJECT_DIR}
+                                   + std::string{"/assets/ABeautifulGame.glb"}};
+    if (argc == 2) {
+        gltfPath = std::filesystem::path(argv[1]);
+    } else {
+        std::println("Correct usage: \'lrt <GLTF filepath>\'. Using default file {}",
+                     gltfPath.c_str());
+    }
 
     std::unique_ptr<Engine> engine = std::make_unique<Engine>(gltfPath);
     engine->run();

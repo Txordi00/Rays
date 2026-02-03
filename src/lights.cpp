@@ -3,7 +3,6 @@
 #include "utils.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/norm.hpp>
-#include <print>
 
 uint32_t Light::nextId = 0;
 

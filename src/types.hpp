@@ -50,13 +50,6 @@ const uint32_t MAX_LIGHTS = 10;
 #define SIMPLE_RMISS_SHADER "shaders/raytrace.rmiss.spv"
 #define SIMPLE_SHADOW_SHADER "shaders/shadow.rmiss.spv"
 
-struct DescriptorSetData
-{
-    vk::DescriptorSetLayout layout;
-    vk::DescriptorType type;
-    uint32_t descriptorCount;
-};
-
 struct SimplePipelineData
 {
     vk::PipelineLayout pipelineLayout;
@@ -92,7 +85,6 @@ struct Buffer
     vk::Buffer buffer;
     VmaAllocation allocation;
     VmaAllocationInfo allocationInfo;
-    uint32_t bufferId;
     vk::DeviceAddress bufferAddress;
 };
 
@@ -128,12 +120,6 @@ struct SpecializationConstantsClosestHit
 struct SpecializationConstantsMiss
 {
     vk::Bool32 envMap{vk::False};
-};
-
-// Per-object uniform buffer data
-struct UniformData
-{
-    glm::mat4 worldMatrix;
 };
 
 // camera data for the storage buffer

@@ -13,7 +13,10 @@
 class Camera
 {
 public:
-    Camera() = default;
+    Camera(const vk::Device &device, const VmaAllocator &allocator)
+        : device{device}
+        , allocator{allocator}
+    {}
     ~Camera() = default;
 
     void setProjMatrix(
@@ -34,10 +37,17 @@ public:
 
     void update();
 
-    void create_camera_buffer(const vk::Device &device, const VmaAllocator &allocator);
+    void create_camera_buffer();
     void destroy_camera_buffer();
 
     void process_event(const bool *keyStates, const float dt);
+
+    Buffer cameraBuffer;
+    CameraData cameraData{};
+
+private:
+    const vk::Device &device;
+    const VmaAllocator &allocator;
 
     glm::mat4 viewMatrix{1.f};
     glm::mat4 invView{1.f};
@@ -45,12 +55,6 @@ public:
     glm::vec3 translation{0.f};
     glm::mat4 projMatrix{1.f};
     glm::mat4 projInverse{1.f};
-
-    Buffer cameraBuffer;
-    CameraData cameraData{};
-
-private:
-    VmaAllocator allocator;
 
     // void create_dispatch_table();
     // std::array<std::function<void(Camera *, const float, const float)>, SDL_SCANCODE_COUNT> actionMap;

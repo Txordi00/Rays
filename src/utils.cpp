@@ -109,23 +109,6 @@ vk::ShaderModule load_shader(const vk::Device &device, const std::string &filePa
     return device.createShaderModule(shaderModuleCreateInfo);
 }
 
-glm::mat4 get_perspective_projection(const float fovy,
-                                     const float aspect,
-                                     const float near,
-                                     const float far)
-{
-    assert(std::abs(aspect) > std::numeric_limits<float>::epsilon());
-    const float tanHalfFovy = tan(fovy / 2.f);
-    glm::mat4 projectionMatrix{0.0f};
-    projectionMatrix[0][0] = 1.f / (aspect * tanHalfFovy);
-    projectionMatrix[1][1] = 1.f / (tanHalfFovy);
-    projectionMatrix[2][2] = far / (far - near);
-    projectionMatrix[2][3] = 1.f;
-    projectionMatrix[3][2] = -(far * near) / (far - near);
-
-    return projectionMatrix;
-}
-
 Buffer create_buffer(const vk::Device &device,
                      const VmaAllocator &allocator,
                      const vk::DeviceSize &size,
@@ -343,45 +326,6 @@ void cmd_submit(const vk::Device &device,
     VK_CHECK_RES(device.waitForFences(fence, vk::True, FENCE_TIMEOUT));
 }
 
-namespace init {
-vk::ImageCreateInfo image_create_info(const vk::Format &format,
-                                      const vk::ImageUsageFlags &flags,
-                                      const vk::Extent3D &extent)
-{
-    vk::ImageCreateInfo imageCreateInfo{};
-    imageCreateInfo.setImageType((extent.depth > 1) ? vk::ImageType::e3D : vk::ImageType::e2D);
-    imageCreateInfo.setFormat(format);
-    imageCreateInfo.setExtent(extent);
-    imageCreateInfo.setUsage(flags);
-    imageCreateInfo.setMipLevels(1);
-    imageCreateInfo.setArrayLayers(1);
-    imageCreateInfo.setSamples(vk::SampleCountFlagBits::e1);
-    imageCreateInfo.setTiling(vk::ImageTiling::eOptimal);
-    imageCreateInfo.setInitialLayout(vk::ImageLayout::eUndefined);
-    return imageCreateInfo;
-}
-
-vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
-                                               const vk::ImageAspectFlags &aspectMask)
-{
-    vk::ImageViewCreateInfo imageViewCreateInfo{};
-    imageViewCreateInfo.setImage(image.image);
-    imageViewCreateInfo.setFormat(image.format);
-    imageViewCreateInfo.setViewType((image.extent.depth > 1) ? vk::ImageViewType::e3D
-                                                             : vk::ImageViewType::e2D);
-    vk::ImageSubresourceRange imSubResRan{};
-    imSubResRan.setAspectMask(aspectMask);
-    imSubResRan.setBaseMipLevel(0);
-    imSubResRan.setLevelCount(1);
-    imSubResRan.setBaseArrayLayer(0);
-    imSubResRan.setLayerCount(1);
-    imageViewCreateInfo.setSubresourceRange(imSubResRan);
-
-    return imageViewCreateInfo;
-}
-
-} // namespace init
-
 void copy_to_device_buffer(const Buffer &buffer,
                            const vk::Device &device,
                            const VmaAllocator &allocator,
@@ -461,21 +405,43 @@ void destroy_swapchain(const vk::Device &device,
     swapchainImages.clear();
 }
 
-// void imgui::InputFloat3(const char *label, float v[], float step)
-// {
-//     const char *components[] = {"X", "Y", "Z"};
-//     for (int i = 0; i < 3; ++i) {
-//         ImGui::SetNextItemWidth(80.0f);
-//         ImGui::InputFloat(components[i], &v[i], step, step * 5, "%.2f");
-//         ImGui::SameLine();
-//     }
-//     ImGui::Text("%s", label);
-// }
+namespace init {
+vk::ImageCreateInfo image_create_info(const vk::Format &format,
+                                      const vk::ImageUsageFlags &flags,
+                                      const vk::Extent3D &extent)
+{
+    vk::ImageCreateInfo imageCreateInfo{};
+    imageCreateInfo.setImageType((extent.depth > 1) ? vk::ImageType::e3D : vk::ImageType::e2D);
+    imageCreateInfo.setFormat(format);
+    imageCreateInfo.setExtent(extent);
+    imageCreateInfo.setUsage(flags);
+    imageCreateInfo.setMipLevels(1);
+    imageCreateInfo.setArrayLayers(1);
+    imageCreateInfo.setSamples(vk::SampleCountFlagBits::e1);
+    imageCreateInfo.setTiling(vk::ImageTiling::eOptimal);
+    imageCreateInfo.setInitialLayout(vk::ImageLayout::eUndefined);
+    return imageCreateInfo;
+}
 
-// namespace init
+vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
+                                               const vk::ImageAspectFlags &aspectMask)
+{
+    vk::ImageViewCreateInfo imageViewCreateInfo{};
+    imageViewCreateInfo.setImage(image.image);
+    imageViewCreateInfo.setFormat(image.format);
+    imageViewCreateInfo.setViewType((image.extent.depth > 1) ? vk::ImageViewType::e3D
+                                                             : vk::ImageViewType::e2D);
+    vk::ImageSubresourceRange imSubResRan{};
+    imSubResRan.setAspectMask(aspectMask);
+    imSubResRan.setBaseMipLevel(0);
+    imSubResRan.setLevelCount(1);
+    imSubResRan.setBaseArrayLayer(0);
+    imSubResRan.setLayerCount(1);
+    imageViewCreateInfo.setSubresourceRange(imSubResRan);
 
-// namespace init
+    return imageViewCreateInfo;
+}
 
-// namespace init
+} // namespace init
 
 } // namespace utils

@@ -58,6 +58,4 @@ public:
 private:
     const vk::Device &device;
     const VmaAllocator &allocator;
-
-    uint32_t nextId{0};
 };

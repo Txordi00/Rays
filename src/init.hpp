@@ -63,7 +63,7 @@ public:
     std::vector<ImageData> swapchainImages;
 
     // Camera
-    Camera camera{};
+    std::unique_ptr<Camera> camera;
 
     // Вescriptors
     std::unique_ptr<DescHelper> descHelperUAB, descHelperRt;

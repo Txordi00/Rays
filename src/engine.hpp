@@ -37,8 +37,8 @@ private:
     // record main command buffer
     void record_frame_cmds();
 
-    // Draw commands
-    void raster(const vk::CommandBuffer &cmd);
+    // Deprecated for now
+    // void raster(const vk::CommandBuffer &cmd);
 
     // Ray tracing commands
     void raytrace(const vk::CommandBuffer &cmd);

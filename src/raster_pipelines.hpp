@@ -8,6 +8,7 @@ import vulkan;
 #include "types.hpp"
 #include <glm/glm.hpp>
 
+// EVERYTHING FROM THIS FILE IS CURRENTLY UNUSED
 SimplePipelineData get_simple_mesh_pipeline(
     const vk::Device &device,
     const vk::Format &colorImageFormat,

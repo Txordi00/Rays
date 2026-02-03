@@ -57,7 +57,7 @@ void Engine::run()
                 shouldResize = true;
 
             case SDL_EVENT_KEY_DOWN:
-                I->camera.process_event(keyStates, dt);
+                I->camera->process_event(keyStates, dt);
             }
             //send SDL event to imgui for handling
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -228,7 +228,7 @@ void Engine::update_descriptors()
             descUpdater->add_uniform(descriptorSetUAB, 3, lightsManager->lightBuffers);
         descUpdater->add_as(descriptorSetRt, 0, I->tlas.as.AS);
         descUpdater->add_storage_image(descriptorSetRt, 1, {frame.imageDraw});
-        descUpdater->add_uniform(descriptorSetRt, 2, {I->camera.cameraBuffer});
+        descUpdater->add_uniform(descriptorSetRt, 2, {I->camera->cameraBuffer});
         descUpdater->add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
         descUpdater->add_combined_image(descriptorSetRt, 4, {I->presampler->ggxImage});
         descUpdater->add_combined_image(descriptorSetRt, 5, {I->backgroundImage});
@@ -405,7 +405,7 @@ void Engine::raytrace(const vk::CommandBuffer &cmd)
     pushInfo.setOffset(0);
     cmd.pushConstants2(pushInfo);
 
-    I->camera.update();
+    I->camera->update();
 
     cmd.traceRaysKHR(I->sbtHelper->rgenRegion,
                      I->sbtHelper->missRegion,

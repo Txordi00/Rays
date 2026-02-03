@@ -153,12 +153,6 @@ void Presampler::run()
                          ggxImage,
                          ggxImage.extent,
                          ggxSamples.data());
-
-    // std::cout << "sizeof(glm::mediump_vec4): " << sizeof(glm::mediump_vec4) << std::endl;
-    // std::cout << "Expected size: " << (4 * 2) << " bytes" << std::endl;
-    // std::cout << "Total data size: " << sizeof(hemisphereSamples) << std::endl;
-    // std::cout << "Expected total: " << (SAMPLING_DISCRETIZATION * SAMPLING_DISCRETIZATION * 4 * 2)
-    //           << std::endl;
 }
 
 void Presampler::destroy()

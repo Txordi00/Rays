@@ -71,11 +71,6 @@ void copy_to_buffer(const Buffer &buffer,
 
 vk::ShaderModule load_shader(const vk::Device &device, const std::string &filePath);
 
-glm::mat4 get_perspective_projection(const float fovy,
-                                     const float aspect,
-                                     const float near,
-                                     const float far);
-
 uint32_t align_up(uint32_t x, uint32_t a);
 
 void cmd_submit(const vk::Device &device,
@@ -105,9 +100,5 @@ vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
                                                const vk::ImageAspectFlags &aspectMask);
 
 } // namespace init
-
-// namespace imgui {
-// void InputFloat3(const char *label, float v[3], float step = 0.1f);
-// }
 
 } // namespace utils

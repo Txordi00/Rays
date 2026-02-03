@@ -83,7 +83,7 @@ void Init::clean()
         device.destroyDescriptorSetLayout(rtDescriptorSetLayout);
 
         // Destroy things created in this class from here:
-        camera.destroy_camera_buffer();
+        camera->destroy_camera_buffer();
 
         device.destroyCommandPool(transferCmdPool);
         device.destroyFence(transferFence);
@@ -317,18 +317,19 @@ void Init::recreate_draw_data()
 
 void Init::recreate_camera()
 {
-    camera.setProjMatrix(FOV,
-                         static_cast<float>(swapchainExtent.width),
-                         static_cast<float>(swapchainExtent.height),
-                         0.01f,
-                         100.f);
-    if (!camera.cameraBuffer.buffer) {
-        camera.create_camera_buffer(device, allocator);
-        camera.backwards(3.f);
-        camera.up(1.f);
-        camera.lookAt(glm::vec3(0.f));
+    if (!camera) {
+        camera = std::make_unique<Camera>(device, allocator);
+        camera->create_camera_buffer();
+        camera->backwards(3.f);
+        camera->up(1.f);
+        camera->lookAt(glm::vec3(0.f));
     }
-    camera.update();
+    camera->setProjMatrix(FOV,
+                          static_cast<float>(swapchainExtent.width),
+                          static_cast<float>(swapchainExtent.height),
+                          0.01f,
+                          100.f);
+    camera->update();
 }
 
 void Init::init_commands()

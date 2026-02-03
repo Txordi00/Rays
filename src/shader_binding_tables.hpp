@@ -6,6 +6,7 @@ import vulkan;
 #endif
 #include "types.hpp"
 
+// Mostly got from the NVIDIA rt tutorial https://nvpro-samples.github.io/vk_raytracing_tutorial_KHR/
 class SbtHelper
 {
 public:

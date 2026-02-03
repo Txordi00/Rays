@@ -20,18 +20,13 @@ struct GLTFMaterial
 
     struct MaterialResources
     {
-        // ImageData colorImage;
         int colorImageIndex{-1};
-        // vk::Sampler colorSampler;
         int colorSamplerIndex{-1};
-        // ImageData metalRoughImage;
         int materialImageIndex{-1};
-        // vk::Sampler metalRoughSampler;
         int materialSamplerIndex{-1};
         int normalMapIndex{-1};
         int normalSamplerIndex{-1};
         Buffer dataBuffer;
-        // uint32_t dataBufferOffset; // I should not need offset if going bindless
     };
 
     enum struct MaterialPass : uint8_t { MainColor, Transparent, Other };
@@ -94,8 +89,6 @@ struct SurfaceStorage
 struct MeshNode : Node
 {
     std::shared_ptr<Mesh> mesh;
-    // The key is going to be used as the customInstanceIndex when building the TLAS
-    // std::vector<Buffer> surfaceUniformBuffers;
 };
 
 struct GLTFObj
@@ -154,10 +147,6 @@ private:
     vk::Sampler samplerLinear, samplerNearest;
     fastgltf::Parser parser{};
 
-    // std::vector<std::shared_ptr<Buffer>> bufferQueue;
-    // std::vector<vk::Sampler> samplerQueue;
-    // std::vector<ImageData> imageQueue;
-
     void load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene);
 
     void load_images(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene);
@@ -185,5 +174,4 @@ private:
     void create_mesh_buffers(const std::vector<uint32_t> &indices,
                              const std::vector<Vertex> &vertices,
                              std::shared_ptr<Mesh> &mesh);
-    // void destroy_buffers();
 };

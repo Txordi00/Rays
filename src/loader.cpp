@@ -7,7 +7,6 @@
 #include <print>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include <chrono>
 
 GLTFLoader::GLTFLoader(const vk::Device &device,
                        const VmaAllocator &allocator,
@@ -201,9 +200,6 @@ void GLTFLoader::load_images(const fastgltf::Asset &asset, std::shared_ptr<GLTFO
             scene->images.emplace_back(checkerboardImage);
         }
     }
-    // const auto end = std::chrono::system_clock::now();
-    // std::println("Duration: {}",
-    //              std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
 }
 
 // stbi_load_from_memory IS VERY SLOW
@@ -362,7 +358,6 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
                                      gltfFence,
                                      &materialConstants,
                                      sizeof(GLTFMaterial::MaterialConstants));
-        // utils::copy_to_buffer(matTmp->materialResources.dataBuffer, allocator, &materialConstants);
 
         // Material type
         matTmp->materialPass = (m.alphaMode == fastgltf::AlphaMode::Blend)
@@ -375,9 +370,7 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
             size_t samplerIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
                                       .samplerIndex.value();
             matTmp->materialResources.colorImageIndex = imgIndex;
-            // matTmp->materialResources.colorImage = scene->images[imgIndex];
             matTmp->materialResources.colorSamplerIndex = samplerIndex;
-            // matTmp->materialResources.colorSampler = scene->samplers[samplerIndex];
         }
         if (m.pbrData.metallicRoughnessTexture.has_value()) {
             size_t matIndex = asset.textures[m.pbrData.metallicRoughnessTexture->textureIndex]
@@ -386,9 +379,7 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
                                          .textures[m.pbrData.metallicRoughnessTexture->textureIndex]
                                          .samplerIndex.value();
             matTmp->materialResources.materialImageIndex = matIndex;
-            // matTmp->materialResources.metalRoughImage = scene->images[matIndex];
             matTmp->materialResources.materialSamplerIndex = matSamplerIndex;
-            // matTmp->materialResources.metalRoughSampler = scene->samplers[matSamplerIndex];
         }
         if (m.normalTexture.has_value()) {
             matTmp->materialResources.normalMapIndex = asset.textures[m.normalTexture->textureIndex]
@@ -598,7 +589,6 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
     std::vector<Buffer> surfaceBuffersTmp{scene->surfaceUniformBuffers};
     scene->surfaceUniformBuffers.clear();
     scene->surfaceUniformBuffers.reserve(scene->surfaceCount);
-    // scene->surfaceUniformBuffers.reserve()
 
     // For now, we will consider that all nodes belong to the same scene
     for (const auto &n : asset.nodes) {
@@ -628,7 +618,6 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
         const auto m = fastgltf::getTransformMatrix(n);
         nodes.back()->localTransform = glm::make_mat4(m.data());
     }
-    // scene->surfaceUniformBuffersCount = surfaceId;
 
     // Generate the node tree structure
     for (size_t i = 0; i < nodes.size(); i++) {
@@ -657,9 +646,6 @@ void GLTFLoader::create_mesh_buffers(const std::vector<uint32_t> &indices,
 {
     mesh->indexBuffer = std::make_shared<Buffer>();
     mesh->vertexBuffer = std::make_shared<Buffer>();
-    // bufferQueue.reserve(bufferQueue.size() + 2);
-    // bufferQueue.emplace_back(mesh->indexBuffer);
-    // bufferQueue.emplace_back(mesh->vertexBuffer);
 
     const vk::DeviceSize verticesSize = vertices.size() * sizeof(Vertex);
     const vk::DeviceSize indicesSize = indices.size() * sizeof(uint32_t);
