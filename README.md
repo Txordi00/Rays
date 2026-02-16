@@ -1,5 +1,7 @@
 # Rays - A Vulkan path tracer for GLTF visualization
-Rays is a real-time Monte-Carlo path tracer for GLTF visualization. It is based on an energy-conserving BRDF that admits PBR materials. It uses the Vulkan RT pipeline and features some optimizations like instancing and a presampling pass in seek of efficiency. This is a personal research project and as is, it is still very much work in progress and lacks polish and some important features (broader GLTF compatibility and denoising stick out the most).
+![Screenshot of the program rendering the default `ABeautifulGame.glb` asset.](assets/screenshot_01.png)
+
+Rays is a real-time Monte Carlo path tracer intended for GLTF visualization. It is based on an energy-conserving BRDF that admits PBR materials. It uses the Vulkan RT pipeline and features some optimizations such as instancing and a presampling pass in seek of efficiency. This is a personal research project and as is, it is still very much work in progress and lacks polish and some important features (broader GLTF compatibility and denoising stick out the most).
 
 The project relies on the following libraries:
 - Vulkan (in its hpp form)
