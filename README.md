@@ -76,7 +76,7 @@ total_luminance_contribution = pdf_hemisphere(hemisphere_sample)^2 /
 - **Refractive materials and caustics:** Handle refraction and the GLTF extensions `KHR_materials_transmission`, `KHR_materials_volume` and `KHR_materials_ior`.
 
 ### ACKNOWLEDGMENTS ###
-I would like to acknowledge NO BRUSH for insight into the GLTF format and for general guidance and motivation, Natalie Vock for helping me debug a couple of very shady bugs in my code and Tom Clabault for helping me correct my Monte-Carlo implementation and keep it energy-conserving. I don't want to forget to mention the participants of the Vulkan Game Engine Design server for their company and support along the way.
+I would like to acknowledge NO BRUSH for insight into the GLTF format and for general guidance and motivation, [Natalie Vock](https://pixelcluster.github.io/) for helping me debug a couple of very shady bugs in my code and [Tom Clabault](https://tomclabault.github.io/) for helping me correct my Monte-Carlo implementation and keep it energy-conserving. I don't want to forget to mention the participants of the [Vulkan Game Engine Design server](https://discord.gg/sG9hbJ499f) for their company and support along the way.
 
 ## License
 MIT License - feel free to use this code in your projects with attribution.
