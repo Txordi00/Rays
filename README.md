@@ -1,5 +1,5 @@
-# LRT
-LRT (Little Ray Tracer) is a real time Monte-Carlo path tracer for GLTF visualization. It is based on an energy-conserving BRDF that admits PBR materials. It uses the Vulkan RT pipeline and features instancing and a presampling pass in seek of efficiency. This is a personal research project and as is, it is still very work in progress and lacks some important features (broader GLTF compatibility and denoising stick out the most) and polish.
+# Rays - Vulkan path tracer for GLTF visualization
+Rays is a real-time Monte-Carlo path tracer for GLTF visualization. It is based on an energy-conserving BRDF that admits PBR materials. It uses the Vulkan RT pipeline and features instancing and a presampling pass in seek of efficiency. This is a personal research project and as is, it is still very work in progress and lacks some important features (broader GLTF compatibility and denoising stick out the most) and polish.
 
 The project relies on the following libraries:
 - Vulkan (in its hpp form)
