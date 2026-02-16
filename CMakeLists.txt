@@ -16,7 +16,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math")
 
 # set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(lrt LANGUAGES CXX)
+project(rays LANGUAGES CXX)
 
 
 find_package(Vulkan REQUIRED)
