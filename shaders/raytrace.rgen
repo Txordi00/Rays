@@ -27,7 +27,7 @@ layout(scalar, push_constant) uniform RayPushConstants
     RayPush rayPush;
 } push;
 
-const uint rayFlags = gl_RayFlagsOpaqueEXT;
+const uint rayFlags = gl_RayFlagsNoneEXT;
 const float tMin = 0.001;
 const float tMax = 10000.;
 

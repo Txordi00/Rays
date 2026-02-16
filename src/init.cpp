@@ -157,8 +157,8 @@ void Init::init_vulkan()
 
     std::vector<const char *> rtExtensions = {VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
                                               VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-                                              VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-                                              VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME};
+                                              VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
+                                              /*,VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME*/};
     vk::PhysicalDeviceAccelerationStructureFeaturesKHR asFeatures{};
     asFeatures.setAccelerationStructure(vk::True);
     // asFeatures.setDescriptorBindingAccelerationStructureUpdateAfterBind(vk::True);
@@ -181,8 +181,7 @@ void Init::init_vulkan()
                            .set_required_features_12(features12)
                            .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
                            // .add_required_extension(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME)
-                           .add_required_extension(
-                               VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) // NOT SUPPORTED YET
+                           .add_required_extension(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME)
                            .add_required_extension_features(unifiedImageLayoutsFeatures)
                            .add_required_extensions(rtExtensions)
                            .add_required_extension_features(asFeatures)

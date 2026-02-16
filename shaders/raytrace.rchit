@@ -77,6 +77,9 @@ const float tMax = 10000.;
 const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT
         | gl_RayFlagsSkipClosestHitShaderEXT;
 
+const float reflectance = 0.5;
+const vec3 nonMetallicF0 = vec3(0.16 * reflectance * reflectance);
+
 uint rngState = gl_LaunchSizeEXT.x * gl_LaunchIDEXT.y + gl_LaunchIDEXT.x; // Initial seed
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
@@ -375,6 +378,7 @@ void main()
         normal = normalize(TBN * normalTexRaw.xyz);
         // print_val("n %f ", length(normal), 0.99, 1.);
     }
+//    normal *= -1.;
     const vec4 baseColor = (colorImageIndex != -1) ? texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
                 samplers[nonuniformEXT(colorSamplerIndex)]),
             uv)
@@ -400,8 +404,8 @@ void main()
     // Parametrization
     const vec3 diffuseColor = (1. - metallic) * baseColor.xyz;
     // const vec3 diffuseColor = vec3(1.);
-    const float reflectance = 0.5;
-    const vec3 f0 = mix(vec3(0.16 * reflectance * reflectance), baseColor.xyz, metallic);
+
+    const vec3 f0 = mix(nonMetallicF0, baseColor.xyz, metallic);
     const float f90 = clamp(50.0 * f0.y, 0.0, 1.0);
     // perceptually linear roughness to roughness
     const float a = perceptualRoughness;

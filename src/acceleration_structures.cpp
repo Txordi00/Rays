@@ -220,7 +220,7 @@ TopLevelAS ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene)
     vk::AccelerationStructureGeometryKHR topASGeometry{};
     topASGeometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
     topASGeometry.setGeometry(instancesData);
-    topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+    // topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
     // Find sizes
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
@@ -344,7 +344,7 @@ void ASBuilder::updateTLAS(TopLevelAS &tlas, const glm::mat4 &transform)
     vk::AccelerationStructureGeometryKHR topASGeometry{};
     topASGeometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
     topASGeometry.setGeometry(instancesData);
-    topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+    // topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
     // Find sizes
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
