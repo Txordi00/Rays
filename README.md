@@ -17,19 +17,19 @@ The project relies on the following libraries:
 
 ## System requirements
 Regarding Vulkan, the project makes extensive use of the Vulkan RT pipeline and relies on the following extensions:
-#### Device extensions
+##### Device extensions
 - `VK_KHR_RAY_TRACING_PIPELINE_EXTENSION`: Required to use the rt pipeline.
 - `VK_KHR_ACCELERATION_STRUCTURE_EXTENSION`: Required to create and update the acceleration structures used to compute the ray intersections.
 - `VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION`: Required by the previous
 - `VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION`: For acquire-after-present. It simplifies the decoupling between frames in flight and the swapchain.
 - `VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION`: Used in order to skip many annoying image layout transitions and keep most GPU images in the general layout. It can arguably be disabled and the program should still work in most GPUs, albeit for some validation warnings.
-#### Instance extensions
+##### Instance extensions
 - `VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION`: Required by VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION.
 - `VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION`: Required by the previous.
 
 If your device drivers do not support any of these extensions, the program won't launch. You can check the supported extensions of your device with the `vulkaninfo` command. E.g.: `vulkaninfo | grep -i VK_KHR_RAY_TRACING_PIPELINE` will check whether you can use the Vulkan rt pipeline extension in your GPU and driver.
 
-## Compilation
+## Compilation and usage
 The project uses cmake as the build tool. It expects to find Vulkan, GLM and SDL3 installed in your system, and all the rest of the libraries are fetched from their repositories using the cmake's `FetchContent` mechanism.
 
 I tested the compilation in Linux using all the possible combinations between `(ninja, make)` and `(g++, clang++)`. Outside of Linux I have not tested anywhere, but it should work with minor changes in Windows. The build process is the typical with cmake:
@@ -42,20 +42,22 @@ cmake -G <build_generator> -DCMAKE_BUILD_TYPE=<build_type> -DCMAKE_CXX_COMPILER=
 ```
 It has been tested with `<build_generator>=Ninja, Unix\ Makefiles`, `<compiler>=g++, clang++` and `<build_generator_exec>=ninja, make`.
 
+The camera uses the WASD keys for forward, backward, left, and right movement; the Q and E keys for downward and upward movement; and the arrow keys for orientation. The Imgui controls are self-explanatory.
+
 > [!NOTE]
-> There is an experimental and currently broken compilation path using the Vulkan-hpp CPP20 module. It is switched on by setting `set(USE_VULKANHPP_CPP20_MODULE ON)` in the main `CMakeLists.txt`. Currently it is broken due to Vulkan forcing the import of the std module, which results in many redefinition errors coming from the include of glm headers. Furthermore, the `vulkan` hpp module forcefully imports the `vulkan:video` module incorrectly, and you have to manually rename `vulkan_hpp:video` to `vulkan:video` in the `vulkan_video.cppm` source file. This path cannot be used at the moment with `<build_generator>=Unix\ Makefiles` and `<build_generator_exec>=make`.
+> There is an experimental and currently broken compilation path using the Vulkan-hpp CPP20 module. It is switched on by setting `set(USE_VULKANHPP_CPP20_MODULE ON)` in the main `CMakeLists.txt`. Currently it is broken due to Vulkan forcing the import of the std module, which results in many redefinition errors coming from the include of glm headers. Furthermore, the `vulkan` module forcefully imports the `vulkan:video` module incorrectly, and you have to manually rename `vulkan_hpp:video` to `vulkan:video` in the `vulkan_video.cppm` source file. This path cannot be used at the moment with `<build_generator>=Unix\ Makefiles` and `<build_generator_exec>=make`.
+
 
 ### Features ###
 - **Vulkan rt pipeline:** Extensive use of the Vulkan RT pipeline for efficient ray generation and intersection in GPU. Runtime update of the acceleration structures (BVHs).
 - **GLTF loader:** GLTF loader worked on top of fastgltf. 
 - **Instancing:** Baked within the GLTF loader and the top-level acceleration structure.
-- **PBR materials with normal maps:** Standard PBR parameters from constants and/or textures (base color, perceptual roughness, metallic factor). Default value for reflectance. Admits normal maps. If the GLTF loader does not find the normal textures, it defaults to interpolated vertex normals.
+- **PBR materials with normal maps:** Standard PBR parameters from per-surface constants and/or textures (base color, perceptual roughness, metallic factor). Default value for reflectance. Admits normal maps. If the GLTF loader does not find the normal textures, it defaults to interpolated vertex normals.
 - **Importance sampling:** Implemented by balancing cosine-weighted hemisphere samples (diffuse pass) and microfacet ggx samples (specular pass) depending on their pdf values:
-```
-total_luminance_contribution = pdf_hemisphere(hemisphere_sample)^2 /
-                (pdf_hemisphere(hemisphere_sample)^2 + pdf_ggx(hemisphere_sample)^2) * contribution(hemisphere_sample)
- + pdf_ggx(ggx_sample)^2 /
-                (pdf_hemisphere(ggx_sample)^2 + pdf_ggx(ggx_sample)^2) * contribution(ggx_sample)
+```math
+\texttt{total\_luminance\_contribution} =
+\frac{\texttt{pdf\_hemisphere(hemisphere\_sample)}^2}{\texttt{pdf\_hemisphere(hemisphere\_sample)}^2 + \texttt{pdf\_ggx(hemisphere\_sample)}^2} \cdot \texttt{contribution(hemisphere\_sample)}
+ + \frac{\texttt{pdf\_ggx(ggx\_sample)}^2}{\texttt{pdf\_hemisphere(ggx\_sample)}^2 + \texttt{pdf\_ggx(ggx\_sample)}^2} \cdot \texttt{contribution(ggx\_sample)}
 ```
 - **Presampling:** Optional discretisation of the sampling space into GPU memory. Instead of computing the bounce directions on-line, they are loaded in from memory. It avoids many non-linear in-shader computations but adds a lot of random memory reads. In my computer (laptop with integrated AMD Radeon 780M graphics) it is unfortunately slower than on-line sampling. But maybe in dedicated GPU setups with higher bandwidth it will be beneficial.
 - **Lights manager and other controls with imgui:** Runtime addition/removal/modification of point lights and directional lights (I have limited them to 10 but the limit can be changed at compile time). Other controls: Background color picker, environment map selection, random sampling toggle (recommended to leave this on, otherwise you get a biased Monte-Carlo integration), rt recursion depth, number of bounces (samples) after each intersection, scene scale and rotation.
