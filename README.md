@@ -24,7 +24,7 @@ Regarding Vulkan, the project makes extensive use of the Vulkan RT pipeline and 
 - `VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION`: For acquire-after-present. It simplifies the decoupling between frames in flight and the swapchain.
 - `VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION`: Used in order to skip many annoying image layout transitions and keep most GPU images in the general layout. It can arguably be disabled and the program should still work in most GPUs, albeit for some validation warnings.
 ##### Instance extensions
-- `VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION`: Required by VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION.
+- `VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION`: Required by `VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION`.
 - `VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION`: Required by the previous.
 
 If your device drivers do not support any of these extensions, the program won't launch. You can check the supported extensions of your device with the `vulkaninfo` command. E.g.: `vulkaninfo | grep -i VK_KHR_RAY_TRACING_PIPELINE` will check whether you can use the Vulkan rt pipeline extension in your GPU and driver.
