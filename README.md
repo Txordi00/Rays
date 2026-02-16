@@ -34,18 +34,18 @@ The project uses cmake as the build tool. It expects to find Vulkan, GLM and SDL
 
 I tested the compilation in Linux using all the possible combinations between `(ninja, make)` and `(g++, clang++)`. Outside of Linux I have not tested anywhere, but it should work with minor changes in Windows. The build process is the typical with cmake:
 ```shell
-cd lrt
+cd Rays
 mkdir build && cd build
 cmake -G <build_generator> -DCMAKE_BUILD_TYPE=<build_type> -DCMAKE_CXX_COMPILER=<compiler>
 <build_generator_exec>
-./lrt <path_to_gltf_scene>
+./rays <path_to_gltf_scene>
 ```
 It has been tested with `<build_generator>=Ninja, Unix\ Makefiles`, `<compiler>=g++, clang++` and `<build_generator_exec>=ninja, make`.
 
 The camera uses the WASD keys for forward, backward, left, and right movement; the Q and E keys for downward and upward movement; and the arrow keys for orientation. The Imgui controls are self-explanatory.
 
 > [!NOTE]
-> There is an experimental and currently broken compilation path using the Vulkan-hpp CPP20 module. It is switched on by setting `set(USE_VULKANHPP_CPP20_MODULE ON)` in the main `CMakeLists.txt`. Currently it is broken due to Vulkan forcing the import of the std module, which results in many redefinition errors coming from the include of glm headers. Furthermore, the `vulkan` module forcefully imports the `vulkan:video` module incorrectly, and you have to manually rename `vulkan_hpp:video` to `vulkan:video` in the `vulkan_video.cppm` source file. This path cannot be used at the moment with `<build_generator>=Unix\ Makefiles` and `<build_generator_exec>=make`.
+> There is an experimental and currently broken compilation path using the Vulkan-hpp CPP20 module. It is switched on by setting `set(USE_VULKANHPP_CPP20_MODULE ON)` in the main `CMakeLists.txt`. Currently it is broken due to Vulkan forcing the import of the `std` module, which results in many redefinition errors coming from the include of glm headers. Furthermore, the `vulkan` module forcefully imports the `vulkan:video` module incorrectly, and you have to manually rename `vulkan_hpp:video` to `vulkan:video` in the `vulkan_video.cppm` source file. This path cannot be used at the moment with `<build_generator>=Unix\ Makefiles` and `<build_generator_exec>=make`.
 
 
 ### Features ###
