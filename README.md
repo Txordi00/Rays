@@ -73,11 +73,11 @@ The camera uses the WASD keys for forward, backward, left, and right movement; t
 - [Understandable RayTracing in 256 lines of bare C++](https://github.com/ssloy/tinyraytracer) - Before proceeding with the Vulkan RT work, I convinced myself that I truly understand ray tracing by trying to reproduce in CPU the results from that project.
 
 ### TODO ###
-- **Improve GLTF compatibility:** Top on the list. Currently, many GLTF files fail to load, probably due to some wrong assumptions on my end about the way the data is delivered. I should explore why and fix it while keeping the current baked-in instancing within the GLTF loader and the acceleration structures builder.
-- **Denoising:** Critical for image quality. Maybe [Intel's oidn](https://github.com/RenderKit/oidn) is a good starting point.
-- **More efficient algorithm:** I am eager to implement a ReSTIR-like algorithm with intelligent caching in the future. I have to study these [notes](https://intro-to-restir.cwyman.org/presentations/2023ReSTIR_Course_Notes.pdf) before that.
-- **Area lights:** I think that this should come after the previous step, since I cannot imagine the current Monte-Carlo implementation working in real-time with emissive surfaces.
-- **Refractive materials and caustics:** Handle refraction and the GLTF extensions `KHR_materials_transmission`, `KHR_materials_volume` and `KHR_materials_ior`.
+- [ ] **Improve GLTF compatibility:** Top on the list. Currently, many GLTF files fail to load, probably due to some wrong assumptions on my end about the way the data is delivered. I should explore why and fix it while keeping the current baked-in instancing within the GLTF loader and the acceleration structures builder.
+- [ ] **Denoising:** Critical for image quality. Maybe [Intel's oidn](https://github.com/RenderKit/oidn) is a good starting point.
+- [ ] **More efficient algorithm:** I am eager to implement a ReSTIR-like algorithm with intelligent caching in the future. I have to study these [notes](https://intro-to-restir.cwyman.org/presentations/2023ReSTIR_Course_Notes.pdf) before that.
+- [ ] **Area lights:** I think that this should come after the previous step, since I cannot imagine the current Monte-Carlo implementation working in real-time with emissive surfaces.
+- [ ] **Refractive materials and caustics:** Handle refraction and the GLTF extensions `KHR_materials_transmission`, `KHR_materials_volume` and `KHR_materials_ior`.
 
 ### ACKNOWLEDGMENTS ###
 I would like to acknowledge [Beaumanvienna (JC)](https://github.com/beaumanvienna/vulkan) and his [videos](https://www.youtube.com/@beaumanvienna6844) for insight into the GLTF format and for general guidance and motivation, [Natalie Vock](https://pixelcluster.github.io/) for helping me debug a couple of shady bugs in my code and [Tom Clabault](https://tomclabault.github.io/) for helping me correct my Monte-Carlo implementation and keep it energy-conserving. I don't want to forget to mention the participants of the [Vulkan Game Engine Design server](https://discord.gg/sG9hbJ499f) for their company and support along the way.
