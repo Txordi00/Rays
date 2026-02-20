@@ -56,7 +56,7 @@ AccelerationStructure ASBuilder::buildBLAS(const std::shared_ptr<MeshNode> &mesh
 
         vk::AccelerationStructureGeometryKHR geom{};
         geom.setGeometryType(vk::GeometryTypeKHR::eTriangles);
-        // geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
+        geom.setFlags(vk::GeometryFlagBitsKHR::eOpaque); // simplest
         geom.setGeometry(triData);
 
         // The entire array will be used to build the BLAS.
@@ -220,7 +220,6 @@ TopLevelAS ASBuilder::buildTLAS(const std::shared_ptr<GLTFObj> &scene)
     vk::AccelerationStructureGeometryKHR topASGeometry{};
     topASGeometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
     topASGeometry.setGeometry(instancesData);
-    // topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
     // Find sizes
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};
@@ -344,7 +343,6 @@ void ASBuilder::updateTLAS(TopLevelAS &tlas, const glm::mat4 &transform)
     vk::AccelerationStructureGeometryKHR topASGeometry{};
     topASGeometry.setGeometryType(vk::GeometryTypeKHR::eInstances);
     topASGeometry.setGeometry(instancesData);
-    // topASGeometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
 
     // Find sizes
     vk::AccelerationStructureBuildGeometryInfoKHR buildInfo{};

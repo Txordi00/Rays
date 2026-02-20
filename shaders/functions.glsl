@@ -63,7 +63,7 @@ vec3 BSDF(const float nDotH, const float lDotH, const float nDotV, const float n
     // diffuse BRDF
     const vec3 Fd = diffuseColor * Fd_Lambert(nDotL);
 
-    return Fd;
+    return Fd + Fr;
 }
 
 vec3 evaluate_directional_light(const Light light, const vec3 BSDF)
