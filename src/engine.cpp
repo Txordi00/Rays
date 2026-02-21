@@ -12,9 +12,6 @@ Engine::Engine(const std::filesystem::path &gltfPath)
 {
     I = std::make_unique<Init>(gltfPath);
 
-    // Init push constants aaa
-    rayPush.clearColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.f);
-    // rayPush.nLights = I->lights.size();
     descUpdater = std::make_unique<DescriptorUpdater>(I->device);
     lightsManager = std::make_unique<LightsManager>(I->device, I->allocator);
 }
@@ -161,6 +158,7 @@ void Engine::update_imgui()
         scale = std::max(scale, 0.01f);
         const float ds = scale / scaleOld;
         const glm::mat4 S = glm::scale(glm::mat4{1.f}, glm::vec3(ds));
+        rayPush.dScale = ds;
         I->asBuilder->updateTLAS(I->tlas, S);
     }
 

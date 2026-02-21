@@ -304,9 +304,8 @@ void main()
     const uint instanceId = gl_InstanceCustomIndexEXT;
     const uint geometryId = gl_GeometryIndexEXT;
     const uint surfaceId = instanceId + geometryId;
-    print_val("id %i ", surfaceId, 0, 6);
 
-    RayPush rayPush = push.rayPush;
+    const RayPush rayPush = push.rayPush;
     SurfaceStorage surface = surfaceStorages[nonuniformEXT(surfaceId)].surface;
 
     const uint primitiveIndex = surface.startIndex + gl_PrimitiveID * 3;
@@ -354,9 +353,10 @@ void main()
 
     const vec3 normalVtxRaw = norm0 * barycentrics.x + norm1 * barycentrics.y
             + norm2 * barycentrics.z; // already normalized
-    // Apply the transformation to the normals (not done in BLAS creation)
-    const vec3 normalVtx = normalize((gl_WorldToObject3x4EXT * normalVtxRaw).xyz);
-    // print_val("n %f ", length(normalVtxRaw), 2., 1.);
+    // Apply the transformation to the normals (not done in BLAS creation).
+    // The scale factor through push constants is a small optimization in order to avoid the non-linear normalization
+    // const vec3 normalVtx = normalize((gl_WorldToObject3x4EXT * normalVtxRaw).xyz);
+    const vec3 normalVtx = (gl_WorldToObject3x4EXT * normalVtxRaw).xyz * rayPush.dScale;
 
     const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
     vec3 normal = normalVtx;
@@ -365,7 +365,8 @@ void main()
         const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y
                 + v2.tangent.xyz * barycentrics.z; // range [-1, 1]
         const float handedness = v0.tangent.w; // All vi.tangent.w are the same
-        const vec3 tangent = normalize((gl_WorldToObject3x4EXT * tangentRaw).xyz);
+        // const vec3 tangent = normalize((gl_WorldToObject3x4EXT * tangentRaw).xyz);
+        const vec3 tangent = (gl_WorldToObject3x4EXT * tangentRaw).xyz * rayPush.dScale;
 
         const vec3 bitangent = cross(normalVtx, tangent) * handedness;
 
