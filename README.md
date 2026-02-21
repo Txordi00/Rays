@@ -30,7 +30,7 @@ Regarding Vulkan, the project makes extensive use of the Vulkan RT pipeline and 
 If your device drivers do not support any of these extensions, the program won't launch. You can check the supported extensions of your device with the `vulkaninfo` command. E.g.: `vulkaninfo | grep -i VK_KHR_RAY_TRACING_PIPELINE` will check whether you can use the Vulkan rt pipeline extension in your GPU and driver.
 
 ## Compilation and usage
-The project uses cmake as the build tool. It expects to find Vulkan, GLM and SDL3 installed in your system, and all the rest of the libraries are fetched from their repositories using the cmake's `FetchContent` mechanism.
+The project uses cmake as the build tool. It expects to find Vulkan, GLM and SDL3 installed in your system, and all the rest of the libraries are fetched from their repositories using the cmake's `FetchContent` mechanism. Many features from Vulkan 1.2 and 1.3 are used, so the Vulkan installation (or SDK) needs to be 1.3+ to compile and run the code. I am trying to keep the `main` branch as stable as possible and push potentially breaking changes into the `dev` branch.
 
 I tested the compilation in Linux using all the possible combinations between `(ninja, make)` and `(g++, clang++)`. Outside of Linux I have not tested anywhere, but it should work with minor changes in Windows. The build process is the typical with cmake:
 ```shell
@@ -73,7 +73,7 @@ The camera uses the WASD keys for forward, backward, left, and right movement; t
 - [Understandable RayTracing in 256 lines of bare C++](https://github.com/ssloy/tinyraytracer) - Before proceeding with the Vulkan RT work, I convinced myself that I truly understand ray tracing by trying to reproduce in CPU the results from that project.
 
 ### TODO ###
-- [ ] **Improve GLTF compatibility:** Top on the list. Currently, many GLTF files fail to load, probably due to some wrong assumptions on my end about the way the data is delivered. I should explore why and fix it while keeping the current baked-in instancing within the GLTF loader and the acceleration structures builder.
+- [x] **Improve GLTF compatibility:** Top on the list. Currently, many GLTF files fail to load, probably due to some wrong assumptions on my end about the way the data is delivered. I should explore why and fix it while keeping the current baked-in instancing within the GLTF loader and the acceleration structures builder. A lot of progress has been made already, but probably there are still scenes that could be fixed with simple tweaks in the GLTF loader. Please report!
 - [ ] **Denoising:** Critical for image quality. Maybe [Intel's oidn](https://github.com/RenderKit/oidn) is a good starting point.
 - [ ] **More efficient algorithm:** I am eager to implement a ReSTIR-like algorithm with intelligent caching in the future. I have to study these [notes](https://intro-to-restir.cwyman.org/presentations/2023ReSTIR_Course_Notes.pdf) before that.
 - [ ] **Area lights:** I think that this should come after the previous step, since I cannot imagine the current Monte-Carlo implementation working in real-time with emissive surfaces.
