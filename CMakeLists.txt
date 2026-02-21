@@ -52,7 +52,7 @@ include(FetchContent)
 FetchContent_Declare(
   imgui
   GIT_REPOSITORY  "https://github.com/ocornut/imgui.git"
-  GIT_TAG         "v1.92.5"  # Specify a version tag or use 'docking' or 'master'
+  GIT_TAG         "v1.92.6"
 )
 FetchContent_MakeAvailable(imgui)
 
@@ -80,7 +80,7 @@ target_link_libraries(imgui PRIVATE Vulkan::Vulkan SDL3::SDL3)
 FetchContent_Declare(
     fetch_vk_bootstrap
     GIT_REPOSITORY "https://github.com/charles-lunarg/vk-bootstrap"
-    GIT_TAG        "v1.4.335"
+    GIT_TAG        "v${Vulkan_VERSION}"
 )
 FetchContent_MakeAvailable(fetch_vk_bootstrap)
 
@@ -98,7 +98,7 @@ FetchContent_MakeAvailable(fastgltf)
 FetchContent_Declare(
   vma
   GIT_REPOSITORY  "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git"
-  GIT_TAG         "v3.3.0"
+  GIT_TAG         "master"
 )
 FetchContent_MakeAvailable(vma)
 
