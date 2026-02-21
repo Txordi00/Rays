@@ -167,6 +167,10 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader::load_gltf_asset(const std::f
 
 void GLTFLoader::load_samplers(const fastgltf::Asset &asset, std::shared_ptr<GLTFObj> &scene)
 {
+    if (asset.samplers.empty()) {
+        scene->samplers.push_back(samplerLinear);
+        return;
+    }
     scene->samplers.reserve(asset.samplers.size());
     scene->samplerQueue.reserve(scene->samplerQueue.size() + asset.samplers.size());
     for (const fastgltf::Sampler &s : asset.samplers) {
@@ -368,7 +372,7 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
             size_t imgIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
                                   .imageIndex.value();
             size_t samplerIndex = asset.textures[m.pbrData.baseColorTexture->textureIndex]
-                                      .samplerIndex.value();
+                                      .samplerIndex.value_or(0);
             matTmp->materialResources.colorImageIndex = imgIndex;
             matTmp->materialResources.colorSamplerIndex = samplerIndex;
         }
@@ -377,7 +381,7 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
                                   .imageIndex.value();
             size_t matSamplerIndex = asset
                                          .textures[m.pbrData.metallicRoughnessTexture->textureIndex]
-                                         .samplerIndex.value();
+                                         .samplerIndex.value_or(0);
             matTmp->materialResources.materialImageIndex = matIndex;
             matTmp->materialResources.materialSamplerIndex = matSamplerIndex;
         }
@@ -385,7 +389,7 @@ void GLTFLoader::load_materials(const fastgltf::Asset &asset,
             matTmp->materialResources.normalMapIndex = asset.textures[m.normalTexture->textureIndex]
                                                            .imageIndex.value();
             matTmp->materialResources.normalSamplerIndex
-                = asset.textures[m.normalTexture->textureIndex].samplerIndex.value();
+                = asset.textures[m.normalTexture->textureIndex].samplerIndex.value_or(0);
         }
         vMaterials.emplace_back(std::move(matTmp));
         scene->materials[m.name.c_str()] = vMaterials.back();

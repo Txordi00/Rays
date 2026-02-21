@@ -89,7 +89,7 @@ FetchContent_MakeAvailable(fetch_vk_bootstrap)
 FetchContent_Declare(
   fastgltf
   GIT_REPOSITORY  "https://github.com/spnda/fastgltf.git"
-  GIT_TAG         "v0.9.0"
+  GIT_TAG         "main"
 )
 set(FASTGLTF_COMPILE_AS_CPP20 YES)
 FetchContent_MakeAvailable(fastgltf)
@@ -114,7 +114,7 @@ FetchContent_MakeAvailable(stb)
 FetchContent_Declare(
     nfd
     GIT_REPOSITORY "https://github.com/btzy/nativefiledialog-extended.git"
-    GIT_TAG "v1.3.0"
+    GIT_TAG "master"
 )
 FetchContent_MakeAvailable(nfd)
 
