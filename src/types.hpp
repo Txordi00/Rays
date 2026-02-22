@@ -107,7 +107,7 @@ struct RayPush
 {
     glm::vec4 clearColor{0.5f, 0.5f, 0.5f, 1.f};
     uint32_t nLights{0};
-    float dScale{1.f};
+    float scale{1.f};
 };
 
 struct SpecializationConstantsClosestHit

@@ -158,7 +158,7 @@ void Engine::update_imgui()
         scale = std::max(scale, 0.01f);
         const float ds = scale / scaleOld;
         const glm::mat4 S = glm::scale(glm::mat4{1.f}, glm::vec3(ds));
-        rayPush.dScale = ds;
+        rayPush.scale = scale;
         I->asBuilder->updateTLAS(I->tlas, S);
     }
 
