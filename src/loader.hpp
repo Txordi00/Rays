@@ -59,8 +59,9 @@ struct Node
     std::weak_ptr<Node> parent;
     std::vector<std::shared_ptr<Node>> children;
 
-    glm::mat4 localTransform;
-    glm::mat4 worldTransform;
+    glm::mat4 localTransform{1.f};
+    glm::mat4 worldTransform{1.f};
+    glm::vec3 scale{1.f};
 
     void refreshTransform(const glm::mat4 &parentMatrix)
     {

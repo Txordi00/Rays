@@ -11,7 +11,7 @@
 layout(location = 0) rayPayloadInEXT HitPayload rayPayload;
 layout(location = 1) rayPayloadEXT HitPayload recursivePayload; // Separate payload for recursive shots
 layout(location = 2) rayPayloadEXT bool isShadowed;
-layout(constant_id = 0) const uint MAX_RT_DEPTH = 3;
+layout(constant_id = 0) const uint MAX_RT_DEPTH = 2;
 layout(constant_id = 1) const uint BOUNCES = 8;
 layout(constant_id = 2) const bool RANDOM = true;
 layout(constant_id = 3) const bool PRESAMPLE = false;
@@ -80,7 +80,8 @@ const uint shadowFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEX
 const float reflectance = 0.5;
 const vec3 nonMetallicF0 = vec3(0.16 * reflectance * reflectance);
 
-uint rngState = gl_LaunchSizeEXT.x * gl_LaunchIDEXT.y + gl_LaunchIDEXT.x; // Initial seed
+uint rngState = gl_LaunchSizeEXT.x * gl_LaunchIDEXT.y + gl_LaunchIDEXT.x
+        + rayPayload.depth * 719393u; // Initial seed
 
 vec3 direct_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, const vec3 diffuseColor, const vec3 f0, const float f90, const float a, const float NoV)
 {
@@ -184,7 +185,7 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
         return vec3(0.);
 
     // Set a different seed for each recursion level
-    rngState *= rayPayload.depth;
+    // rngState *= rayPayload.depth;
 
     // Local normal frame
     const mat3 S = normal_cob(normal);
@@ -203,7 +204,7 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
         (PRESAMPLE) ? cosine_sample_hemisphere_cached(S, u, l, pdf_diffuse, NoL) :
         cosine_sample_hemisphere(S, u, l, pdf_diffuse, NoL);
 
-        if (pdf_diffuse < 1e-5) {
+        if (pdf_diffuse < 1e-5 || NoL < 1e-5) {
             samples--;
             continue;
         }
@@ -243,15 +244,12 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
     for (uint s = 0; s < samplesPerStrategy; s++)
     {
         vec2 u = (RANDOM) ? vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState)) : UV[s];
-        // vec2 u = vec2(stepAndOutputRNGFloat(rngState), stepAndOutputRNGFloat(rngState));
-        // u = min(round(u * 100.) / 100., 0.99);
-        // float aa = min(round(a * 100.) / 100., 0.99);
         vec3 l, h;
         float pdf_specular, NoL, VoH;
         (PRESAMPLE) ? sample_microfacet_ggx_specular_cached(S, v, u, a, l, h, NoL, VoH, pdf_specular) :
         sample_microfacet_ggx_specular(S, v, u, a, l, h, NoL, VoH, pdf_specular);
 
-        if (pdf_specular < 1e-5) {
+        if (pdf_specular < 1e-5 || NoL < 1e-5) {
             samples--;
             continue;
         }
@@ -286,7 +284,7 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
         // Accumulate indirect lighting
         indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_specular;
     }
-
+    // print_val("h %f", length(indirectLuminance), -0.1, 1000.);
     indirectLuminance /= float(BOUNCES);
     return indirectLuminance;
 }
@@ -297,6 +295,7 @@ void main()
     rayPayload.depth++;
 
     if (rayPayload.depth > MAX_RT_DEPTH) {
+        rayPayload.hitValue = vec3(0.);
         return;
     }
 
@@ -355,9 +354,7 @@ void main()
             + norm2 * barycentrics.z; // already normalized
     // Apply the transformation to the normals (not done in BLAS creation).
     // The scale factor through push constants is a small optimization in order to avoid the non-linear normalization
-    // const vec3 normalVtx = normalize((gl_WorldToObject3x4EXT * normalVtxRaw).xyz);
-    const vec3 normalVtx = (gl_WorldToObject3x4EXT * normalVtxRaw).xyz * rayPush.scale;
-    // print_val("n %f ", length(normalVtx), 0.99, 1.);
+    const vec3 normalVtx = normalize((gl_WorldToObject3x4EXT * normalVtxRaw).xyz);
     const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
     vec3 normal = normalVtx;
     if (normalMapIndex != -1)
@@ -365,8 +362,7 @@ void main()
         const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y
                 + v2.tangent.xyz * barycentrics.z; // range [-1, 1]
         const float handedness = v0.tangent.w; // All vi.tangent.w are the same
-        // const vec3 tangent = normalize((gl_WorldToObject3x4EXT * tangentRaw).xyz);
-        const vec3 tangent = (gl_WorldToObject3x4EXT * tangentRaw).xyz * rayPush.scale;
+        const vec3 tangent = normalize((gl_WorldToObject3x4EXT * tangentRaw).xyz);
         // print_val("t %f ", length(tangent), 0.99, 1.);
 
         const vec3 bitangent = cross(normalVtx, tangent) * handedness;
@@ -381,6 +377,7 @@ void main()
         normal = TBN * normalTexRaw.xyz;
         // print_val("n %f ", length(normal), 0.99, 1.);
     }
+    // print_val("n0 %f ", length(normal), 0.9, 1.1);
 
     const vec4 baseColor = (colorImageIndex != -1) ? texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
                 samplers[nonuniformEXT(colorSamplerIndex)]),

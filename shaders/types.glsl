@@ -64,7 +64,6 @@ struct RayPush
 {
     vec4 clearColor;
     uint numLights;
-    float scale;
 };
 
 struct MaterialConstants

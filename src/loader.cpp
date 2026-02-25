@@ -621,6 +621,16 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
         // Load the local transform
         const auto m = fastgltf::getTransformMatrix(n);
         nodes.back()->localTransform = glm::make_mat4(m.data());
+
+        const auto *trs = std::get_if<fastgltf::TRS>(&n.transform);
+        if (trs) {
+            const fastgltf::math::fvec3 scale = trs->scale;
+            nodes.back()->scale = glm::make_vec3(scale.data());
+            // std::println("scale: ({}, {}, {})",
+            //              nodes.back()->scale.x,
+            //              nodes.back()->scale.y,
+            //              nodes.back()->scale.z);
+        }
     }
 
     // Generate the node tree structure

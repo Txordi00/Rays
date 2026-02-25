@@ -76,7 +76,7 @@ vec3 evaluate_directional_light(const Light light, const vec3 BSDF)
 vec3 evaluate_point_light(const Light light, const float distanceSquared, const vec3 BSDF)
 {
     const float attenuation = light.intensity / distanceSquared;
-    vec3 luminance = BSDF * attenuation * light.color;
+    const vec3 luminance = BSDF * attenuation * light.color;
     return luminance;
 }
 

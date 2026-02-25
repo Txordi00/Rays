@@ -107,13 +107,12 @@ struct RayPush
 {
     glm::vec4 clearColor{0.5f, 0.5f, 0.5f, 1.f};
     uint32_t nLights{0};
-    float scale{1.f};
 };
 
 struct SpecializationConstantsClosestHit
 {
-    uint32_t recursionDepth{2};
-    uint32_t numBounces{8};
+    uint32_t recursionDepth{1};
+    uint32_t numBounces{2};
     vk::Bool32 random{vk::True};
     vk::Bool32 presampled{vk::False};
 };
