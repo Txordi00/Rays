@@ -284,7 +284,6 @@ vec3 indirect_lighting(const vec3 worldPos, const vec3 normal, const vec3 v, con
         // Accumulate indirect lighting
         indirectLuminance += weight * BSDF * recursivePayload.hitValue / pdf_specular;
     }
-    // print_val("h %f", length(indirectLuminance), -0.1, 1000.);
     indirectLuminance /= float(BOUNCES);
     return indirectLuminance;
 }
@@ -374,7 +373,7 @@ void main()
                         samplers[nonuniformEXT(normalSamplerIndex)]),
                     uv) - 1.; // range [0, 1] -> [-1, 1]
 
-        normal = TBN * normalTexRaw.xyz;
+        normal = normalize(TBN * normalTexRaw.xyz);
         // print_val("n %f ", length(normal), 0.99, 1.);
     }
     // print_val("n0 %f ", length(normal), 0.9, 1.1);

@@ -12,7 +12,7 @@ if(USE_VULKANHPP_CPP20_MODULE)
   set(CMAKE_CXX_MODULE_STD ON)
 endif()
 add_compile_options(-Wno-nullability-completeness -Wno-deprecated-literal-operator)
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math -flto -march=native")
 
 # set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

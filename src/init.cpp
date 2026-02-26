@@ -565,8 +565,6 @@ void Init::init_imgui()
     initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
     ImGui_ImplVulkan_Init(&initInfo);
-
-    // ImGui_ImplVulkan_CreateFontsTexture();
 }
 
 void Init::init_rt()
