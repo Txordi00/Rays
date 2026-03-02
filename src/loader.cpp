@@ -159,8 +159,14 @@ std::optional<std::shared_ptr<GLTFObj>> GLTFLoader::load_gltf_asset(const std::f
     // MESHES
     load_meshes(asset.get(), materials, scene, meshes);
 
+    // Surface buffers
+    create_surface_buffers(meshes, scene);
+
     // Load nodes and their meshes
     load_nodes(asset.get(), meshes, scene, nodes);
+
+    // Create per-instance buffer
+    create_instances_buffer(scene);
 
     return scene;
 }
@@ -533,7 +539,11 @@ void GLTFLoader::load_meshes(const fastgltf::Asset &asset,
         meshes.emplace_back(std::move(meshTmp));
         scene->meshes.insert({m.name.c_str(), meshes.back()});
     }
+}
 
+void GLTFLoader::create_surface_buffers(const std::vector<std::shared_ptr<Mesh>> &meshes,
+                                        std::shared_ptr<GLTFObj> &scene)
+{
     // Create the per-surface uniform buffers
     scene->surfaceUniformBuffers.reserve(scene->surfaceCount);
     uint32_t surfaceId = 0;
@@ -624,7 +634,7 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
 
         const auto *trs = std::get_if<fastgltf::TRS>(&n.transform);
         if (trs) {
-            const fastgltf::math::fvec3 scale = trs->scale;
+            const fastgltf::math::fvec3 &scale = trs->scale;
             nodes.back()->scale = glm::make_vec3(scale.data());
             // std::println("scale: ({}, {}, {})",
             //              nodes.back()->scale.x,
@@ -652,6 +662,34 @@ void GLTFLoader::load_nodes(const fastgltf::Asset &asset,
             n->refreshTransform(glm::mat4(1.f));
         }
     }
+}
+
+void GLTFLoader::create_instances_buffer(std::shared_ptr<GLTFObj> &scene)
+{
+    std::vector<InstanceStorage> scales;
+    scales.reserve(scene->meshNodes.size());
+    for (const auto &mn : scene->meshNodes) {
+        scales.emplace_back(mn->scale);
+    }
+    vk::DeviceSize instancesBufferSize = vk::DeviceSize{sizeof(InstanceStorage) * scales.size()};
+    std::shared_ptr<Buffer> instancesBuffer = std::make_shared<Buffer>(
+        utils::create_buffer(device,
+                             allocator,
+                             instancesBufferSize,
+                             vk::BufferUsageFlagBits::eStorageBuffer,
+                             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE));
+    utils::copy_to_device_buffer(*instancesBuffer,
+                                 device,
+                                 allocator,
+                                 gltfCmd,
+                                 queue,
+                                 gltfFence,
+                                 scales.data(),
+                                 instancesBufferSize);
+
+    scene->instancesBuffer = *instancesBuffer;
+
+    scene->bufferQueue.push_back(std::move(instancesBuffer));
 }
 
 void GLTFLoader::create_mesh_buffers(const std::vector<uint32_t> &indices,

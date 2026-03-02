@@ -39,6 +39,11 @@ layout(buffer_reference, std140, scalar) readonly buffer IndexBuffer
     uint indices[];
 };
 
+layout(set = 0, binding = 6, scalar) readonly buffer InstancesBuffer
+{
+    vec3 scales[];
+} instancesBuffer;
+
 layout(buffer_reference, scalar) readonly buffer MaterialConstantsBuffer
 {
     MaterialConstants materialConstants;
@@ -349,11 +354,17 @@ void main()
     const vec3 pos = vertPos0 * barycentrics.x + vertPos1 * barycentrics.y
             + vertPos2 * barycentrics.z;
 
+    const vec3 scale = instancesBuffer.scales[instanceId] * rayPush.globalScale;
+//    print_val("s %f ", instancesBuffer.scales[instanceId].z, 2., 1.);
+
     const vec3 normalVtxRaw = norm0 * barycentrics.x + norm1 * barycentrics.y
             + norm2 * barycentrics.z; // already normalized
     // Apply the transformation to the normals (not done in BLAS creation).
-    // The scale factor through push constants is a small optimization in order to avoid the non-linear normalization
-    const vec3 normalVtx = normalize((gl_WorldToObject3x4EXT * normalVtxRaw).xyz);
+    // The per-instance scale factor is a small optimization in order to avoid
+    // a couple of non-linear normalizations. But I don't think it is worth it...
+    const vec3 normalVtx = (gl_WorldToObject3x4EXT * normalVtxRaw).xyz * scale;
+//    print_val("nvtx %f ", length(normalVtx), 0.99, 1.);
+//    const float normalLength = length(normalVtx);
     const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
     vec3 normal = normalVtx;
     if (normalMapIndex != -1)
@@ -361,9 +372,11 @@ void main()
         const vec3 tangentRaw = v0.tangent.xyz * barycentrics.x + v1.tangent.xyz * barycentrics.y
                 + v2.tangent.xyz * barycentrics.z; // range [-1, 1]
         const float handedness = v0.tangent.w; // All vi.tangent.w are the same
-        const vec3 tangent = normalize((gl_WorldToObject3x4EXT * tangentRaw).xyz);
-        // print_val("t %f ", length(tangent), 0.99, 1.);
+        // |tangent| = |normalVtx|
+        const vec3 tangent = (gl_WorldToObject3x4EXT * tangentRaw).xyz * scale;
+//        print_val("t %f ", abs(length(tangent) - length(normalVtx)), 2., 1.);
 
+        // |a x b| = |a||b||sin(angle(a,b))| => |bitangent| = normalLength^2
         const vec3 bitangent = cross(normalVtx, tangent) * handedness;
 
         const mat3 TBN = mat3(tangent, bitangent, normalVtx);
@@ -373,10 +386,11 @@ void main()
                         samplers[nonuniformEXT(normalSamplerIndex)]),
                     uv) - 1.; // range [0, 1] -> [-1, 1]
 
-        normal = normalize(TBN * normalTexRaw.xyz);
-        // print_val("n %f ", length(normal), 0.99, 1.);
+        normal = TBN * normalTexRaw.xyz;
+//        print_val("n %f ", length(normal), 0.99, 1.);
     }
-    // print_val("n0 %f ", length(normal), 0.9, 1.1);
+    normal = normalize(normal);
+//    print_val("n %f ", length(normal), 0.9, 1.1);
 
     const vec4 baseColor = (colorImageIndex != -1) ? texture(sampler2D(textures[nonuniformEXT(colorImageIndex)],
                 samplers[nonuniformEXT(colorSamplerIndex)]),

@@ -159,6 +159,7 @@ void Engine::update_imgui()
         const float ds = scale / scaleOld;
         const glm::mat4 S = glm::scale(glm::mat4{1.f}, glm::vec3(ds));
         I->asBuilder->updateTLAS(I->tlas, S);
+        rayPush.globalScale = scale;
     }
 
     const float xRotOld{xRot};
@@ -229,6 +230,7 @@ void Engine::update_descriptors()
         descUpdater->add_combined_image(descriptorSetRt, 3, {I->presampler->hemisphereImage});
         descUpdater->add_combined_image(descriptorSetRt, 4, {I->presampler->ggxImage});
         descUpdater->add_combined_image(descriptorSetRt, 5, {I->backgroundImage});
+        descUpdater->add_storage(descriptorSetRt, 6, {I->scene->instancesBuffer});
     }
     descUpdater->update();
 }

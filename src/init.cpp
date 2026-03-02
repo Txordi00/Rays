@@ -30,7 +30,6 @@ Init::Init(const std::filesystem::path &gltfPath)
     recreate_draw_data();
     load_meshes(gltfPath);
     load_background();
-    // create_lights();
     create_as();
     init_descriptors();
     init_pipelines();
@@ -443,6 +442,8 @@ void Init::init_descriptors()
     descHelperRt
         ->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1},
                              frameOverlap); // Env map
+    descHelperRt->add_descriptor_set(vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1},
+                                     frameOverlap); // Env map
     descHelperRt->create_descriptor_pool();
     descHelperRt->add_binding(
         Binding{vk::DescriptorType::eAccelerationStructureKHR,
@@ -463,6 +464,8 @@ void Init::init_descriptors()
     descHelperRt->add_binding(Binding{vk::DescriptorType::eCombinedImageSampler,
                                       vk::ShaderStageFlagBits::eMissKHR,
                                       5}); // Env map
+    descHelperRt->add_binding(
+        Binding{vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eMissKHR, 6});
 
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt

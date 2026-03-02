@@ -87,6 +87,11 @@ struct SurfaceStorage
     uint32_t count{0};
 };
 
+struct InstanceStorage
+{
+    glm::vec3 scale{1.f};
+};
+
 struct MeshNode : Node
 {
     std::shared_ptr<Mesh> mesh;
@@ -107,6 +112,7 @@ struct GLTFObj
     std::vector<std::shared_ptr<MeshNode>> meshNodes;
 
     std::vector<Buffer> surfaceUniformBuffers;
+    Buffer instancesBuffer;
 
     size_t surfaceCount{0};
 
@@ -164,6 +170,9 @@ private:
                      std::shared_ptr<GLTFObj> &scene,
                      std::vector<std::shared_ptr<Mesh>> &meshes);
 
+    void create_surface_buffers(const std::vector<std::shared_ptr<Mesh>> &meshes,
+                                std::shared_ptr<GLTFObj> &scene);
+
     Buffer create_surface_buffer(const std::shared_ptr<Mesh> &mesh, const Surface &surface);
 
     // We will need to modify the meshes in order to accomodate each surface id.
@@ -171,6 +180,8 @@ private:
                     std::vector<std::shared_ptr<Mesh>> &meshes,
                     std::shared_ptr<GLTFObj> &scene,
                     std::vector<std::shared_ptr<Node>> &nodes);
+
+    void create_instances_buffer(std::shared_ptr<GLTFObj> &scene);
 
     void create_mesh_buffers(const std::vector<uint32_t> &indices,
                              const std::vector<Vertex> &vertices,
