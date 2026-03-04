@@ -1,5 +1,5 @@
 # Rays - A Vulkan path tracer for GLTF visualization
-![Screenshot of the program rendering the default `ABeautifulGame.glb` asset.](assets/screenshot_01.png)
+[![video](assets/media/screenshot_01.png)](assets/media/screencast.mp4)
 
 Rays is a real-time Monte Carlo path tracer intended for GLTF visualization. It is based on an energy-conserving BRDF that admits PBR materials. It uses the Vulkan RT pipeline and features some optimizations such as instancing and a presampling pass in seek of efficiency. This is a personal research project and as is, it is still very much work in progress and lacks polish and some important features (broader GLTF compatibility and denoising stick out the most).
 
@@ -29,6 +29,8 @@ Regarding Vulkan, the project makes extensive use of the Vulkan RT pipeline and 
 
 If your device drivers do not support any of these extensions, the program won't launch. You can check the supported extensions of your device with the `vulkaninfo` command. E.g.: `vulkaninfo | grep -i VK_KHR_RAY_TRACING_PIPELINE` will check whether you can use the Vulkan rt pipeline extension in your GPU and driver.
 
+The Vulkan driver in your system has to be at least 1.3-compliant in order to use the RT extensions and the `dynamicRendering`, `synchronization2` 1.3 standard features. It also takes advantage of the `descriptorIndexing`, `descriptorBindingPartiallyBound`, `runtimeDescriptorArray`, `scalarBlockLayout`, `bufferDeviceAddress`, `*UpdateAfterBind` and `*NonUniformIndexing` 1.2 features.
+
 ## Compilation and usage
 The project uses cmake as the build tool. It expects to find Vulkan, GLM and SDL3 installed in your system, and all the rest of the libraries are fetched from their repositories using the cmake's `FetchContent` mechanism. Many features from Vulkan 1.2 and 1.3 are used, so the Vulkan installation (or SDK) needs to be 1.3+ to compile and run the code. I am trying to keep the `main` branch as stable as possible and push potentially breaking changes into the `dev` branch.
 
@@ -48,7 +50,7 @@ The camera uses the WASD keys for forward, backward, left, and right movement; t
 > There is an experimental and currently broken compilation path using the Vulkan-hpp CPP20 module. It is switched on by setting `set(USE_VULKANHPP_CPP20_MODULE ON)` in the main `CMakeLists.txt`. Currently it is broken due to Vulkan forcing the import of the `std` module, which results in many redefinition errors coming from the include of glm headers. Furthermore, the `vulkan` module forcefully imports the `vulkan:video` module incorrectly, and you have to manually rename `vulkan_hpp:video` to `vulkan:video` in the `vulkan_video.cppm` source file. This path cannot be used at the moment with `<build_generator>=Unix\ Makefiles` and `<build_generator_exec>=make`.
 
 
-### Features ###
+## Features
 - **Vulkan rt pipeline:** Extensive use of the Vulkan RT pipeline for efficient ray generation and intersection in GPU. Runtime update of the acceleration structures (BVHs).
 - **GLTF loader:** GLTF loader worked on top of fastgltf. 
 - **Instancing:** Baked within the GLTF loader and the top-level acceleration structure.
@@ -62,7 +64,7 @@ The camera uses the WASD keys for forward, backward, left, and right movement; t
 - **Presampling:** Optional discretisation of the sampling space into GPU memory. Instead of computing the bounce directions on-line, they are loaded in from memory. It avoids many non-linear in-shader computations but adds a lot of random memory reads. In my computer (laptop with integrated AMD Radeon 780M graphics) it is unfortunately slower than on-line sampling. But maybe in dedicated GPU setups with higher bandwidth it will be beneficial.
 - **Lights manager and other controls with imgui:** Runtime addition/removal/modification of point lights and directional lights (I have limited them to 10 but the limit can be changed at compile time). Other controls: Background color picker, environment map selection, random sampling toggle (recommended to leave this on, otherwise you get a biased Monte-Carlo integration), rt recursion depth, number of bounces (samples) after each intersection, scene scale and rotation.
 
-### REFERENCES ###
+## REFERENCES
 - [Vulkan Guide](https://vkguide.dev/) (Victor Blanco) - Overall engine structure and my main source of knowledge of the Vulkan API
 - [NVIDIA Vulkan Ray Tracing Tutorial](https://nvpro-samples.github.io/vk_raytracing_tutorial_KHR/) (v1) - Vulkan RT pipeline setup
 - [Filament](https://google.github.io/filament/Filament.md.html) - PBR shader functions
@@ -72,14 +74,20 @@ The camera uses the WASD keys for forward, backward, left, and right movement; t
 - [Physically Based Rendering: From Theory To Implementation](https://www.pbr-book.org/) - Cosine-weighted hemisphere sampling and more insight into Monte Carlo path tracing
 - [Understandable RayTracing in 256 lines of bare C++](https://github.com/ssloy/tinyraytracer) - Before proceeding with the Vulkan RT work, I convinced myself that I truly understand ray tracing by trying to reproduce in CPU the results from that project.
 
-### TODO ###
+## SCREENSHOTS
+![screenshot_02](assets/media/screenshot_02.png)
+![screenshot_03](assets/media/screenshot_03.png)
+![screenshot_04](assets/media/screenshot_04.png)
+![screenshot_05](assets/media/screenshot_05.png)
+
+## TODO
 - [ ] **Improve GLTF compatibility:** ~~Top on the list. Currently, many GLTF files fail to load, probably due to some wrong assumptions on my end about the way the data is delivered. I should explore why and fix it while keeping the current baked-in instancing within the GLTF loader and the acceleration structures builder.~~ A lot of progress has been made already in this regard, but probably there are still many scenes that could be fixed with simple tweaks in the GLTF loader and acceleration structure builder. If anybody finds a scene that fails to load, please report!
 - [ ] **Denoising:** Critical for image quality. Maybe [Intel's oidn](https://github.com/RenderKit/oidn) is a good starting point.
 - [ ] **More efficient algorithm:** I am eager to implement a ReSTIR-like algorithm with intelligent caching and proper NEE in the future. I have to study these [notes](https://intro-to-restir.cwyman.org/presentations/2023ReSTIR_Course_Notes.pdf) before that.
 - [ ] **Area lights:** I think that this should come after the previous step, since I cannot imagine the current Monte-Carlo implementation working in real-time with emissive surfaces.
 - [ ] **Refractive materials and caustics:** Handle refraction and the GLTF extensions `KHR_materials_transmission`, `KHR_materials_volume` and `KHR_materials_ior`.
 
-### ACKNOWLEDGMENTS ###
+## ACKNOWLEDGMENTS
 I would like to acknowledge [Beaumanvienna (JC)](https://github.com/beaumanvienna/vulkan) and his [videos](https://www.youtube.com/@beaumanvienna6844) for insight into the GLTF format and for general guidance and motivation, [Natalie Vock](https://pixelcluster.github.io/) for helping me debug a couple of shady bugs in my code and [Tom Clabault](https://tomclabault.github.io/) for helping me correct my Monte-Carlo implementation and keep it energy-conserving. I don't want to forget to mention the participants of the [Vulkan Game Engine Design server](https://discord.gg/sG9hbJ499f) for their company and support along the way.
 
 ## License
