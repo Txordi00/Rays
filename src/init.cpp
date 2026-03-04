@@ -464,8 +464,9 @@ void Init::init_descriptors()
     descHelperRt->add_binding(Binding{vk::DescriptorType::eCombinedImageSampler,
                                       vk::ShaderStageFlagBits::eMissKHR,
                                       5}); // Env map
-    descHelperRt->add_binding(
-        Binding{vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eMissKHR, 6});
+    descHelperRt->add_binding(Binding{vk::DescriptorType::eStorageBuffer,
+                                      vk::ShaderStageFlagBits::eClosestHitKHR,
+                                      6}); // Per-instance storabe
 
     rtDescriptorSetLayout = descHelperRt->create_descriptor_set_layout();
     std::vector<vk::DescriptorSet> setsRt

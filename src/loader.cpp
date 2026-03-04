@@ -676,7 +676,8 @@ void GLTFLoader::create_instances_buffer(std::shared_ptr<GLTFObj> &scene)
         utils::create_buffer(device,
                              allocator,
                              instancesBufferSize,
-                             vk::BufferUsageFlagBits::eStorageBuffer,
+                             vk::BufferUsageFlagBits::eStorageBuffer
+                                 | vk::BufferUsageFlagBits::eTransferDst,
                              VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE));
     utils::copy_to_device_buffer(*instancesBuffer,
                                  device,

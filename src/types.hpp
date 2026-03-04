@@ -33,7 +33,7 @@ const unsigned int W = 1000;
 const unsigned int H = 1000;
 const float F = 1.f; // focal length
 const float FOV = glm::radians(70.f);
-#define PROJNAME "LRT"
+#define PROJNAME "Rays"
 const unsigned int API_VERSION[3] = {1, 4, 0};
 
 const vk::PresentModeKHR PRESENT_MODE = vk::PresentModeKHR::eFifoRelaxed;
