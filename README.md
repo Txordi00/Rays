@@ -1,19 +1,9 @@
 # Rays - A Vulkan path tracer for GLTF visualization
-[![video](assets/media/screenshot_01.png)](assets/media/screencast.mp4)
+![screenshot_01](assets/media/screenshot_01.png)
 
-Rays is a real-time Monte Carlo path tracer intended for GLTF visualization. It is based on an energy-conserving BRDF that admits PBR materials. It uses the Vulkan RT pipeline and features some optimizations such as instancing and a presampling pass in seek of efficiency. This is a personal research project and as is, it is still very much work in progress and lacks polish and some important features (broader GLTF compatibility and denoising stick out the most).
+Rays is a real-time Monte Carlo path tracer intended for GLTF visualization. It is based on an energy-conserving BRDF that admits PBR materials. It uses the Vulkan RT pipeline and features some optimizations such as instancing and a presampling pass in seek of efficiency. This is a personal research project and as is, it is still very much work in progress and lacks polish and some important features (broader GLTF extensions support and denoising stick out the most).
 
-The project relies on the following libraries:
-- Vulkan (in its hpp form)
-- C++ standard library
-- GLM
-- SDL3
-- Dear ImGui
-- Vk-Bootstrap
-- FastGLTF
-- Vulkan Memory Allocator
-- Stb
-- NativeFileDialog Extended
+![screencast](assets/media/screencast.gif)
 
 ## System requirements
 Regarding Vulkan, the project makes extensive use of the Vulkan RT pipeline and relies on the following extensions:
@@ -32,7 +22,19 @@ If your device drivers do not support any of these extensions, the program won't
 The Vulkan driver in your system has to be at least 1.3-compliant in order to use the RT extensions and the `dynamicRendering`, `synchronization2` 1.3 standard features. It also takes advantage of the `descriptorIndexing`, `descriptorBindingPartiallyBound`, `runtimeDescriptorArray`, `scalarBlockLayout`, `bufferDeviceAddress`, `*UpdateAfterBind` and `*NonUniformIndexing` 1.2 features.
 
 ## Compilation and usage
-The project uses cmake as the build tool. It expects to find Vulkan, GLM and SDL3 installed in your system, and all the rest of the libraries are fetched from their repositories using the cmake's `FetchContent` mechanism. Many features from Vulkan 1.2 and 1.3 are used, so the Vulkan installation (or SDK) needs to be 1.3+ to compile and run the code. I am trying to keep the `main` branch as stable as possible and push potentially breaking changes into the `dev` branch.
+The project relies on the following libraries:
+- Vulkan (in its hpp form)
+- C++ standard library
+- GLM
+- SDL3
+- Dear ImGui
+- Vk-Bootstrap
+- FastGLTF
+- Vulkan Memory Allocator
+- Stb
+- NativeFileDialog Extended
+
+The build tool being used is CMake. It expects to find Vulkan, GLM and SDL3 installed in your system, and all the rest of the libraries are fetched from their repositories using the cmake's `FetchContent` mechanism. Many features from Vulkan 1.2 and 1.3 are used, so the Vulkan installation (or SDK) needs to be 1.3+ to compile and run the code. I am trying to keep the `main` branch as stable as possible and push potentially breaking changes into the `dev` branch.
 
 I tested the compilation in Linux using all the possible combinations between `(ninja, make)` and `(g++, clang++)`. Outside of Linux I have not tested anywhere, but it should work with minor changes in Windows. The build process is the typical with cmake:
 ```shell
