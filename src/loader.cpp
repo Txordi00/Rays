@@ -10,9 +10,11 @@
 
 GLTFLoader::GLTFLoader(const vk::Device &device,
                        const VmaAllocator &allocator,
-                       const uint32_t queueFamilyIndex)
+                       const uint32_t queueFamilyIndex,
+                       const bool mipMap)
     : device{device}
     , allocator{allocator}
+    , mipMap{mipMap}
 {
     // Create pool
     vk::CommandPoolCreateInfo commandPoolCreateInfo{};
@@ -96,12 +98,16 @@ GLTFLoader::GLTFLoader(const vk::Device &device,
 
     // Default samplers
     vk::SamplerCreateInfo samplerInfo{};
+    samplerInfo.setMaxLod(vk::LodClampNone);
+    samplerInfo.setMinLod(0.f);
     samplerInfo.setMagFilter(vk::Filter::eLinear);
     samplerInfo.setMinFilter(vk::Filter::eLinear);
+    samplerInfo.setMipmapMode(vk::SamplerMipmapMode::eLinear);
     samplerLinear = device.createSampler(samplerInfo);
 
     samplerInfo.setMagFilter(vk::Filter::eNearest);
     samplerInfo.setMinFilter(vk::Filter::eNearest);
+    samplerInfo.setMipmapMode(vk::SamplerMipmapMode::eNearest);
     samplerNearest = device.createSampler(samplerInfo);
 }
 
@@ -235,7 +241,8 @@ std::optional<ImageData> GLTFLoader::load_image(const fastgltf::Asset &asset,
                                         vk::Format::eR8G8B8A8Unorm,
                                         vk::ImageUsageFlagBits::eSampled,
                                         imSize,
-                                        imData);
+                                        imData,
+                                        mipMap);
             // std::println("Image created.");
 
             stbi_image_free(imData);

@@ -57,7 +57,6 @@ void copy_to_image(const vk::Device &device,
                    const void *data);
 
 void generate_mipmaps(const vk::Device &device,
-                      const VmaAllocator &allocator,
                       const vk::CommandBuffer &cmd,
                       const vk::Fence &fence,
                       const vk::Queue &queue,

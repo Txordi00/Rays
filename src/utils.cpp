@@ -193,11 +193,13 @@ ImageData create_image(const vk::Device &device,
                                      std::ceil(std::log2(std::max(extent.height, extent.width))))
                                : 1;
 
-    vk::ImageUsageFlags usageFlags = (data) ? flags | vk::ImageUsageFlagBits::eTransferDst : flags;
+    vk::ImageUsageFlags usageFlags{flags};
 
-    usageFlags = (mipMap) ? flags | vk::ImageUsageFlagBits::eTransferSrc
+    usageFlags = (data) ? usageFlags | vk::ImageUsageFlagBits::eTransferDst : usageFlags;
+
+    usageFlags = (mipMap) ? usageFlags | vk::ImageUsageFlagBits::eTransferSrc
                                 | vk::ImageUsageFlagBits::eTransferDst
-                          : flags;
+                          : usageFlags;
 
     const vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(format,
                                                                                usageFlags,
@@ -240,6 +242,9 @@ ImageData create_image(const vk::Device &device,
     // Map data if requested so
     if (data)
         utils::copy_to_image(device, allocator, cmd, fence, queue, image, extent, data);
+
+    if (mipMap)
+        utils::generate_mipmaps(device, cmd, fence, queue, image);
 
     return image;
 }
@@ -302,7 +307,6 @@ void copy_to_image(const vk::Device &device,
 }
 
 void generate_mipmaps(const vk::Device &device,
-                      const VmaAllocator &allocator,
                       const vk::CommandBuffer &cmd,
                       const vk::Fence &fence,
                       const vk::Queue &queue,
@@ -313,13 +317,20 @@ void generate_mipmaps(const vk::Device &device,
                                                      ? vk::ImageAspectFlagBits::eDepth
                                                      : vk::ImageAspectFlagBits::eColor;
 
-        std::vector<vk::ImageBlit2> regions{image.mipLevels - 1};
-
         int32_t mipH{static_cast<int32_t>(image.extent.height)},
             mipW{static_cast<int32_t>(image.extent.width)};
 
         for (uint32_t level = 1; level < image.mipLevels; level++) {
-            vk::ImageBlit2 blit{};
+            // Prevent read&write if write has not finished yet
+            vk::MemoryBarrier2 memBarrier{};
+            memBarrier.setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite);
+            memBarrier.setDstAccessMask(vk::AccessFlagBits2::eMemoryWrite
+                                        | vk::AccessFlagBits2::eMemoryRead);
+            memBarrier.setSrcStageMask(vk::PipelineStageFlagBits2::eBlit);
+            memBarrier.setDstStageMask(vk::PipelineStageFlagBits2::eBlit);
+            vk::DependencyInfo depInfo{};
+            depInfo.setMemoryBarriers(memBarrier);
+            cmd.pipelineBarrier2(depInfo);
 
             vk::ImageSubresourceLayers srcSubresource{}, dstSubresource{};
             srcSubresource.setAspectMask(aspectFlags);
@@ -341,25 +352,25 @@ void generate_mipmaps(const vk::Device &device,
             std::array<vk::Offset3D, 2> dstOffsets{vk::Offset3D{0, 0, 0},
                                                    vk::Offset3D{halfW, halfH, 1}};
 
+            vk::ImageBlit2 blit{};
             blit.setSrcSubresource(srcSubresource);
             blit.setDstSubresource(dstSubresource);
             blit.setSrcOffsets(srcOffsets);
             blit.setDstOffsets(dstOffsets);
 
-            regions[level - 1] = blit;
+            vk::BlitImageInfo2 blitInfo{};
+            blitInfo.setSrcImage(image.image);
+            blitInfo.setDstImage(image.image);
+            blitInfo.setSrcImageLayout(vk::ImageLayout::eGeneral);
+            blitInfo.setDstImageLayout(vk::ImageLayout::eGeneral);
+            blitInfo.setFilter(vk::Filter::eLinear);
+            blitInfo.setRegions(blit);
+
+            cmd.blitImage2(blitInfo);
 
             mipH = halfH, mipW = halfW;
         }
 
-        vk::BlitImageInfo2 blitInfo{};
-        blitInfo.setSrcImage(image.image);
-        blitInfo.setDstImage(image.image);
-        blitInfo.setSrcImageLayout(vk::ImageLayout::eGeneral);
-        blitInfo.setDstImageLayout(vk::ImageLayout::eGeneral);
-        blitInfo.setFilter(vk::Filter::eLinear);
-        blitInfo.setRegions(regions);
-
-        cmd.blitImage2(blitInfo);
     });
 }
 

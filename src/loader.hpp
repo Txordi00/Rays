@@ -135,9 +135,12 @@ class GLTFLoader
 public:
     GLTFLoader(const vk::Device &device,
                const VmaAllocator &allocator,
-               const uint32_t queueFamilyIndex);
+               const uint32_t queueFamilyIndex,
+               const bool mipMap = false);
 
     ~GLTFLoader() = default;
+
+    bool mipMap{false};
 
     void destroy();
 
