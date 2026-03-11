@@ -114,7 +114,7 @@ void Init::init_vulkan()
                        .require_api_version(API_VERSION[0], API_VERSION[1], API_VERSION[2])
                        .request_validation_layers(enableValidationLayers)
                        .enable_extensions({VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
-                                           VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME})
+                                           VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME})
                        .use_default_debug_messenger()
                        .build();
 
@@ -178,7 +178,7 @@ void Init::init_vulkan()
     auto resSelector = physDevSelector.set_minimum_version(API_VERSION[0], API_VERSION[1])
                            .set_required_features_13(features13)
                            .set_required_features_12(features12)
-                           .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
+                           .add_required_extension(VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
                            // .add_required_extension(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME)
                            .add_required_extension(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME)
                            .add_required_extension_features(unifiedImageLayoutsFeatures)
@@ -591,7 +591,7 @@ void Init::presample()
 
 void Init::load_meshes(const std::filesystem::path &gltfPath)
 {
-    gltfLoader = std::make_unique<GLTFLoader>(device, allocator, transferQueueFamilyIndex);
+    gltfLoader = std::make_unique<GLTFLoader>(device, allocator, graphicsQueueFamilyIndex, true);
     // scene = gltfLoader->load_gltf_asset("/home/jordi/Documents/lrt/assets/CornellBox-Original.gltf")
     //             .value();
     scene = gltfLoader->load_gltf_asset(gltfPath).value();

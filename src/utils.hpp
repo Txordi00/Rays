@@ -44,7 +44,8 @@ ImageData create_image(const vk::Device &device,
                        const vk::Format &format,
                        const vk::ImageUsageFlags &flags,
                        const vk::Extent3D &extent,
-                       const void *data = nullptr);
+                       const void *data = nullptr,
+                       const bool mipMap = false);
 
 void copy_to_image(const vk::Device &device,
                    const VmaAllocator &allocator,
@@ -54,6 +55,12 @@ void copy_to_image(const vk::Device &device,
                    const ImageData &image,
                    const vk::Extent3D &extent,
                    const void *data);
+
+void generate_mipmaps(const vk::Device &device,
+                      const vk::CommandBuffer &cmd,
+                      const vk::Fence &fence,
+                      const vk::Queue &queue,
+                      const ImageData &image);
 
 void destroy_buffer(const VmaAllocator &allocator, const Buffer &buffer);
 
@@ -94,7 +101,8 @@ std::filesystem::path load_file_from_window(const std::vector<nfdu8filteritem_t>
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
-                                      const vk::Extent3D &extent);
+                                      const vk::Extent3D &extent,
+                                      const uint32_t mipLevels = 1);
 
 vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
                                                const vk::ImageAspectFlags &aspectMask);

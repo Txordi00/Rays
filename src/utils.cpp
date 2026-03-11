@@ -181,19 +181,30 @@ ImageData create_image(const vk::Device &device,
                        const vk::Format &format,
                        const vk::ImageUsageFlags &flags,
                        const vk::Extent3D &extent,
-                       const void *data)
+                       const void *data,
+                       const bool mipMap)
 {
     ImageData image;
 
     image.format = format;
     image.extent = extent;
 
-    const vk::ImageUsageFlags usageFlags = (data) ? flags | vk::ImageUsageFlagBits::eTransferDst
-                                                  : flags;
+    image.mipLevels = (mipMap) ? static_cast<uint32_t>(
+                                     std::ceil(std::log2(std::max(extent.height, extent.width))))
+                               : 1;
+
+    vk::ImageUsageFlags usageFlags{flags};
+
+    usageFlags = (data) ? usageFlags | vk::ImageUsageFlagBits::eTransferDst : usageFlags;
+
+    usageFlags = (mipMap) ? usageFlags | vk::ImageUsageFlagBits::eTransferSrc
+                                | vk::ImageUsageFlagBits::eTransferDst
+                          : usageFlags;
 
     const vk::ImageCreateInfo imageCreateInfo = utils::init::image_create_info(format,
                                                                                usageFlags,
-                                                                               extent);
+                                                                               extent,
+                                                                               image.mipLevels);
 
     VmaAllocationCreateInfo allocationCreateInfo{};
     allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
@@ -229,8 +240,11 @@ ImageData create_image(const vk::Device &device,
     });
 
     // Map data if requested so
-    if (data != nullptr)
+    if (data)
         utils::copy_to_image(device, allocator, cmd, fence, queue, image, extent, data);
+
+    if (mipMap)
+        utils::generate_mipmaps(device, cmd, fence, queue, image);
 
     return image;
 }
@@ -290,6 +304,74 @@ void copy_to_image(const vk::Device &device,
         cmd.copyBufferToImage2(copyInfo);
     });
     utils::destroy_buffer(allocator, tmpBuffer);
+}
+
+void generate_mipmaps(const vk::Device &device,
+                      const vk::CommandBuffer &cmd,
+                      const vk::Fence &fence,
+                      const vk::Queue &queue,
+                      const ImageData &image)
+{
+    utils::cmd_submit(device, queue, fence, cmd, [&](const vk::CommandBuffer &cmd) {
+        const vk::ImageAspectFlags aspectFlags = (image.format == vk::Format::eD32Sfloat)
+                                                     ? vk::ImageAspectFlagBits::eDepth
+                                                     : vk::ImageAspectFlagBits::eColor;
+
+        int32_t mipH{static_cast<int32_t>(image.extent.height)},
+            mipW{static_cast<int32_t>(image.extent.width)};
+
+        for (uint32_t level = 1; level < image.mipLevels; level++) {
+            // Prevent read&write if write has not finished yet
+            vk::MemoryBarrier2 memBarrier{};
+            memBarrier.setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite);
+            memBarrier.setDstAccessMask(vk::AccessFlagBits2::eMemoryWrite
+                                        | vk::AccessFlagBits2::eMemoryRead);
+            memBarrier.setSrcStageMask(vk::PipelineStageFlagBits2::eBlit);
+            memBarrier.setDstStageMask(vk::PipelineStageFlagBits2::eBlit);
+            vk::DependencyInfo depInfo{};
+            depInfo.setMemoryBarriers(memBarrier);
+            cmd.pipelineBarrier2(depInfo);
+
+            vk::ImageSubresourceLayers srcSubresource{}, dstSubresource{};
+            srcSubresource.setAspectMask(aspectFlags);
+            srcSubresource.setMipLevel(level - 1);
+            srcSubresource.setBaseArrayLayer(0);
+            srcSubresource.setLayerCount(1);
+
+            dstSubresource.setAspectMask(aspectFlags);
+            dstSubresource.setAspectMask(aspectFlags);
+            dstSubresource.setMipLevel(level);
+            dstSubresource.setBaseArrayLayer(0);
+            dstSubresource.setLayerCount(1);
+
+            std::array<vk::Offset3D, 2> srcOffsets{vk::Offset3D{0, 0, 0},
+                                                   vk::Offset3D{mipW, mipH, 1}};
+
+            int32_t halfH = std::max(mipH / 2, 1), halfW = std::max(mipW / 2, 1);
+
+            std::array<vk::Offset3D, 2> dstOffsets{vk::Offset3D{0, 0, 0},
+                                                   vk::Offset3D{halfW, halfH, 1}};
+
+            vk::ImageBlit2 blit{};
+            blit.setSrcSubresource(srcSubresource);
+            blit.setDstSubresource(dstSubresource);
+            blit.setSrcOffsets(srcOffsets);
+            blit.setDstOffsets(dstOffsets);
+
+            vk::BlitImageInfo2 blitInfo{};
+            blitInfo.setSrcImage(image.image);
+            blitInfo.setDstImage(image.image);
+            blitInfo.setSrcImageLayout(vk::ImageLayout::eGeneral);
+            blitInfo.setDstImageLayout(vk::ImageLayout::eGeneral);
+            blitInfo.setFilter(vk::Filter::eLinear);
+            blitInfo.setRegions(blit);
+
+            cmd.blitImage2(blitInfo);
+
+            mipH = halfH, mipW = halfW;
+        }
+
+    });
 }
 
 void cmd_submit(const vk::Device &device,
@@ -408,14 +490,15 @@ void destroy_swapchain(const vk::Device &device,
 namespace init {
 vk::ImageCreateInfo image_create_info(const vk::Format &format,
                                       const vk::ImageUsageFlags &flags,
-                                      const vk::Extent3D &extent)
+                                      const vk::Extent3D &extent,
+                                      const uint32_t mipLevels)
 {
     vk::ImageCreateInfo imageCreateInfo{};
     imageCreateInfo.setImageType((extent.depth > 1) ? vk::ImageType::e3D : vk::ImageType::e2D);
     imageCreateInfo.setFormat(format);
     imageCreateInfo.setExtent(extent);
     imageCreateInfo.setUsage(flags);
-    imageCreateInfo.setMipLevels(1);
+    imageCreateInfo.setMipLevels(mipLevels);
     imageCreateInfo.setArrayLayers(1);
     imageCreateInfo.setSamples(vk::SampleCountFlagBits::e1);
     imageCreateInfo.setTiling(vk::ImageTiling::eOptimal);
@@ -434,7 +517,7 @@ vk::ImageViewCreateInfo image_view_create_info(const ImageData &image,
     vk::ImageSubresourceRange imSubResRan{};
     imSubResRan.setAspectMask(aspectMask);
     imSubResRan.setBaseMipLevel(0);
-    imSubResRan.setLevelCount(1);
+    imSubResRan.setLevelCount(image.mipLevels);
     imSubResRan.setBaseArrayLayer(0);
     imSubResRan.setLayerCount(1);
     imageViewCreateInfo.setSubresourceRange(imSubResRan);
