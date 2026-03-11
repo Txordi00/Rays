@@ -11,10 +11,10 @@ Regarding Vulkan, the project makes extensive use of the Vulkan RT pipeline and 
 - `VK_KHR_RAY_TRACING_PIPELINE_EXTENSION`: Required to use the rt pipeline.
 - `VK_KHR_ACCELERATION_STRUCTURE_EXTENSION`: Required to create and update the acceleration structures used to compute the ray intersections.
 - `VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION`: Required by the previous
-- `VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION`: For acquire-after-present. It simplifies the decoupling between frames in flight and the swapchain.
+- `VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION`: For acquire-after-present. It simplifies the decoupling between frames in flight and the swapchain.
 - `VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION`: Used in order to skip many annoying image layout transitions and keep most GPU images in the general layout. It can arguably be disabled and the program should still work in most GPUs, albeit for some validation warnings.
 ##### Instance extensions
-- `VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION`: Required by `VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION`.
+- `VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION`: Required by `VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION`.
 - `VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION`: Required by the previous.
 
 If your device drivers do not support any of these extensions, the program won't launch. You can check the supported extensions of your device with the `vulkaninfo` command. E.g.: `vulkaninfo | grep -i VK_KHR_RAY_TRACING_PIPELINE` will check whether you can use the Vulkan rt pipeline extension in your GPU and driver.
@@ -84,7 +84,7 @@ The camera uses the WASD keys for forward, backward, left, and right movement; t
 
 ## TODO
 - [ ] **Improve GLTF compatibility:** ~~Top on the list. Currently, many GLTF files fail to load, probably due to some wrong assumptions on my end about the way the data is delivered. I should explore why and fix it while keeping the current baked-in instancing within the GLTF loader and the acceleration structures builder.~~ A lot of progress has been made already in this regard, but probably there are still many scenes that could be fixed with simple tweaks in the GLTF loader and acceleration structure builder. If anybody finds a scene that fails to load, please report!
-- [ ] **Mipmapping:** To avoid some artifacts when sampling from a distance. I want as well to explore if it can improve performance because I am heavily memory-limited.
+- [x] **Mipmapping:** To avoid some artifacts when sampling textures from a distance. I implemented it already, but it seems that regular mipmapping does not fix some artifacting from within the RT pipeline. See [this article](https://research.nvidia.com/publication/2021-04_improved-shader-and-texture-level-detail-using-ray-cones).
 - [ ] **Denoising:** Critical for image quality. Maybe [Intel's oidn](https://github.com/RenderKit/oidn) is a good starting point.
 - [ ] **More efficient algorithm:** I am eager to implement a ReSTIR-like algorithm with intelligent caching and proper NEE in the future. I have to study these [notes](https://intro-to-restir.cwyman.org/presentations/2023ReSTIR_Course_Notes.pdf) before that.
 - [ ] **Area lights:** I think that this should come after the previous step, since I cannot imagine the current Monte-Carlo implementation working in real-time with emissive surfaces.
